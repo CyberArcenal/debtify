@@ -25,6 +25,16 @@ export interface Debt {
   };
 }
 
+export interface BorrowerFilters {
+  search?: string;
+  includeDeleted?: boolean;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+  limit?: number;
+  page?: number;
+}
+
+
 export interface DebtStatistics {
   totalDebts: number;
   totalActive: number;

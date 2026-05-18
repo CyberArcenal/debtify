@@ -7,6 +7,18 @@ import { useEffect, useState } from "react";
 import { LicenseModal } from "../components/Shared/LicenseModal";
 import { Help } from "../pages/help";
 import DebtDashboard from "../pages/dashboard/components/DebtDashboard";
+import DebtorDirectory from "../pages/debtors";
+import CreditCheckPage from "../pages/debtors/credit-check";
+import DebtorGroupsPage from "../pages/debtors/group";
+import ActiveLoansPage from "../pages/loans/active";
+import OverdueLoansPage from "../pages/loans/overdue";
+import ClosedLoansPage from "../pages/loans/closed";
+import LoanApplicationsPage from "../pages/loans/applications";
+import PaymentSchedulePage from "../pages/payments/schedule";
+import TransactionsPage from "../pages/payments/transactions";
+import PaymentMethodsPage from "../pages/payments/methods";
+import AgingAnalysisPage from "../pages/reports/aging";
+import CollectionReportPage from "../pages/reports/collection";
 // import DebtDashboard from "../pages/dashboard";
 
 function App() {
@@ -59,6 +71,18 @@ function App() {
         <Route path="system/audit" element={<AuditTrailPage />} />
         <Route path="notification-logs" element={<NotificationLogPage />} />
         <Route path="system/settings" element={<SettingsPage />} />
+        <Route path="debtors/list" element={<DebtorDirectory />} />
+        <Route path="debtors/credit-check" element={<CreditCheckPage />} />
+        <Route path="debtors/group" element={<DebtorGroupsPage />} />
+        <Route path="loans/active" element={<ActiveLoansPage />} />
+        <Route path="loans/overdue" element={<OverdueLoansPage />} />
+        <Route path="loans/closed" element={<ClosedLoansPage />} />
+        <Route path="loans/applications" element={<LoanApplicationsPage />} />
+        <Route path="payments/schedule" element={<PaymentSchedulePage />} />
+        <Route path="payments/transactions" element={<TransactionsPage />} />
+        <Route path="payments/methods" element={<PaymentMethodsPage />} />
+        <Route path="reports/aging" element={<AgingAnalysisPage />} />
+        <Route path="reports/collection" element={<CollectionReportPage />} />
 
         {/* 404 Page */}
         <Route path="*" element={<div>Not found page</div>} />

@@ -33,6 +33,15 @@ export function formatDate(
   }
 }
 
+// src/renderer/utils/formatters.ts
+export const daysUntil = (dateString: string): number => {
+  const due = new Date(dateString);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diffTime = due.getTime() - today.getTime();
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+};
+
 function tokenFormat(d: Date, fmt: string): string {
   const rep: Record<string, string> = {
     yyyy: String(d.getFullYear()),
