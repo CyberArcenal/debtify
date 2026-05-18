@@ -8,6 +8,7 @@ const PenaltyTransaction = new EntitySchema({
     amount: { type: "decimal", precision: 12, scale: 2 },
     penaltyDate: { type: Date },
     reason: { type: String, nullable: true },
+    deletedAt: { type: Date, nullable: true },
     createdAt: { type: Date, createDate: true },
   },
   relations: {

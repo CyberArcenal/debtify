@@ -16,14 +16,6 @@ export interface Borrower {
   deletedAt: string | null;
 }
 
-export interface PaginatedBorrowers {
-  items: Borrower[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}
-
 export interface BorrowerStatistics {
   total: number;
   totalWithEmail: number;
@@ -78,10 +70,11 @@ export interface BorrowerResponse {
   data: Borrower;
 }
 
+// ✅ Changed: data is now an array of Borrowers (not paginated wrapper)
 export interface BorrowersResponse {
   status: boolean;
   message: string;
-  data: PaginatedBorrowers;
+  data: Borrower[];
 }
 
 export interface BorrowerStatisticsResponse {
@@ -163,6 +156,7 @@ class BorrowersAPI {
   /**
    * Get all borrowers with optional filters and pagination
    * @param params - Filtering, pagination, sorting options
+   * @returns BorrowersResponse with data as an array of Borrowers (no pagination metadata)
    */
   async getAll(params?: {
     page?: number;
@@ -186,7 +180,7 @@ class BorrowersAPI {
       });
 
       if (response.status) {
-        return response;
+        return response; // response.data is Borrower[]
       }
       throw new Error(response.message || "Failed to fetch borrowers");
     } catch (error: any) {
@@ -222,6 +216,7 @@ class BorrowersAPI {
    * @param searchTerm - Search keyword
    * @param page - Page number
    * @param limit - Items per page
+   * @returns BorrowersResponse with data as an array of Borrowers
    */
   async search(searchTerm: string, page?: number, limit?: number): Promise<BorrowersResponse> {
     try {
@@ -489,7 +484,7 @@ class BorrowersAPI {
   async existsByEmail(email: string): Promise<boolean> {
     try {
       const response = await this.getAll({ email, limit: 1 });
-      return response.data.total > 0;
+      return response.data.length > 0;   // ✅ changed: .data is array
     } catch (error) {
       console.error("Error checking borrower by email:", error);
       return false;
@@ -503,7 +498,7 @@ class BorrowersAPI {
   async existsByContact(contact: string): Promise<boolean> {
     try {
       const response = await this.getAll({ contact, limit: 1 });
-      return response.data.total > 0;
+      return response.data.length > 0;   // ✅ changed: .data is array
     } catch (error) {
       console.error("Error checking borrower by contact:", error);
       return false;
@@ -517,7 +512,7 @@ class BorrowersAPI {
   async getByEmail(email: string): Promise<Borrower | null> {
     try {
       const response = await this.getAll({ email, limit: 1 });
-      return response.data.items[0] || null;
+      return response.data[0] || null;   // ✅ changed: .data[0] instead of .items[0]
     } catch (error) {
       console.error("Error fetching borrower by email:", error);
       return null;

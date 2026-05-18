@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DebtManagerX - Loading</title>
+    <title>Debtify - Loading</title>
     <style>
       * {
         margin: 0;
@@ -310,7 +310,7 @@
     <div class="bg-pattern"></div>
 
     <div class="main-container">
-      <div class="app-name">DebtManagerX</div>
+      <div class="app-name">Debtify</div>
       <div class="app-subtext">Debt & Collection System</div>
 
       <!-- Loading section -->
@@ -319,7 +319,7 @@
           <div class="loading-progress"></div>
         </div>
         <div class="loading-text" id="loading-text">
-          Initializing DebtManagerX...
+          Initializing Debtify...
         </div>
         <div class="migration-status" id="migration-status">
           <span id="migration-text">Applying loan schema updates...</span>
@@ -361,13 +361,13 @@
     </div>
 
     <div class="version-info">
-      DebtManagerX v1.0.11 • Secure Debt Management
+      Debtify v1.0.11 • Secure Debt Management
     </div>
 
     <script>
       // Loading phases for debt management
       const loadingPhases = [
-        "Initializing DebtManagerX...",
+        "Initializing Debtify...",
         "Loading loan modules...",
         "Connecting to borrower database...",
         "Starting collection engine...",
@@ -459,13 +459,13 @@
         updateStatus(2, true);
       }, 4500);
       setTimeout(() => {
-        loadingText.textContent = "Loading DebtManagerX interface...";
+        loadingText.textContent = "Loading Debtify interface...";
         updateStatus(3, true);
       }, 5800);
 
       // Final ready state
       setTimeout(() => {
-        loadingText.textContent = "DebtManagerX Ready ✓";
+        loadingText.textContent = "Debtify Ready ✓";
         loadingText.style.color = "#34d399";
         loadingText.style.fontWeight = "600";
         document.querySelector(".loading-progress").style.background =

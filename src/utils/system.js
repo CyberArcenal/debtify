@@ -191,7 +191,7 @@ async function companyName() {
     SettingType.GENERAL,
 
     // @ts-ignore
-    "Tillify",
+    "Debtify",
   );
 }
 

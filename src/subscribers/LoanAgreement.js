@@ -1,6 +1,6 @@
 // src/subscribers/LoanAgreementSubscriber.js
-
-const { LoanAgreement } = require("../entities/LoanAgreement");
+//@ts-check
+const LoanAgreement = require("../entities/LoanAgreement");
 const { logger } = require("../utils/logger");
 
 console.log("[Subscriber] Loading LoanAgreementSubscriber");

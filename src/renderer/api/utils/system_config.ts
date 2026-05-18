@@ -25,7 +25,7 @@ export interface FrontendSystemInfo {
   system_version: string;
 }
 
-// 📊 Tillify Management Setting Types
+// 📊 Debtify Management Setting Types
 export const SettingType = {
   EMAIL: "email",
   ATTENDANCE: "attendance",
@@ -1012,7 +1012,7 @@ class SystemConfigAPI {
       const defaultSettings = [
         {
           key: "company_name",
-          value: "Tillify",
+          value: "Debtify",
           setting_type: SettingType.GENERAL,
           description: "Company name",
         },

@@ -10,10 +10,10 @@ export function Help() {
   const [licensedTo, setLicensedTo] = useState<string | null>(null);
 
   useEffect(() => {
-    const stored = localStorage.getItem('tillify_license_type');
+    const stored = localStorage.getItem('Debtify_license_type');
     if (stored === 'commercial') {
       setLicenseType('commercial');
-      setLicensedTo(localStorage.getItem('tillify_licensed_to'));
+      setLicensedTo(localStorage.getItem('Debtify_licensed_to'));
     }
   }, []);
 
@@ -64,7 +64,7 @@ export function Help() {
                 📖 Open Source License (Apache 2.0)
               </p>
               <p className="text-slate-300 text-sm mt-2">
-                You are free to use, modify, and distribute Tillify under the terms of the Apache 2.0 license.
+                You are free to use, modify, and distribute Debtify under the terms of the Apache 2.0 license.
               </p>
             </div>
           )}
@@ -77,11 +77,11 @@ export function Help() {
             <h2 className="text-xl font-bold text-white">Licensing</h2>
           </div>
           <p className="text-slate-300 mb-4">
-            Tillify is dual‑licensed. You are currently using it under the{' '}
+            Debtify is dual‑licensed. You are currently using it under the{' '}
             {licenseType === 'commercial' ? 'Commercial License' : 'Apache 2.0 open source license'}.
           </p>
           <button
-            onClick={() => openExternal('https://github.com/CyberArcenal/Tillify/blob/main/LICENSE')}
+            onClick={() => openExternal('https://github.com/CyberArcenal/Debtify/blob/main/LICENSE')}
             className="text-blue-400 hover:text-blue-300 underline flex items-center gap-1"
           >
             Read full Apache 2.0 License →
@@ -94,7 +94,7 @@ export function Help() {
                 Need a Commercial License?
               </p>
               <p className="text-slate-300 text-sm mt-1">
-                If you use Tillify for proprietary business operations or require support,
+                If you use Debtify for proprietary business operations or require support,
                 please contact us to purchase a commercial license.
               </p>
               <button
@@ -131,12 +131,12 @@ export function Help() {
             <h2 className="text-xl font-bold text-white">Attribution</h2>
           </div>
           <p className="text-slate-300">
-            Powered by <strong className="text-white">Tillify POS</strong> –{' '}
+            Powered by <strong className="text-white">Debtify POS</strong> –{' '}
             <button
-              onClick={() => openExternal('https://github.com/CyberArcenal/Tillify')}
+              onClick={() => openExternal('https://github.com/CyberArcenal/Debtify')}
               className="text-blue-400 hover:text-blue-300 underline"
             >
-              https://github.com/CyberArcenal/Tillify
+              https://github.com/CyberArcenal/Debtify
             </button>
           </p>
           <p className="text-slate-500 text-sm mt-2">Original author: CyberArcenal</p>

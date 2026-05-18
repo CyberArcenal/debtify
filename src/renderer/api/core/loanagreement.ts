@@ -25,14 +25,6 @@ export interface LoanAgreement {
   };
 }
 
-export interface PaginatedLoanAgreements {
-  items: LoanAgreement[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}
-
 export interface LoanAgreementStatistics {
   totalAgreements: number;
   withFiles: number;
@@ -92,10 +84,11 @@ export interface LoanAgreementResponse {
   data: LoanAgreement;
 }
 
+// ✅ Changed: data is now an array of LoanAgreements (no pagination metadata)
 export interface LoanAgreementsResponse {
   status: boolean;
   message: string;
-  data: PaginatedLoanAgreements;
+  data: LoanAgreement[];
 }
 
 export interface LoanAgreementStatisticsResponse {
@@ -166,6 +159,7 @@ class LoanAgreementsAPI {
 
   /**
    * Get all loan agreements with optional filters and pagination
+   * @returns LoanAgreementsResponse where data is an array of LoanAgreements (no pagination metadata)
    */
   async getAll(params?: {
     page?: number;
@@ -208,6 +202,7 @@ class LoanAgreementsAPI {
 
   /**
    * Search loan agreements by lender name, terms, borrower, etc.
+   * @returns LoanAgreementsResponse where data is an array of LoanAgreements
    */
   async search(
     searchTerm: string,
@@ -382,7 +377,7 @@ class LoanAgreementsAPI {
    */
   async getByDebtId(debtId: number, includeDeleted = false): Promise<LoanAgreement[]> {
     const response = await this.getAll({ debtId, includeDeleted, limit: 1000 });
-    return response.data.items;
+    return response.data;   // ✅ changed: .data is array directly
   }
 
   /**
@@ -391,7 +386,7 @@ class LoanAgreementsAPI {
   async hasAgreements(debtId: number): Promise<boolean> {
     try {
       const response = await this.getAll({ debtId, limit: 1 });
-      return response.data.total > 0;
+      return response.data.length > 0;   // ✅ changed: .data is array
     } catch (error) {
       console.error("Error checking agreements:", error);
       return false;

@@ -15,7 +15,7 @@ import { dialogs } from "../../../utils/dialogs";
 import { useSettings as useSettings1 } from "../../../contexts/SettingsContext";
 // ========== Default values for every category ==========
 const DEFAULT_GENERAL: GeneralSettings = {
-  company_name: "Tillify",
+  company_name: "Debtify",
   store_location: "",
   default_timezone: "Asia/Manila",
   currency: "USD",

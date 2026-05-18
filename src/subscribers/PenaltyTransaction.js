@@ -1,6 +1,6 @@
 // src/subscribers/PenaltyTransactionSubscriber.js
-
-const { PenaltyTransaction } = require("../entities/PenaltyTransaction");
+//@ts-check
+const PenaltyTransaction  = require("../entities/PenaltyTransaction");
 const { logger } = require("../utils/logger");
 
 console.log("[Subscriber] Loading PenaltyTransactionSubscriber");

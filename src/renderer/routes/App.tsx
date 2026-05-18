@@ -6,7 +6,8 @@ import SettingsPage from "../pages/Settings";
 import { useEffect, useState } from "react";
 import { LicenseModal } from "../components/Shared/LicenseModal";
 import { Help } from "../pages/help";
-import DebtDashboard from "../pages/dashboard";
+import DebtDashboard from "../pages/dashboard/components/DebtDashboard";
+// import DebtDashboard from "../pages/dashboard";
 
 function App() {
   const [licenseAccepted, setLicenseAccepted] = useState(false);
@@ -37,7 +38,7 @@ function App() {
   };
 
   // Show modal on first visit if license not accepted
-  if (!licenseAccepted && !localStorage.getItem("tillify_license_accepted")) {
+  if (!licenseAccepted && !localStorage.getItem("Debtify_license_accepted")) {
     return (
       <LicenseModal
         onAccept={handleAccept}

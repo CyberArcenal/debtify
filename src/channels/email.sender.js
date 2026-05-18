@@ -1,10 +1,11 @@
 // src/channels/email.sender.js
-
+//@ts-check
 const nodemailer = require("nodemailer");
 const PQueue = require("p-queue").default;
 const NotificationLog = require("../entities/NotificationLog");
 const { logger } = require("../utils/logger");
 const { AppDataSource } = require("../main/db/data-source");
+const notificationService = require("../services/Notification");
 
 
 class EmailSender {
@@ -39,7 +40,6 @@ class EmailSender {
    */
   // @ts-ignore
   async _sendWithRetry(to, subject, html, text, options) {
-    const notificationService = require("../services/NotificationService");
     let attempt = 0;
     let lastError;
 

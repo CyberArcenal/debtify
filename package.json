@@ -1,7 +1,7 @@
 {
-  "name": "debtmanagerx",
+  "name": "debtify",
   "private": true,
-  "version": "v1.0.11",
+  "version": "v0.0.0-beta.1",
   "main": "src/main/index.js",
   "author": {
     "name": "CyberArcenal",
@@ -9,11 +9,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/CyberArcenal/DebtManagerX.git"
+    "url": "https://github.com/CyberArcenal/debtify.git"
   },
   "build": {
-    "appId": "com.CyberArcenal.debtmanagerx.app",
-    "productName": "debtmanagerx",
+    "appId": "com.CyberArcenal.debtify.app",
+    "productName": "debtify",
     "directories": {
       "output": "release"
     },
@@ -38,7 +38,7 @@
     "publish": {
       "provider": "github",
       "owner": "CyberArcenal",
-      "repo": "DebtManagerX",
+      "repo": "Debtify",
       "releaseType": "release"
     }
   },

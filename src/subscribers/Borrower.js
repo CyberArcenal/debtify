@@ -1,6 +1,6 @@
 // src/subscribers/BorrowerSubscriber.js
-
-const { Borrower } = require("../entities/Borrower");
+//@ts-check
+const Borrower = require("../entities/Borrower");
 const { logger } = require("../utils/logger");
 
 console.log("[Subscriber] Loading BorrowerSubscriber");

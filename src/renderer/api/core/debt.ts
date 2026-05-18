@@ -25,14 +25,6 @@ export interface Debt {
   };
 }
 
-export interface PaginatedDebts {
-  items: Debt[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}
-
 export interface DebtStatistics {
   totalDebts: number;
   totalActive: number;
@@ -96,10 +88,11 @@ export interface DebtResponse {
   data: Debt;
 }
 
+// ✅ Changed: data is now an array of Debts (no pagination metadata)
 export interface DebtsResponse {
   status: boolean;
   message: string;
-  data: PaginatedDebts;
+  data: Debt[];
 }
 
 export interface DebtStatisticsResponse {
@@ -178,6 +171,7 @@ class DebtsAPI {
 
   /**
    * Get all debts with optional filters and pagination
+   * @returns DebtsResponse where data is an array of Debts (no pagination metadata)
    */
   async getAll(params?: {
     page?: number;
@@ -221,6 +215,7 @@ class DebtsAPI {
 
   /**
    * Search debts by name, borrower name, etc.
+   * @returns DebtsResponse where data is an array of Debts
    */
   async search(
     searchTerm: string,
@@ -408,7 +403,7 @@ class DebtsAPI {
   async existsForBorrower(borrowerId: number, debtName: string): Promise<boolean> {
     try {
       const response = await this.getAll({ borrowerId, search: debtName, limit: 1 });
-      return response.data.total > 0;
+      return response.data.length > 0;   // ✅ changed: .data is array
     } catch (error) {
       console.error("Error checking debt existence:", error);
       return false;
@@ -420,7 +415,7 @@ class DebtsAPI {
    */
   async getByBorrowerId(borrowerId: number, includeDeleted = false): Promise<Debt[]> {
     const response = await this.getAll({ borrowerId, includeDeleted, limit: 1000 });
-    return response.data.items;
+    return response.data;   // ✅ changed: .data is array directly
   }
 
   /**

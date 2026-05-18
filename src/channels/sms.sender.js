@@ -1,9 +1,9 @@
 // src/channels/sms.sender.js
-
+//@ts-check
 const twilio = require("twilio");
 const { getTwilioConfig } = require("../utils/system");
 const { logger } = require("../utils/logger");
-const notificationService = require("../services/NotificationService");
+const notificationService = require("../services/Notification");
 
 class SmsSender {
   constructor() {

@@ -2,14 +2,16 @@
 //@ts-check
 const { AuditLog } = require("../../../../../entities/AuditLog");
 const PaymentTransaction = require("../../../../../entities/PaymentTransaction");
+const { AppDataSource } = require("../../../../db/data-source");
 
 module.exports = async (params) => {
+  const repo = AppDataSource.getRepository(PaymentTransaction);
   const { days = 7 } = params;
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);
   startDate.setHours(0, 0, 0, 0);
 
-  const payments = await PaymentTransaction
+  const payments = await repo
     .createQueryBuilder("payment")
     .select("DATE(payment.paymentDate)", "date")
     .addSelect("SUM(payment.amount)", "total")

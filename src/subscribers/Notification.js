@@ -1,6 +1,6 @@
 // src/subscribers/NotificationSubscriber.js
-
-const { Notification } = require("../entities/Notification");
+//@ts-check
+const Notification = require("../entities/Notification");
 const { logger } = require("../utils/logger");
 
 console.log("[Subscriber] Loading NotificationSubscriber");

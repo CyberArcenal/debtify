@@ -36,20 +36,22 @@ import {
   ClipboardCheck,
   Building2,
   ComputerIcon,
-  HandCoins,        // For loans/debts
-  Landmark,         // For bank/payments
-  AlertTriangle,    // For overdue
-  Scale,            // For legal/collection
-  Target,           // For goals
-  PiggyBank,        // For savings
-  Clock,            // For payment schedule
-  CreditCard,       // For payment methods
-  FileSignature,    // For agreements
+  HandCoins,
+  Landmark,
+  AlertTriangle,
+  Scale,
+  Target,
+  PiggyBank,
+  Clock,
+  CreditCard,
+  FileSignature,
   ChartNoAxesCombined,
 } from "lucide-react";
 import { formatCurrency } from "../utils/formatters";
 import systemConfigAPI from "../api/utils/system_config";
 import { useSettings } from "../contexts/SettingsContext";
+import dashboardAPI from "../api/core/analytics";
+import debtsAPI from "../api/core/debt";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -79,41 +81,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen }) => {
 
   const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>({});
 
-  // Debt management stats
+  // Real debt management stats
   const [stats, setStats] = useState({
     totalOutstanding: 0,
     overdueAmount: 0,
     collectionRate: 0,
     activeDebtors: 0,
   });
-
-  // Fetch debt stats (mock - replace with actual API)
-  useEffect(() => {
-    let mounted = true;
-
-    const fetchStats = async () => {
-      try {
-        // Replace with your debt summary API
-        // const res = await debtAPI.getSummary();
-        // if (mounted && res.status) setStats(res.data);
-        
-        // Mock data for demonstration
-        if (mounted) {
-          setStats({
-            totalOutstanding: 125000.00,
-            overdueAmount: 32500.00,
-            collectionRate: 74.5,
-            activeDebtors: 42,
-          });
-        }
-      } catch (error) {
-        console.error("Failed to fetch debt stats:", error);
-      }
-    };
-
-    fetchStats();
-    return () => { mounted = false; };
-  }, []);
+  const [statsLoading, setStatsLoading] = useState(true);
 
   // Menu items for Debt Management
   const [menuItems, setMenuItems] = useState<MenuItem[]>([
@@ -183,6 +158,58 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen }) => {
       ],
     },
   ]);
+
+  // Fetch real stats
+  useEffect(() => {
+    let mounted = true;
+
+    const fetchStats = async () => {
+      try {
+        setStatsLoading(true);
+
+        // Get dashboard statistics (total outstanding, overdue amount, payments)
+        const dashboardStatsRes = await dashboardAPI.getDashboardStats();
+        if (!dashboardStatsRes.status) throw new Error(dashboardStatsRes.message);
+
+        const { totalRemainingBalance, totalOverdue, totalPaymentsCollected } = dashboardStatsRes.data;
+
+        // Calculate collection rate
+        const totalCollectedAndOutstanding = totalPaymentsCollected + totalRemainingBalance;
+        const collectionRate = totalCollectedAndOutstanding > 0
+          ? (totalPaymentsCollected / totalCollectedAndOutstanding) * 100
+          : 0;
+
+        // Get all debts to compute active debtors (distinct borrowers with non-paid debts)
+        const debtsRes = await debtsAPI.getAll({ limit: 1000, includeDeleted: false });
+        if (!debtsRes.status) throw new Error(debtsRes.message);
+
+        const activeDebtorIds = new Set<number>();
+        debtsRes.data.forEach((debt) => {
+          if (debt.status !== "paid" && debt.borrower?.id) {
+            activeDebtorIds.add(debt.borrower.id);
+          }
+        });
+        const activeDebtors = activeDebtorIds.size;
+
+        if (mounted) {
+          setStats({
+            totalOutstanding: totalRemainingBalance,
+            overdueAmount: totalOverdue,
+            collectionRate,
+            activeDebtors,
+          });
+        }
+      } catch (error) {
+        console.error("Failed to fetch debt stats:", error);
+        // Keep existing stats (default zeros) on error
+      } finally {
+        if (mounted) setStatsLoading(false);
+      }
+    };
+
+    fetchStats();
+    return () => { mounted = false; };
+  }, []);
 
   const filteredMenu = menuItems
     .map((item) => {
@@ -390,22 +417,42 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen }) => {
         <div className="grid grid-cols-2 gap-2 mb-3">
           <div className="bg-[var(--status-overdue-bg)] text-[var(--status-overdue)] text-xs py-2 px-2 rounded-lg text-center border border-[var(--border-light)]">
             <div className="font-bold text-sm">
-              {formatCurrency(stats.totalOutstanding.toFixed(2))}
+              {statsLoading ? (
+                <div className="animate-pulse h-4 w-16 bg-gray-500 rounded mx-auto"></div>
+              ) : (
+                formatCurrency(stats.totalOutstanding)
+              )}
             </div>
             <div className="text-[10px]">Total Outstanding</div>
           </div>
           <div className="bg-[var(--status-partial-bg)] text-[var(--status-partial)] text-xs py-2 px-2 rounded-lg text-center border border-[var(--border-light)]">
             <div className="font-bold text-sm">
-              {formatCurrency(stats.overdueAmount.toFixed(2))}
+              {statsLoading ? (
+                <div className="animate-pulse h-4 w-16 bg-gray-500 rounded mx-auto"></div>
+              ) : (
+                formatCurrency(stats.overdueAmount)
+              )}
             </div>
             <div className="text-[10px]">Overdue</div>
           </div>
           <div className="bg-[var(--status-paid-bg)] text-[var(--status-paid)] text-xs py-2 px-2 rounded-lg text-center border border-[var(--border-light)]">
-            <div className="font-bold text-sm">{stats.collectionRate}%</div>
+            <div className="font-bold text-sm">
+              {statsLoading ? (
+                <div className="animate-pulse h-4 w-12 bg-gray-500 rounded mx-auto"></div>
+              ) : (
+                `${stats.collectionRate.toFixed(1)}%`
+              )}
+            </div>
             <div className="text-[10px]">Collection Rate</div>
           </div>
           <div className="bg-[var(--accent-blue-light)] text-[var(--accent-blue)] text-xs py-2 px-2 rounded-lg text-center border border-[var(--border-light)]">
-            <div className="font-bold text-sm">{stats.activeDebtors}</div>
+            <div className="font-bold text-sm">
+              {statsLoading ? (
+                <div className="animate-pulse h-4 w-8 bg-gray-500 rounded mx-auto"></div>
+              ) : (
+                stats.activeDebtors
+              )}
+            </div>
             <div className="text-[10px]">Active Debtors</div>
           </div>
         </div>
@@ -423,7 +470,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen }) => {
       {/* Footer */}
       <div className="p-4 border-t border-[var(--border-color)] text-center flex-shrink-0 bg-gradient-to-r from-[var(--sidebar-bg)] to-[#1a1625]">
         <p className="text-xs text-[var(--text-tertiary)] mb-2">
-          {version} • © {new Date().getFullYear()} Tillify Debt
+          {version} • © {new Date().getFullYear()} {toTitleCase(name)}
         </p>
         <div className="flex justify-center gap-4">
           <button

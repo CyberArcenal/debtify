@@ -2,7 +2,7 @@
 // src/main/index.js
 //@ts-check
 /**
- * @file Main entry point for retail Tillify System
+ * @file Main entry point for retail Debtify System
  * @version 0.0.0
  * @author CyberArcenal
  * @description Electron main process with TypeORM, SQLite, and React integration
@@ -91,7 +91,7 @@ let migrationManager = null;
 /** @type {AppConfig} */
 const APP_CONFIG = {
   isDev: process.env.NODE_ENV === "development" || !app.isPackaged,
-  appName: "Tillify",
+  appName: "Debtify",
   version: app.getVersion(),
   userDataPath: app.getPath("userData"),
 };

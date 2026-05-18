@@ -60,9 +60,11 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
         sortOrder: "DESC",
       });
       if (response.status) {
-        const items = response.data.items;
+        // ✅ response.data is directly Notification[]
+        const items = response.data;
         setNotifications((prev) => (reset ? items : [...prev, ...items]));
-        setHasMore(response.data.page < response.data.totalPages);
+        // ✅ hasMore if we received exactly 'limit' items (implies more may exist)
+        setHasMore(items.length === limit);
       } else {
         throw new Error(response.message);
       }
@@ -75,7 +77,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
 
   const fetchUnreadCount = async () => {
     try {
-      // getUnreadCount returns a number directly
+      // ✅ getUnreadCount returns a number directly
       const count = await notificationAPI.getUnreadCount();
       setUnreadCount(count);
     } catch (err) {

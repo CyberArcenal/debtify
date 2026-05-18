@@ -3,11 +3,13 @@
 //@ts-check
 const { AuditLog } = require("../../../../../entities/AuditLog");
 const Debt = require("../../../../../entities/Debt");
+const { AppDataSource } = require("../../../../db/data-source");
 
 module.exports = async (params) => {
+  const repo = AppDataSource.getRepository(Debt);
   const { threshold = 5 } = params;
   // Placeholder: ipakita ang mga debt na due within 7 days
-  const dueSoon = await Debt
+  const dueSoon = await repo
     .createQueryBuilder("debt")
     .where("debt.dueDate BETWEEN :today AND :nextWeek", {
       today: new Date(),

@@ -3,9 +3,11 @@
 //@ts-check
 const { AuditLog } = require("../../../../../entities/AuditLog");
 const PaymentTransaction = require("../../../../../entities/PaymentTransaction");
+const { AppDataSource } = require("../../../../db/data-source");
 
 module.exports = async () => {
-  const methods = await PaymentTransaction
+  const repo = AppDataSource.getRepository(PaymentTransaction);
+  const methods = await repo
     .createQueryBuilder("payment")
     .select("payment.reference", "method")
     .addSelect("COUNT(payment.id)", "count")
@@ -17,7 +19,7 @@ module.exports = async () => {
 
   // Kung walang reference, pwedeng i‑group sa "Cash" bilang default
   if (methods.length === 0) {
-    const total = await PaymentTransaction
+    const total = await repo
       .createQueryBuilder("payment")
       .select("SUM(payment.amount)", "total")
       .where("payment.deletedAt IS NULL")

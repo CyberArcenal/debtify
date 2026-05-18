@@ -23,14 +23,6 @@ export interface Notification {
   };
 }
 
-export interface PaginatedNotifications {
-  items: Notification[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}
-
 export interface NotificationStatistics {
   total: number;
   read: number;
@@ -80,7 +72,7 @@ export interface ExportNotificationData {
 }
 
 // ----------------------------------------------------------------------
-// 📨 Response Interfaces
+// 📨 Response Interfaces (mirror IPC response format)
 // ----------------------------------------------------------------------
 
 export interface NotificationResponse {
@@ -89,10 +81,11 @@ export interface NotificationResponse {
   data: Notification;
 }
 
+// ✅ Changed: data is now an array of Notifications (no pagination metadata)
 export interface NotificationsResponse {
   status: boolean;
   message: string;
-  data: PaginatedNotifications;
+  data: Notification[];
 }
 
 export interface NotificationStatisticsResponse {
@@ -176,6 +169,10 @@ class NotificationsAPI {
     throw new Error(response.message || "Failed to fetch notification");
   }
 
+  /**
+   * Get all notifications with optional filters and pagination
+   * @returns NotificationsResponse where data is an array of Notifications (no pagination metadata)
+   */
   async getAll(params?: {
     page?: number;
     limit?: number;
@@ -409,9 +406,9 @@ class NotificationsAPI {
   }
 
   async markAllAsReadForDebt(debtId: number, user = "system"): Promise<MarkManyReadResponse> {
-    // First fetch all unread notification ids for the debt
+    // Fetch all unread notification ids for the debt
     const response = await this.getAll({ debtId, isRead: false, limit: 1000 });
-    const ids = response.data.items.map(n => n.id);
+    const ids = response.data.map(n => n.id);   // ✅ changed: response.data is array
     if (ids.length === 0) {
       return { status: true, message: "No unread notifications", data: { updatedCount: 0 } };
     }

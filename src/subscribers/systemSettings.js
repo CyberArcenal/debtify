@@ -1,5 +1,5 @@
 // src/subscribers/SystemSettingSubscriber.js
-
+//@ts-check
 const { SystemSetting } = require("../entities/systemSettings");
 const { logger } = require("../utils/logger");
 

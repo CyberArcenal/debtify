@@ -23,14 +23,6 @@ export interface PenaltyTransaction {
   };
 }
 
-export interface PaginatedPenalties {
-  items: PenaltyTransaction[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}
-
 export interface PenaltyStatistics {
   totalPenalties: number;
   totalPenaltyAmount: number;
@@ -85,7 +77,7 @@ export interface TotalPenaltyForDebt {
 }
 
 // ----------------------------------------------------------------------
-// 📨 Response Interfaces
+// 📨 Response Interfaces (mirror IPC response format)
 // ----------------------------------------------------------------------
 
 export interface PenaltyResponse {
@@ -94,10 +86,11 @@ export interface PenaltyResponse {
   data: PenaltyTransaction;
 }
 
+// ✅ Changed: data is now an array of PenaltyTransactions (no pagination metadata)
 export interface PenaltiesResponse {
   status: boolean;
   message: string;
-  data: PaginatedPenalties;
+  data: PenaltyTransaction[];
 }
 
 export interface PenaltyStatisticsResponse {
@@ -169,6 +162,10 @@ class PenaltiesAPI {
     throw new Error(response.message || "Failed to fetch penalty");
   }
 
+  /**
+   * Get all penalty transactions with optional filters and pagination
+   * @returns PenaltiesResponse where data is an array of PenaltyTransactions (no pagination metadata)
+   */
   async getAll(params?: {
     page?: number;
     limit?: number;
@@ -361,7 +358,7 @@ class PenaltiesAPI {
 
   async getByDebtId(debtId: number, includeDeleted = false): Promise<PenaltyTransaction[]> {
     const response = await this.getAll({ debtId, includeDeleted, limit: 1000 });
-    return response.data.items;
+    return response.data;   // ✅ changed: .data is array directly
   }
 
   async getTotalAmountForDebt(debtId: number, includeDeleted = false): Promise<number> {

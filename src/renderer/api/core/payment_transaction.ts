@@ -24,14 +24,6 @@ export interface PaymentTransaction {
   };
 }
 
-export interface PaginatedPayments {
-  items: PaymentTransaction[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}
-
 export interface PaymentStatistics {
   totalPayments: number;
   totalAmountCollected: number;
@@ -78,7 +70,7 @@ export interface ExportPaymentData {
 }
 
 // ----------------------------------------------------------------------
-// 📨 Response Interfaces
+// 📨 Response Interfaces (mirror IPC response format)
 // ----------------------------------------------------------------------
 
 export interface PaymentResponse {
@@ -87,10 +79,11 @@ export interface PaymentResponse {
   data: PaymentTransaction;
 }
 
+// ✅ Changed: data is now an array of PaymentTransactions (no pagination metadata)
 export interface PaymentsResponse {
   status: boolean;
   message: string;
-  data: PaginatedPayments;
+  data: PaymentTransaction[];
 }
 
 export interface PaymentStatisticsResponse {
@@ -156,6 +149,10 @@ class PaymentsAPI {
     throw new Error(response.message || "Failed to fetch payment");
   }
 
+  /**
+   * Get all payment transactions with optional filters and pagination
+   * @returns PaymentsResponse where data is an array of PaymentTransactions (no pagination metadata)
+   */
   async getAll(params?: {
     page?: number;
     limit?: number;
@@ -336,7 +333,7 @@ class PaymentsAPI {
 
   async getByDebtId(debtId: number, includeDeleted = false): Promise<PaymentTransaction[]> {
     const response = await this.getAll({ debtId, includeDeleted, limit: 1000 });
-    return response.data.items;
+    return response.data;   // ✅ changed: .data is array directly
   }
 
   async getTotalPaidForDebt(debtId: number): Promise<number> {

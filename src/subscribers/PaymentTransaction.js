@@ -1,6 +1,6 @@
 // src/subscribers/PaymentTransactionSubscriber.js
-
-const { PaymentTransaction } = require("../entities/PaymentTransaction");
+//@ts-check
+const  PaymentTransaction  = require("../entities/PaymentTransaction");
 const { logger } = require("../utils/logger");
 
 console.log("[Subscriber] Loading PaymentTransactionSubscriber");

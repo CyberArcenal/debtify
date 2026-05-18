@@ -39,6 +39,7 @@ export interface RecentActivity {
 }
 
 export interface DashboardStats {
+  totalRemainingBalance: number;
   totalBorrowers: number;
   totalDebts: number;
   totalPaidDebts: number;

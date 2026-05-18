@@ -13,6 +13,7 @@ const Debt = new EntitySchema({
     status: { type: String, default: "active", enum: ["active","paid","overdue","defaulted"] },
     interestRate: { type: "decimal", precision: 5, scale: 2, nullable: true },
     penaltyRate: { type: "decimal", precision: 5, scale: 2, nullable: true },
+    deletedAt: { type: Date, nullable: true },
     createdAt: { type: Date, createDate: true },
     updatedAt: { type: Date, updateDate: true },
   },

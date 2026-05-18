@@ -17,7 +17,7 @@ function loadSubscribers() {
       const cls = typeof mod === "function" ? mod : Object.values(mod)[0];
       if (cls) {
         subscribers.push(new cls());
-        logger.debug(`Subscriber loaded: ${cls.name} from ${file}`);
+        // logger.debug(`Subscriber loaded: ${cls.name} from ${file}`);
       } else {
         logger.warn(`No class found in subscriber file: ${file}`);
       }

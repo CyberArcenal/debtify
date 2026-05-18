@@ -30,6 +30,14 @@ module.exports = async () => {
     .where("penalty.deletedAt IS NULL")
     .getRawOne();
 
+  // ➕ Calculate total remaining balance (unpaid debts)
+  const totalRemaining = await debtRepo
+    .createQueryBuilder("debt")
+    .select("SUM(debt.remainingAmount)", "sum")
+    .where("debt.status != :paid", { paid: "paid" })
+    .andWhere("debt.deletedAt IS NULL")
+    .getRawOne();
+
   return {
     status: true,
     message: "Dashboard statistics retrieved",
@@ -40,6 +48,7 @@ module.exports = async () => {
       totalOverdue,
       totalPaymentsCollected: parseFloat(totalPayments.sum) || 0,
       totalPenaltiesCollected: parseFloat(totalPenalties.sum) || 0,
+      totalRemainingBalance: parseFloat(totalRemaining.sum) || 0, // ✅ added field
     },
   };
 };
