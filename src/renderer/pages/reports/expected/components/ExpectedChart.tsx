@@ -11,16 +11,16 @@ interface ExpectedChartProps {
 const ExpectedChart: React.FC<ExpectedChartProps> = ({ report }) => {
   const data = report.data.map(d => ({ period: d.date, amount: d.amount }));
   return (
-    <div className="bg-white rounded-lg border p-4 shadow-sm">
-      <h3 className="font-semibold mb-3">Expected Payments by {report.groupBy}</h3>
+    <div className="rounded-lg border p-4 shadow-sm" style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--border-color)" }}>
+      <h3 className="font-semibold mb-3" style={{ color: "var(--text-primary)" }}>Expected Payments by {report.groupBy}</h3>
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="period" angle={-45} textAnchor="end" height={60} />
-          <YAxis tickFormatter={(v) => formatCurrency(v)} width={80} />
-          <Tooltip formatter={(v: number) => formatCurrency(v)} />
-          <Legend />
-          <Bar dataKey="amount" fill="#0e9d7c" name="Expected Amount" />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+          <XAxis dataKey="period" angle={-45} textAnchor="end" height={60} tick={{ fill: "var(--text-secondary)" }} />
+          <YAxis tickFormatter={(v) => formatCurrency(v)} width={80} tick={{ fill: "var(--text-secondary)" }} />
+          <Tooltip formatter={(v: number) => formatCurrency(v)} contentStyle={{ backgroundColor: "var(--card-bg)", borderColor: "var(--border-color)", color: "var(--text-primary)" }} />
+          <Legend wrapperStyle={{ color: "var(--text-primary)" }} />
+          <Bar dataKey="amount" fill="var(--primary-color)" name="Expected Amount" />
         </BarChart>
       </ResponsiveContainer>
     </div>

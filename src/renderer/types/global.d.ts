@@ -28,6 +28,7 @@ declare global {
       loanAgreement: (payload: any) => Promise<any>;
       paymentTransaction: (payload: any) => Promise<any>;
       penaltyTransaction: (payload: any) => Promise<any>;
+      interestRateChangeLog: (payload: any) => Promise<any>;
 
       // ========== NEW DEBT MANAGEMENT MODULES ==========
       group: (payload: any) => Promise<any>;

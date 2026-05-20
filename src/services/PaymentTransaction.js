@@ -2,6 +2,10 @@
 
 const auditLogger = require("../utils/auditLogger");
 const { validatePaymentData } = require("../utils/paymentUtils");
+const {
+  enableEarlyPaymentDiscount,
+  earlyPaymentDiscountRate,
+} = require("../utils/system");
 
 class PaymentTransactionService {
   constructor() {
@@ -106,7 +110,8 @@ class PaymentTransactionService {
         throw new Error(validation.errors.join(", "));
       }
 
-      const { amount, paymentDate, reference, notes, debtId } = paymentData;
+      let { amount, paymentDate, reference, notes, debtId } = paymentData;
+      let originalAmount = amount;
 
       // Validate debt existence and remaining balance
       const debt = await debtRepo.findOne({ where: { id: debtId } });
@@ -118,6 +123,26 @@ class PaymentTransactionService {
       const currentRemaining = debt.totalAmount - debt.paidAmount;
       if (parseFloat(amount) > currentRemaining) {
         throw new Error(`Payment amount (${amount}) exceeds remaining balance (${currentRemaining})`);
+      }
+
+      // --- Early Payment Discount Logic ---
+      const discountEnabled = await enableEarlyPaymentDiscount();
+      if (discountEnabled) {
+        const dueDate = new Date(debt.dueDate);
+        const paymentDateObj = new Date(paymentDate);
+        const isEarly = paymentDateObj < dueDate;
+        const isFullPayment = Math.abs(parseFloat(amount) - currentRemaining) < 0.01;
+
+        if (isEarly && isFullPayment) {
+          const discountRate = await earlyPaymentDiscountRate();
+          if (discountRate > 0) {
+            const discountedAmount = currentRemaining * (1 - discountRate / 100);
+            amount = parseFloat(discountedAmount.toFixed(2));
+            const discountNote = `[Early payment discount ${discountRate}% applied – original amount ${originalAmount}]`;
+            notes = notes ? `${discountNote} ${notes}` : discountNote;
+            console.log(`Early payment discount applied: original ${originalAmount} → discounted ${amount}`);
+          }
+        }
       }
 
       const payment = paymentRepo.create({

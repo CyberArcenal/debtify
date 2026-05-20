@@ -16,20 +16,29 @@ interface ApplicationDetailModalProps {
 const ApplicationDetailModal: React.FC<ApplicationDetailModalProps> = ({ isOpen, application, onClose, onApprove, onReject }) => {
   if (!application) return null;
 
+  const getStatusColor = () => {
+    switch (application.status) {
+      case "pending": return "var(--status-pending-text)";
+      case "approved": return "var(--status-paid-text)";
+      case "rejected": return "var(--status-overdue-text)";
+      default: return "var(--text-primary)";
+    }
+  };
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Loan Application Details" size="lg">
       <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-4 p-3 bg-gray-50 rounded-md">
-          <div><span className="text-sm text-gray-500">Debtor:</span><div className="font-medium">{application.debtorName}</div></div>
-          <div><span className="text-sm text-gray-500">Status:</span><div className={`font-semibold ${application.status === "pending" ? "text-yellow-600" : application.status === "approved" ? "text-green-600" : "text-red-600"}`}>{application.status.toUpperCase()}</div></div>
-          <div><span className="text-sm text-gray-500">Requested Amount:</span><div>{formatCurrency(application.requestedAmount)}</div></div>
-          <div><span className="text-sm text-gray-500">Purpose:</span><div>{application.purpose}</div></div>
-          <div><span className="text-sm text-gray-500">Proposed Due Date:</span><div>{formatDate(application.proposedDueDate)}</div></div>
-          <div><span className="text-sm text-gray-500">Interest Rate:</span><div>{application.interestRate ? `${application.interestRate}%` : "—"}</div></div>
-          <div><span className="text-sm text-gray-500">Applied On:</span><div>{formatDate(application.createdAt)}</div></div>
-          {application.approvedAt && <div><span className="text-sm text-gray-500">Approved On:</span><div>{formatDate(application.approvedAt)}</div></div>}
-          {application.rejectedAt && <div><span className="text-sm text-gray-500">Rejected On:</span><div>{formatDate(application.rejectedAt)}</div></div>}
-          {application.rejectionReason && <div className="col-span-2"><span className="text-sm text-gray-500">Rejection Reason:</span><div>{application.rejectionReason}</div></div>}
+        <div className="grid grid-cols-2 gap-4 p-3 rounded-md" style={{ backgroundColor: "var(--card-secondary-bg)" }}>
+          <div><span className="text-sm" style={{ color: "var(--text-secondary)" }}>Debtor:</span><div className="font-medium" style={{ color: "var(--text-primary)" }}>{application.debtorName}</div></div>
+          <div><span className="text-sm" style={{ color: "var(--text-secondary)" }}>Status:</span><div className="font-semibold" style={{ color: getStatusColor() }}>{application.status.toUpperCase()}</div></div>
+          <div><span className="text-sm" style={{ color: "var(--text-secondary)" }}>Requested Amount:</span><div style={{ color: "var(--text-primary)" }}>{formatCurrency(application.requestedAmount)}</div></div>
+          <div><span className="text-sm" style={{ color: "var(--text-secondary)" }}>Purpose:</span><div style={{ color: "var(--text-primary)" }}>{application.purpose}</div></div>
+          <div><span className="text-sm" style={{ color: "var(--text-secondary)" }}>Proposed Due Date:</span><div style={{ color: "var(--text-primary)" }}>{formatDate(application.proposedDueDate)}</div></div>
+          <div><span className="text-sm" style={{ color: "var(--text-secondary)" }}>Interest Rate:</span><div style={{ color: "var(--text-primary)" }}>{application.interestRate ? `${application.interestRate}%` : "—"}</div></div>
+          <div><span className="text-sm" style={{ color: "var(--text-secondary)" }}>Applied On:</span><div style={{ color: "var(--text-primary)" }}>{formatDate(application.createdAt)}</div></div>
+          {application.approvedAt && <div><span className="text-sm" style={{ color: "var(--text-secondary)" }}>Approved On:</span><div style={{ color: "var(--text-primary)" }}>{formatDate(application.approvedAt)}</div></div>}
+          {application.rejectedAt && <div><span className="text-sm" style={{ color: "var(--text-secondary)" }}>Rejected On:</span><div style={{ color: "var(--text-primary)" }}>{formatDate(application.rejectedAt)}</div></div>}
+          {application.rejectionReason && <div className="col-span-2"><span className="text-sm" style={{ color: "var(--text-secondary)" }}>Rejection Reason:</span><div style={{ color: "var(--text-primary)" }}>{application.rejectionReason}</div></div>}
         </div>
         {application.status === "pending" && (
           <div className="flex justify-end gap-2 pt-2">

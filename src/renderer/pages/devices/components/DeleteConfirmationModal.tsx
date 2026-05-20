@@ -13,7 +13,15 @@ interface DeleteConfirmationModalProps {
 
 const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({ isOpen, printerName, onClose, onConfirm, loading }) => (
   <Modal isOpen={isOpen} onClose={onClose} title="Delete Printer" size="sm">
-    <div className="space-y-4"><p>Permanently delete printer <strong>{printerName}</strong>?</p><p className="text-sm text-red-500">This action cannot be undone.</p><div className="flex justify-end gap-2"><Button variant="secondary" onClick={onClose}>Cancel</Button><Button variant="danger" onClick={onConfirm} disabled={loading}>Delete</Button></div></div>
+    <div className="space-y-4">
+      <p style={{ color: "var(--text-primary)" }}>Permanently delete printer <strong>{printerName}</strong>?</p>
+      <p className="text-sm" style={{ color: "var(--danger-color)" }}>This action cannot be undone.</p>
+      <div className="flex justify-end gap-2">
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button variant="danger" onClick={onConfirm} disabled={loading}>Delete</Button>
+      </div>
+    </div>
   </Modal>
 );
+
 export default DeleteConfirmationModal;

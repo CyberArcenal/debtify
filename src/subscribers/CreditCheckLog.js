@@ -3,9 +3,23 @@
 const CreditCheckLog = require("../entities/CreditCheckLog");
 const { logger } = require("../utils/logger");
 
+const { AppDataSource } = require("../main/db/data-source");
+const { CreditCheckStateTransitionService } = require("../StateTransitionServices/CreditCheck");
+
 console.log("[Subscriber] Loading CreditCheckLogSubscriber");
 
 class CreditCheckLogSubscriber {
+  constructor() {
+    this.transitionService = null;
+  }
+
+  async getTransitionService() {
+    if (!this.transitionService) {
+      this.transitionService = new CreditCheckStateTransitionService(AppDataSource);
+    }
+    return this.transitionService;
+  }
+
   listenTo() {
     return CreditCheckLog;
   }
@@ -31,6 +45,10 @@ class CreditCheckLogSubscriber {
         score: entity.score,
         riskLevel: entity.riskLevel,
       });
+      const service = await this.getTransitionService();
+      if (service.onCheckPerformed) {
+        await service.onCheckPerformed(entity, "system");
+      }
     } catch (err) {
       logger.error("[CreditCheckLogSubscriber] afterInsert error", err);
     }
@@ -48,6 +66,9 @@ class CreditCheckLogSubscriber {
     try {
       const { entity } = event;
       logger.info("[CreditCheckLogSubscriber] afterUpdate", { id: entity.id });
+      // Usually logs are not updated, but if needed:
+      // const service = await this.getTransitionService();
+      // if (service.onLogUpdated) await service.onLogUpdated(entity, "system");
     } catch (err) {
       logger.error("[CreditCheckLogSubscriber] afterUpdate error", err);
     }
@@ -64,6 +85,10 @@ class CreditCheckLogSubscriber {
   async afterRemove(event) {
     try {
       logger.info("[CreditCheckLogSubscriber] afterRemove", { id: event.entityId });
+      const service = await this.getTransitionService();
+      if (service.onLogDeleted) {
+        await service.onLogDeleted({ id: event.entityId }, "system");
+      }
     } catch (err) {
       logger.error("[CreditCheckLogSubscriber] afterRemove error", err);
     }

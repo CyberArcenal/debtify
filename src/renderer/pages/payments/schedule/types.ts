@@ -4,7 +4,7 @@ export interface ScheduledPayment {
   debtName: string;
   borrowerId: number;
   borrowerName: string;
-  dueDate: string;
+  dueDate: string | Date;
   amountDue: number; // remaining balance as of today
   contact: string | null;
   email: string | null;

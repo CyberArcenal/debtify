@@ -7,7 +7,6 @@ const { logger } = require("../utils/logger");
 const { AppDataSource } = require("../main/db/data-source");
 const notificationService = require("../services/Notification");
 
-
 class EmailSender {
   constructor() {
     this.queue = new PQueue({ concurrency: 1 });
@@ -140,19 +139,17 @@ class EmailSender {
   // @ts-ignore
   async _sendInternal(to, subject, html, text, options = {}) {
     const {
-      enableEmailAlerts,
+      emailEnabled,
       smtpHost,
       smtpPort,
       smtpUsername,
       smtpPassword,
       companyName,
-      // @ts-ignore
-      // @ts-ignore
       smtpFromName,
       smtpFromEmail,
     } = require("../utils/system");
 
-    if (!(await enableEmailAlerts())) {
+    if (!(await emailEnabled())) {
       throw new Error("Email notifications are disabled");
     }
 

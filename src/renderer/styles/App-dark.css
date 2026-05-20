@@ -121,4 +121,15 @@
   --status-partial: #fbbf24;
   --status-paid-bg: rgba(16, 185, 129, 0.2);
   --status-paid: #34d399;
+
+  --status-overdue-text: #f87171;
+  --status-paid-text: #34d399;
+  --status-partial-text: #fbbf24;
+  --status-pending-bg: rgba(59, 130, 246, 0.2);
+  --status-pending-text: #60a5fa;
+
+
+   --debt-high: #f87171;
+  --debt-medium: #fbbf24;
+  --debt-low: #34d399;
 }

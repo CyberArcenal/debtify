@@ -506,6 +506,8 @@ async function getAuditSecuritySettings() {
   return { audit_log_enabled, log_retention_days, log_events, force_https, session_encryption_enabled, gdpr_compliance_enabled, require_mfa_for_admin };
 }
 
+
+
 // ============================================================
 // 📤 EXPORT ALL FUNCTIONS
 // ============================================================

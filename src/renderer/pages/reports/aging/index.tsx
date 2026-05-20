@@ -13,17 +13,20 @@ const AgingAnalysisPage: React.FC = () => {
   const { loading, error, asOfDate, setAsOfDate, agingSummary, refresh } = useAgingAnalysis();
   const [selectedBucket, setSelectedBucket] = useState<AgingBucket | null>(null);
 
-  if (loading) return <div className="flex justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>;
-  if (error) return <div className="text-center p-8 text-red-500">Error: {error}</div>;
-  if (!agingSummary) return <div className="text-center p-8">No active debts found.</div>;
+  if (loading) return <div className="flex justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: "var(--primary-color)" }}></div></div>;
+  if (error) return <div className="text-center p-8" style={{ color: "var(--danger-color)" }}>Error: {error}</div>;
+  if (!agingSummary) return <div className="text-center p-8" style={{ color: "var(--text-secondary)" }}>No active debts found.</div>;
 
   const { buckets, totalOutstanding } = agingSummary;
 
   return (
-    <div className="p-4">
-      <div className="rounded-md shadow-md border p-4 bg-white">
+    <div className="p-4" style={{ backgroundColor: "var(--background-color)" }}>
+      <div className="rounded-md shadow-md border p-4" style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--border-color)" }}>
         <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center gap-2"><TrendingUp className="w-6 h-6 text-blue-600" /><h1 className="text-xl font-bold">Aging Analysis</h1></div>
+          <div className="flex items-center gap-2">
+            <TrendingUp className="w-6 h-6" style={{ color: "var(--primary-color)" }} />
+            <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>Aging Analysis</h1>
+          </div>
           <ExportButton summary={agingSummary} />
         </div>
 
@@ -33,8 +36,8 @@ const AgingAnalysisPage: React.FC = () => {
           <AgingChart buckets={buckets} />
         </div>
 
-        <div className="mb-4 p-3 bg-gray-100 rounded-md">
-          <p className="text-sm">Total Outstanding: <span className="font-bold text-lg">{totalOutstanding.toLocaleString()} PHP</span></p>
+        <div className="mb-4 p-3 rounded-md" style={{ backgroundColor: "var(--card-secondary-bg)", border: `1px solid var(--border-color)` }}>
+          <p className="text-sm" style={{ color: "var(--text-primary)" }}>Total Outstanding: <span className="font-bold text-lg" style={{ color: "var(--debt-high)" }}>{totalOutstanding.toLocaleString()} PHP</span></p>
         </div>
 
         <AgingSummaryTable buckets={buckets} totalOutstanding={totalOutstanding} onBucketClick={setSelectedBucket} />

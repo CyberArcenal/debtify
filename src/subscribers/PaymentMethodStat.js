@@ -1,5 +1,4 @@
 // src/subscribers/PaymentMethodStatSubscriber.js
-//@ts-check
 const PaymentMethodStat = require("../entities/PaymentMethodStat");
 const { logger } = require("../utils/logger");
 

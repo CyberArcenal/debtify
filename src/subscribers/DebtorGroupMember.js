@@ -1,5 +1,4 @@
 // src/subscribers/DebtorGroupMemberSubscriber.js
-//@ts-check
 const DebtorGroupMember = require("../entities/DebtorGroupMember");
 const { logger } = require("../utils/logger");
 

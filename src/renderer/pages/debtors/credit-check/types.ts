@@ -7,7 +7,7 @@ export interface CreditScore {
 }
 
 export interface CreditCheckLog {
-  id: string;
+  id: number;
   debtorId: number;
   debtorName: string;
   score: CreditScore;

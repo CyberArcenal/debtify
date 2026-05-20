@@ -1,5 +1,5 @@
 // src/renderer/pages/reports/debtor-stmt/hooks/useDebtorStatement.ts
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import borrowersAPI from "../../../../api/core/borrower";
 import debtsAPI from "../../../../api/core/debt";
 import type { StatementData } from "../types";
@@ -7,36 +7,10 @@ import penaltiesAPI from "../../../../api/core/pernalty_transaction";
 import paymentsAPI from "../../../../api/core/payment_transaction";
 
 const useDebtorStatement = () => {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [searching, setSearching] = useState(false);
   const [selectedDebtor, setSelectedDebtor] = useState<any>(null);
   const [statement, setStatement] = useState<StatementData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const searchDebtors = useCallback(async () => {
-    if (!searchTerm.trim()) {
-      setSearchResults([]);
-      return;
-    }
-    setSearching(true);
-    try {
-      const res = await borrowersAPI.getAll({ search: searchTerm, includeDeleted: false, limit: 20 });
-      if (res.status) setSearchResults(res.data);
-      else setSearchResults([]);
-    } catch (err: any) {
-      console.error(err);
-      setSearchResults([]);
-    } finally {
-      setSearching(false);
-    }
-  }, [searchTerm]);
-
-  useEffect(() => {
-    const delay = setTimeout(searchDebtors, 300);
-    return () => clearTimeout(delay);
-  }, [searchTerm, searchDebtors]);
 
   const loadStatement = useCallback(async (debtor: any) => {
     setLoading(true);
@@ -83,23 +57,17 @@ const useDebtorStatement = () => {
     }
   }, []);
 
-  const selectDebtor = (debtor: any) => {
+  const selectDebtor = useCallback((debtor: any) => {
     setSelectedDebtor(debtor);
     loadStatement(debtor);
-  };
+  }, [loadStatement]);
 
-  const clearSelection = () => {
+  const clearSelection = useCallback(() => {
     setSelectedDebtor(null);
     setStatement(null);
-    setSearchTerm("");
-    setSearchResults([]);
-  };
+  }, []);
 
   return {
-    searchTerm,
-    setSearchTerm,
-    searchResults,
-    searching,
     selectedDebtor,
     statement,
     loading,

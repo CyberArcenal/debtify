@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld("backendAPI", {
   loanApplication: (payload) => ipcRenderer.invoke("loanApplication", payload),
   paymentMethod: (payload) => ipcRenderer.invoke("paymentMethod", payload),
   creditCheck: (payload) => ipcRenderer.invoke("creditCheck", payload),
+  interestRateChangeLog: (payload) => ipcRenderer.invoke("interestRateChangeLog", payload),
 
   // ========== PRINTER MODULE (generic + specific methods) ==========
   // Generic handler for printer configuration (CRUD, test, etc.)

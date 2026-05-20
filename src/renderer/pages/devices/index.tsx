@@ -50,19 +50,55 @@ const DevicesPage: React.FC = () => {
     }
   };
 
-  if (error) return <div className="p-4 text-center text-red-500">Error: {error}</div>;
+  if (error) return <div className="p-4 text-center" style={{ color: "var(--danger-color)" }}>Error: {error}</div>;
 
   return (
-    <div className="p-4">
-      <div className="rounded-md shadow-md border p-4 bg-white">
+    <div className="p-4" style={{ backgroundColor: "var(--background-color)" }}>
+      <div className="rounded-md shadow-md border p-4" style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--border-color)" }}>
         <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center gap-2"><Printer className="w-6 h-6 text-[var(--primary-color)]" /><h1 className="text-xl font-bold">Printer Manager</h1></div>
-          <div className="flex gap-2"><button onClick={refresh} disabled={loading} className="px-3 py-2 border rounded flex items-center gap-1"><RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> Refresh</button><Button onClick={() => setAddModalOpen(true)} variant="success" icon={Plus}>Add Printer</Button></div>
+          <div className="flex items-center gap-2">
+            <Printer className="w-6 h-6" style={{ color: "var(--primary-color)" }} />
+            <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>Printer Manager</h1>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={refresh}
+              disabled={loading}
+              className="px-3 py-2 border rounded flex items-center gap-1"
+              style={{ borderColor: "var(--border-color)", backgroundColor: "var(--card-secondary-bg)", color: "var(--text-primary)" }}
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> Refresh
+            </button>
+            <Button onClick={() => setAddModalOpen(true)} variant="success" icon={Plus}>Add Printer</Button>
+          </div>
         </div>
-        {loading && <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--primary-color)]"></div></div>}
-        {!loading && printers.length === 0 && <div className="text-center py-12 border rounded-md bg-gray-50"><Printer className="w-12 h-12 mx-auto text-gray-300 mb-2" /><p className="text-gray-500">No printers configured.</p></div>}
-        {!loading && printers.length > 0 && <PrinterTable printers={printers} onSetDefault={setDefault} onEdit={setEditPrinter} onDelete={setDeleteTarget} onTest={handleTest} testingId={testingId} />}
+
+        {loading && (
+          <div className="flex justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: "var(--primary-color)" }}></div>
+          </div>
+        )}
+
+        {!loading && printers.length === 0 && (
+          <div className="text-center py-12 border rounded-md" style={{ backgroundColor: "var(--card-secondary-bg)", borderColor: "var(--border-color)" }}>
+            <Printer className="w-12 h-12 mx-auto mb-3" style={{ color: "var(--text-tertiary)" }} />
+            <p className="text-lg font-medium" style={{ color: "var(--text-primary)" }}>No printers configured.</p>
+            <p className="text-sm" style={{ color: "var(--text-tertiary)" }}>Click "Add Printer" to create one.</p>
+          </div>
+        )}
+
+        {!loading && printers.length > 0 && (
+          <PrinterTable
+            printers={printers}
+            onSetDefault={setDefault}
+            onEdit={setEditPrinter}
+            onDelete={setDeleteTarget}
+            onTest={handleTest}
+            testingId={testingId}
+          />
+        )}
       </div>
+
       <PrinterFormModal isOpen={addModalOpen} printer={null} onClose={() => setAddModalOpen(false)} onSave={handleAdd} />
       <PrinterFormModal isOpen={!!editPrinter} printer={editPrinter} onClose={() => setEditPrinter(null)} onSave={handleUpdate} />
       <DeleteConfirmationModal isOpen={!!deleteTarget} printerName={deleteTarget?.name || ""} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete} loading={actionLoading} />

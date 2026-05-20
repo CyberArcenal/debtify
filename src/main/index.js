@@ -29,6 +29,7 @@ require("reflect-metadata");
 const MigrationManager = require("../utils/dbUtils/migrationManager");
 const { registerImageProtocol } = require("./protocols/imageProtocol.js");
 const printerService = require("../services/Printer.js");
+const AuditTrailCleanupScheduler = require("../scheduler/auditTrailCleanupScheduler.js");
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -859,6 +860,7 @@ function registerIpcHandlers() {
       "./ipc/core/group/index.ipc.js",
       "./ipc/core/loanApplication/index.ipc.js",
       "./ipc/core/paymentMethod/index.ipc.js",
+      "./ipc/core/interestRateChangeLog/index.ipc.js",
     ];
 
     ipcModules.forEach((modulePath) => {
@@ -941,6 +943,9 @@ async function startupSequence() {
     await createMainWindow();
 
     log(LogLevel.SUCCESS, `✅ ${APP_CONFIG.appName} started successfully!`);
+
+    const auditCleaner = new AuditTrailCleanupScheduler()
+    auditCleaner.start()
   } catch (error) {
     log(LogLevel.ERROR, "Startup sequence failed:", error);
 

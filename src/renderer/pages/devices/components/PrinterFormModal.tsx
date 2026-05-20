@@ -25,7 +25,12 @@ const PrinterFormModal: React.FC<PrinterFormModalProps> = ({ isOpen, printer, on
 
   useEffect(() => {
     if (printer) {
-      reset({ name: printer.name, description: printer.description || "", interface: printer.interface, connectionString: printer.connectionString });
+      reset({
+        name: printer.name,
+        description: printer.description || "",
+        interface: printer.interface,
+        connectionString: printer.connectionString,
+      });
     } else {
       reset({ name: "", description: "", interface: "usb", connectionString: "" });
     }
@@ -36,14 +41,41 @@ const PrinterFormModal: React.FC<PrinterFormModalProps> = ({ isOpen, printer, on
     onClose();
   };
 
+  const inputStyle = {
+    backgroundColor: "var(--input-bg)",
+    borderColor: "var(--border-color)",
+    color: "var(--text-primary)",
+  };
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={printer ? "Edit Printer" : "Add Printer"} size="md">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <div><label className="block text-sm font-medium mb-1">Printer Name *</label><input {...register("name", { required: "Name required" })} className="w-full px-3 py-2 border rounded" /></div>
-        <div><label className="block text-sm font-medium mb-1">Description</label><textarea {...register("description")} rows={2} className="w-full px-3 py-2 border rounded" /></div>
-        <div><label className="block text-sm font-medium mb-1">Interface *</label><select {...register("interface", { required: true })} className="w-full px-3 py-2 border rounded"><option value="usb">USB</option><option value="network">Network (Ethernet/WiFi)</option><option value="bluetooth">Bluetooth</option></select></div>
-        <div><label className="block text-sm font-medium mb-1">Connection String *</label><input {...register("connectionString", { required: "Connection string required" })} className="w-full px-3 py-2 border rounded" placeholder="e.g., USB001, 192.168.1.100:9100, 00:11:22:33:44:55" /></div>
-        <div className="flex justify-end gap-2"><Button variant="secondary" onClick={onClose}>Cancel</Button><Button type="submit" variant="success" disabled={isSubmitting}>{printer ? "Update" : "Add"}</Button></div>
+        <div>
+          <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Printer Name *</label>
+          <input {...register("name", { required: "Name required" })} className="w-full px-3 py-2 border rounded" style={inputStyle} />
+          {errors.name && <p className="text-xs mt-1" style={{ color: "var(--danger-color)" }}>{errors.name.message}</p>}
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Description</label>
+          <textarea {...register("description")} rows={2} className="w-full px-3 py-2 border rounded" style={inputStyle} />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Interface *</label>
+          <select {...register("interface", { required: true })} className="w-full px-3 py-2 border rounded" style={inputStyle}>
+            <option value="usb">USB</option>
+            <option value="network">Network (Ethernet/WiFi)</option>
+            <option value="bluetooth">Bluetooth</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Connection String *</label>
+          <input {...register("connectionString", { required: "Connection string required" })} className="w-full px-3 py-2 border rounded" style={inputStyle} placeholder="e.g., USB001, 192.168.1.100:9100, 00:11:22:33:44:55" />
+          {errors.connectionString && <p className="text-xs mt-1" style={{ color: "var(--danger-color)" }}>{errors.connectionString.message}</p>}
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button type="submit" variant="success" disabled={isSubmitting}>{printer ? "Update" : "Add"}</Button>
+        </div>
       </form>
     </Modal>
   );

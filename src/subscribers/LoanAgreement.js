@@ -6,8 +6,6 @@ const { logger } = require("../utils/logger");
 console.log("[Subscriber] Loading LoanAgreementSubscriber");
 
 class LoanAgreementSubscriber {
-  constructor() {}
-
   listenTo() {
     return LoanAgreement;
   }
@@ -38,9 +36,7 @@ class LoanAgreementSubscriber {
 
   async beforeUpdate(entity) {
     try {
-      logger.info("[LoanAgreementSubscriber] beforeUpdate", {
-        id: entity.id,
-      });
+      logger.info("[LoanAgreementSubscriber] beforeUpdate", { id: entity.id });
     } catch (err) {
       logger.error("[LoanAgreementSubscriber] beforeUpdate error", err);
     }
@@ -49,9 +45,7 @@ class LoanAgreementSubscriber {
   async afterUpdate(event) {
     try {
       const { entity } = event;
-      logger.info("[LoanAgreementSubscriber] afterUpdate", {
-        id: entity.id,
-      });
+      logger.info("[LoanAgreementSubscriber] afterUpdate", { id: entity.id });
     } catch (err) {
       logger.error("[LoanAgreementSubscriber] afterUpdate error", err);
     }
@@ -59,9 +53,7 @@ class LoanAgreementSubscriber {
 
   async beforeRemove(entity) {
     try {
-      logger.info("[LoanAgreementSubscriber] beforeRemove", {
-        id: entity.id,
-      });
+      logger.info("[LoanAgreementSubscriber] beforeRemove", { id: entity.id });
     } catch (err) {
       logger.error("[LoanAgreementSubscriber] beforeRemove error", err);
     }
@@ -69,9 +61,7 @@ class LoanAgreementSubscriber {
 
   async afterRemove(event) {
     try {
-      logger.info("[LoanAgreementSubscriber] afterRemove", {
-        id: event.entityId,
-      });
+      logger.info("[LoanAgreementSubscriber] afterRemove", { id: event.entityId });
     } catch (err) {
       logger.error("[LoanAgreementSubscriber] afterRemove error", err);
     }

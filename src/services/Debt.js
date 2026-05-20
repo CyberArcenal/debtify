@@ -1,7 +1,7 @@
 // services/DebtService.js
-
 const auditLogger = require("../utils/auditLogger");
 const { validateDebtData } = require("../utils/debtUtils");
+const { defaultInterestRate, defaultPenaltyRate } = require("../utils/system");
 
 class DebtService {
   constructor() {
@@ -83,6 +83,12 @@ class DebtService {
 
       // Calculate remaining amount
       const remainingAmount = totalAmount - paidAmount;
+      const finalInterestRate = interestRate !== null && interestRate !== undefined
+        ? parseFloat(interestRate)
+        : await defaultInterestRate();
+        let finalPenaltyRate = (penaltyRate !== null && penaltyRate !== undefined)
+        ? parseFloat(penaltyRate)
+        : await defaultPenaltyRate();
 
       const debt = debtRepo.create({
         name,
@@ -91,8 +97,8 @@ class DebtService {
         remainingAmount,
         dueDate: new Date(dueDate),
         status,
-        interestRate: interestRate ? parseFloat(interestRate) : null,
-        penaltyRate: penaltyRate ? parseFloat(penaltyRate) : null,
+        interestRate: finalInterestRate,
+        penaltyRate: finalPenaltyRate,
         borrower,
         createdAt: new Date(),
         updatedAt: new Date(),

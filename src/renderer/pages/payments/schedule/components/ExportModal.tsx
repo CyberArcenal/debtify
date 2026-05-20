@@ -45,11 +45,26 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, payments, onClose }) 
     onClose();
   };
 
+  const inputStyle = {
+    backgroundColor: "var(--input-bg)",
+    borderColor: "var(--border-color)",
+    color: "var(--text-primary)",
+  };
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Export Payment Schedule" size="sm">
       <div className="space-y-4">
-        <div><label className="block text-sm font-medium mb-1">Export Format</label><select value={format} onChange={(e) => setFormat(e.target.value as any)} className="w-full px-3 py-2 border rounded-md"><option value="csv">CSV</option><option value="json">JSON</option></select></div>
-        <div className="flex justify-end gap-2"><Button variant="secondary" onClick={onClose}>Cancel</Button><Button variant="primary" onClick={handleExport}>Export</Button></div>
+        <div>
+          <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Export Format</label>
+          <select value={format} onChange={(e) => setFormat(e.target.value as any)} className="w-full px-3 py-2 border rounded-md" style={inputStyle}>
+            <option value="csv">CSV</option>
+            <option value="json">JSON</option>
+          </select>
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" onClick={handleExport}>Export</Button>
+        </div>
       </div>
     </Modal>
   );

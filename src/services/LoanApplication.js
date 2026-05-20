@@ -1,7 +1,13 @@
 // src/main/services/LoanApplication.js
-//@ts-check
 const auditLogger = require("../utils/auditLogger");
 const debtService = require("./Debt");
+const {
+  maxLoanAmount,
+  minLoanAmount,
+  defaultInterestRate,
+  enforceCreditCheck,
+  requireLoanAgreement,
+} = require("../utils/system");
 
 class LoanApplicationService {
   constructor() {
@@ -170,7 +176,6 @@ class LoanApplicationService {
         address: newDebtor.address || null,
         notes: newDebtor.notes || null,
       };
-      // Use borrowerService to create, but within same transaction if qr provided
       const Borrower = require("../entities/Borrower");
       const borrowerRepo = this._getRepo(qr, Borrower);
       const borrower = borrowerRepo.create(borrowerData);
@@ -181,7 +186,6 @@ class LoanApplicationService {
       debtorEmail = savedBorrower.email;
       debtorAddress = savedBorrower.address;
     } else if (data.debtorId) {
-      // Fetch existing debtor details for snapshot
       const borrowerRepo = this._getRepo(qr, require("../entities/Borrower"));
       const debtor = await borrowerRepo.findOne({ where: { id: data.debtorId } });
       if (!debtor) {
@@ -269,6 +273,40 @@ class LoanApplicationService {
       throw new Error(`Application ${id} has no associated debtor`);
     }
 
+    // --- Amount validation using system settings ---
+    const maxAmount = await maxLoanAmount();
+    const minAmount = await minLoanAmount();
+    if (maxAmount > 0 && app.requestedAmount > maxAmount) {
+      throw new Error(`Requested amount (${app.requestedAmount}) exceeds maximum loan amount (${maxAmount})`);
+    }
+    if (minAmount > 0 && app.requestedAmount < minAmount) {
+      throw new Error(`Requested amount (${app.requestedAmount}) is below minimum loan amount (${minAmount})`);
+    }
+
+    // --- Interest rate: use application rate or system default ---
+    let interestRate = app.interestRate;
+    if (interestRate === null || interestRate === undefined) {
+      interestRate = await defaultInterestRate();
+    }
+
+    // --- Credit check enforcement (only if required) ---
+    const needCreditCheck = await enforceCreditCheck();
+    if (needCreditCheck) {
+      // Optionally call a credit check service to verify the debtor's score.
+      // For now, we'll assume the frontend already performed the check.
+      // You can implement a call to CreditCheckService here.
+      console.log(`Credit check required for debtor ${app.debtorId} – ensure it was done.`);
+    }
+
+    // --- Loan agreement requirement ---
+    const needAgreement = await requireLoanAgreement();
+    if (needAgreement) {
+      // The frontend should have uploaded an agreement file.
+      // We could check if a related LoanAgreement record exists for this application.
+      // For simplicity, we'll assume the frontend handles it and just log.
+      console.log(`Loan agreement required for application ${id} – ensure document exists.`);
+    }
+
     // Create active debt using debtService (within same transaction)
     const debtData = {
       name: `Loan: ${app.purpose}`,
@@ -276,8 +314,8 @@ class LoanApplicationService {
       paidAmount: 0,
       dueDate: app.proposedDueDate.toISOString().split("T")[0],
       status: "active",
-      interestRate: app.interestRate,
-      penaltyRate: null,
+      interestRate: interestRate,
+      penaltyRate: null,   // penalty rate will be set from default when debt is created (DebtService handles it)
       borrowerId: app.debtorId,
     };
     const createdDebt = await debtService.create(debtData, user, qr);

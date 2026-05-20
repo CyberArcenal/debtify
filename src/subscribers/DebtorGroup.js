@@ -3,9 +3,23 @@
 const DebtorGroup = require("../entities/DebtorGroup");
 const { logger } = require("../utils/logger");
 
+const { AppDataSource } = require("../main/db/data-source");
+const { DebtorGroupStateTransitionService } = require("../StateTransitionServices/DebtorGroup");
+
 console.log("[Subscriber] Loading DebtorGroupSubscriber");
 
 class DebtorGroupSubscriber {
+  constructor() {
+    this.transitionService = null;
+  }
+
+  async getTransitionService() {
+    if (!this.transitionService) {
+      this.transitionService = new DebtorGroupStateTransitionService(AppDataSource);
+    }
+    return this.transitionService;
+  }
+
   listenTo() {
     return DebtorGroup;
   }
@@ -27,6 +41,10 @@ class DebtorGroupSubscriber {
         id: entity.id,
         name: entity.name,
       });
+      const service = await this.getTransitionService();
+      if (service.onCreated) {
+        await service.onCreated(entity, "system");
+      }
     } catch (err) {
       logger.error("[DebtorGroupSubscriber] afterInsert error", err);
     }
@@ -35,6 +53,10 @@ class DebtorGroupSubscriber {
   async beforeUpdate(entity) {
     try {
       logger.info("[DebtorGroupSubscriber] beforeUpdate", { id: entity.id });
+      const service = await this.getTransitionService();
+      if (service.onBeforeUpdate) {
+        // We need the old state; fetch from DB or use event later. Simpler to call in afterUpdate.
+      }
     } catch (err) {
       logger.error("[DebtorGroupSubscriber] beforeUpdate error", err);
     }
@@ -42,8 +64,12 @@ class DebtorGroupSubscriber {
 
   async afterUpdate(event) {
     try {
-      const { entity } = event;
+      const { entity, databaseEntity } = event;
       logger.info("[DebtorGroupSubscriber] afterUpdate", { id: entity.id });
+      const service = await this.getTransitionService();
+      if (service.onAfterUpdate) {
+        await service.onAfterUpdate(databaseEntity, entity, "system");
+      }
     } catch (err) {
       logger.error("[DebtorGroupSubscriber] afterUpdate error", err);
     }
@@ -52,6 +78,10 @@ class DebtorGroupSubscriber {
   async beforeRemove(entity) {
     try {
       logger.info("[DebtorGroupSubscriber] beforeRemove", { id: entity.id });
+      const service = await this.getTransitionService();
+      if (service.onBeforeDelete) {
+        await service.onBeforeDelete(entity, "system");
+      }
     } catch (err) {
       logger.error("[DebtorGroupSubscriber] beforeRemove error", err);
     }
@@ -60,6 +90,10 @@ class DebtorGroupSubscriber {
   async afterRemove(event) {
     try {
       logger.info("[DebtorGroupSubscriber] afterRemove", { id: event.entityId });
+      const service = await this.getTransitionService();
+      if (service.onAfterDelete) {
+        await service.onAfterDelete({ id: event.entityId }, "system");
+      }
     } catch (err) {
       logger.error("[DebtorGroupSubscriber] afterRemove error", err);
     }

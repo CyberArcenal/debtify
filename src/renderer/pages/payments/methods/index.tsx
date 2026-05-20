@@ -45,20 +45,29 @@ const PaymentMethodsPage: React.FC = () => {
   };
 
   return (
-    <div className="p-4">
-      <div className="rounded-md shadow-md border p-4 bg-white">
+    <div className="p-4" style={{ backgroundColor: "var(--background-color)" }}>
+      <div className="rounded-md shadow-md border p-4" style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--border-color)" }}>
         <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center gap-2"><CreditCard className="w-6 h-6 text-[var(--primary-color)]" /><h1 className="text-xl font-bold">Payment Methods</h1></div>
+          <div className="flex items-center gap-2">
+            <CreditCard className="w-6 h-6" style={{ color: "var(--primary-color)" }} />
+            <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>Payment Methods</h1>
+          </div>
           <div className="flex gap-2">
-            <button onClick={refresh} disabled={loading} className="px-3 py-2 border rounded flex items-center gap-1"><RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> Refresh</button>
+            <button onClick={refresh} disabled={loading} className="px-3 py-2 rounded-md flex items-center gap-1 border" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--card-secondary-bg)", color: "var(--text-primary)" }}>
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> Refresh
+            </button>
             <Button onClick={() => setFormOpen(true)} variant="success" icon={Plus}>Add Method</Button>
           </div>
         </div>
 
-        {loading && <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--primary-color)]"></div></div>}
+        {loading && <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: "var(--primary-color)" }}></div></div>}
 
         {!loading && methods.length === 0 && (
-          <div className="text-center py-12 border rounded-md"><CreditCard className="w-12 h-12 mx-auto mb-3 text-gray-400" /><p className="text-lg font-medium">No payment methods</p><p className="text-sm text-gray-500">Click "Add Method" to create one.</p></div>
+          <div className="text-center py-12 border rounded-md" style={{ borderColor: "var(--border-color)" }}>
+            <CreditCard className="w-12 h-12 mx-auto mb-3" style={{ color: "var(--text-tertiary)" }} />
+            <p className="text-lg font-medium" style={{ color: "var(--text-primary)" }}>No payment methods</p>
+            <p className="text-sm" style={{ color: "var(--text-tertiary)" }}>Click "Add Method" to create one.</p>
+          </div>
         )}
 
         {!loading && methods.length > 0 && (
@@ -81,27 +90,9 @@ const PaymentMethodsPage: React.FC = () => {
         )}
       </div>
 
-      <MethodFormModal
-        isOpen={formOpen}
-        mode="create"
-        method={null}
-        onClose={() => setFormOpen(false)}
-        onSubmit={handleCreate}
-      />
-      <MethodFormModal
-        isOpen={!!editingMethod}
-        mode="edit"
-        method={editingMethod}
-        onClose={() => setEditingMethod(null)}
-        onSubmit={handleUpdate}
-      />
-      <DeleteConfirmationModal
-        isOpen={!!deletingId}
-        methodName={methods.find(m => m.id === deletingId)?.name || ""}
-        onClose={() => setDeletingId(null)}
-        onConfirm={handleDelete}
-        loading={deleteLoading}
-      />
+      <MethodFormModal isOpen={formOpen} mode="create" method={null} onClose={() => setFormOpen(false)} onSubmit={handleCreate} />
+      <MethodFormModal isOpen={!!editingMethod} mode="edit" method={editingMethod} onClose={() => setEditingMethod(null)} onSubmit={handleUpdate} />
+      <DeleteConfirmationModal isOpen={!!deletingId} methodName={methods.find(m => m.id === deletingId)?.name || ""} onClose={() => setDeletingId(null)} onConfirm={handleDelete} loading={deleteLoading} />
     </div>
   );
 };

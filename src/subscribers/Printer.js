@@ -1,10 +1,23 @@
 // src/subscribers/PrinterSubscriber.js
 const Printer = require("../entities/Printer");
 const { logger } = require("../utils/logger");
+const { AppDataSource } = require("../main/db/data-source");
+const { PrinterStateTransitionService } = require("../StateTransitionServices/Printer");
 
 console.log("[Subscriber] Loading PrinterSubscriber");
 
 class PrinterSubscriber {
+  constructor() {
+    this.transitionService = null;
+  }
+
+  async getTransitionService() {
+    if (!this.transitionService) {
+      this.transitionService = new PrinterStateTransitionService(AppDataSource);
+    }
+    return this.transitionService;
+  }
+
   listenTo() {
     return Printer;
   }
@@ -30,6 +43,10 @@ class PrinterSubscriber {
         interface: entity.interface,
         isDefault: entity.isDefault,
       });
+      const service = await this.getTransitionService();
+      if (service.onCreated) {
+        await service.onCreated(entity, "system");
+      }
     } catch (err) {
       logger.error("[PrinterSubscriber] afterInsert error", err);
     }
@@ -45,8 +62,12 @@ class PrinterSubscriber {
 
   async afterUpdate(event) {
     try {
-      const { entity } = event;
+      const { entity, databaseEntity } = event;
       logger.info("[PrinterSubscriber] afterUpdate", { id: entity.id });
+      const service = await this.getTransitionService();
+      if (service.onUpdate) {
+        await service.onUpdate(databaseEntity, entity, "system");
+      }
     } catch (err) {
       logger.error("[PrinterSubscriber] afterUpdate error", err);
     }
@@ -55,6 +76,10 @@ class PrinterSubscriber {
   async beforeRemove(entity) {
     try {
       logger.info("[PrinterSubscriber] beforeRemove", { id: entity.id });
+      const service = await this.getTransitionService();
+      if (service.onDelete) {
+        await service.onDelete(entity, "system");
+      }
     } catch (err) {
       logger.error("[PrinterSubscriber] beforeRemove error", err);
     }

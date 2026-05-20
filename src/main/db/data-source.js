@@ -25,7 +25,7 @@ const PaymentMethod = require("../../entities/PaymentMethod");
 const PaymentMethodStat = require("../../entities/PaymentMethodStat");
 const Printer = require("../../entities/Printer");
 const CreditCheckLog = require("../../entities/CreditCheckLog");
-const TaxChangeLog = require("../../entities/TaxChangeLog");
+const InterestRateChangeLog = require("../../entities/InterestRateChangeLog");
 
 const config = getDatabaseConfig();
 
@@ -38,7 +38,7 @@ const entities = [
   PenaltyTransaction,
   LicenseCache,
   SystemSetting,
-  TaxChangeLog,
+  InterestRateChangeLog,
   NotificationLog,
   Notification,
   DebtorGroup,
@@ -58,6 +58,7 @@ const dataSourceOptions = {
     : [config.migrations],
 };
 
+// @ts-ignore
 const AppDataSource = new DataSource(dataSourceOptions);
 
 module.exports = { AppDataSource };

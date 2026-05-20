@@ -1,12 +1,26 @@
 // src/subscribers/SystemSettingSubscriber.js
 const { SystemSetting } = require("../entities/systemSettings");
-const TaxChangeLog = require("../entities/TaxChangeLog");
 const { logger } = require("../utils/logger");
+const { AppDataSource } = require("../main/db/data-source");
+const {
+  SystemSettingStateTransitionService,
+} = require("../StateTransitionServices/systemSettings");
 
 console.log("[Subscriber] Loading SystemSettingSubscriber");
 
 class SystemSettingSubscriber {
-  constructor() {}
+  constructor() {
+    this.transitionService = null;
+  }
+
+  async getTransitionService() {
+    if (!this.transitionService) {
+      this.transitionService = new SystemSettingStateTransitionService(
+        AppDataSource,
+      );
+    }
+    return this.transitionService;
+  }
 
   listenTo() {
     return SystemSetting;
@@ -17,7 +31,7 @@ class SystemSettingSubscriber {
       logger.info("[SystemSettingSubscriber] beforeInsert", {
         id: entity.id,
         key: entity.key,
-        category: entity.category,
+        setting_type: entity.setting_type,
       });
     } catch (err) {
       logger.error("[SystemSettingSubscriber] beforeInsert error", err);
@@ -29,8 +43,12 @@ class SystemSettingSubscriber {
       logger.info("[SystemSettingSubscriber] afterInsert", {
         id: entity.id,
         key: entity.key,
-        category: entity.category,
+        setting_type: entity.setting_type,
       });
+      const service = await this.getTransitionService();
+      if (service.onApply) {
+        await service.onApply(entity, null, entity.value, "system");
+      }
     } catch (err) {
       logger.error("[SystemSettingSubscriber] afterInsert error", err);
     }
@@ -38,9 +56,7 @@ class SystemSettingSubscriber {
 
   async beforeUpdate(entity) {
     try {
-      logger.info("[SystemSettingSubscriber] beforeUpdate", {
-        id: entity.id,
-      });
+      logger.info("[SystemSettingSubscriber] beforeUpdate", { id: entity.id });
     } catch (err) {
       logger.error("[SystemSettingSubscriber] beforeUpdate error", err);
     }
@@ -50,32 +66,35 @@ class SystemSettingSubscriber {
     try {
       const { entity, databaseEntity } = event;
       logger.info("[SystemSettingSubscriber] afterUpdate", { id: entity.id });
+      const service = await this.getTransitionService();
+      if (service.onApply) {
+        await service.onApply(
+          entity,
+          databaseEntity.value,
+          entity.value,
+          "system",
+        );
+      }
 
-      // --- TAX CHANGE LOGGING ---
-      // Only log if the setting key is tax‑related and the value changed
-      const taxKeys = [
-        "tax_rate",
-        "tax_enabled",
-        "tax_type",
-        "vat_rate",
-        "gst_rate",
-      ];
+      // Inside afterUpdate of SystemSettingSubscriber
+
+      const interestRateKeys = ["default_interest_rate"];
       if (
-        taxKeys.includes(entity.key) &&
+        interestRateKeys.includes(entity.key) &&
         entity.value !== databaseEntity.value
       ) {
         const { AppDataSource } = require("../main/db/data-source");
-        const logRepo = AppDataSource.getRepository(TaxChangeLog);
+        const InterestRateChangeLog = require("../entities/InterestRateChangeLog");
+        const logRepo = AppDataSource.getRepository(InterestRateChangeLog);
         const log = logRepo.create({
           setting_key: entity.key,
-          old_value: databaseEntity.value,
-          new_value: entity.value,
-          changed_by: "system", // TODO: get current user from context (e.g., from global state)
+          old_value: parseFloat(databaseEntity.value),
+          new_value: parseFloat(entity.value),
+          changed_by: "system", // TODO: get current user
           reason: "Auto‑logged on setting update",
-          setting_id: entity.id,
         });
         await logRepo.save(log);
-        logger.info("[SystemSettingSubscriber] Tax change logged", {
+        logger.info("[SystemSettingSubscriber] Interest rate change logged", {
           key: entity.key,
           old: databaseEntity.value,
           new: entity.value,
@@ -88,9 +107,7 @@ class SystemSettingSubscriber {
 
   async beforeRemove(entity) {
     try {
-      logger.info("[SystemSettingSubscriber] beforeRemove", {
-        id: entity.id,
-      });
+      logger.info("[SystemSettingSubscriber] beforeRemove", { id: entity.id });
     } catch (err) {
       logger.error("[SystemSettingSubscriber] beforeRemove error", err);
     }

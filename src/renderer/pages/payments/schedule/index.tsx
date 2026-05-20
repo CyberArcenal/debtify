@@ -50,16 +50,16 @@ const PaymentSchedulePage: React.FC = () => {
     <div className="p-4" style={{ backgroundColor: "var(--background-color)" }}>
       <div className="rounded-md shadow-md border p-4" style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--border-color)" }}>
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
-          <div className="flex items-center gap-2"><Calendar className="w-6 h-6 text-[var(--primary-color)]" /><h1 className="text-xl font-bold">Payment Schedule</h1></div>
+          <div className="flex items-center gap-2"><Calendar className="w-6 h-6" style={{ color: "var(--primary-color)" }} /><h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>Payment Schedule</h1></div>
           <div className="flex gap-2">
-            <button onClick={refresh} disabled={loading} className="px-3 py-2 rounded-md flex items-center gap-1 border"><RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> Refresh</button>
-            <button onClick={() => setExportModalOpen(true)} className="px-3 py-2 rounded-md flex items-center gap-1 border"><Download className="w-4 h-4" /> Export</button>
+            <button onClick={refresh} disabled={loading} className="px-3 py-2 rounded-md flex items-center gap-1 border" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--card-secondary-bg)", color: "var(--text-primary)" }}><RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> Refresh</button>
+            <button onClick={() => setExportModalOpen(true)} className="px-3 py-2 rounded-md flex items-center gap-1 border" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--card-secondary-bg)", color: "var(--text-primary)" }}><Download className="w-4 h-4" /> Export</button>
           </div>
         </div>
 
-        <div className="mb-4 p-3 rounded-md bg-gray-50 flex flex-wrap justify-between items-center gap-3">
-          <div><span className="font-semibold">Total Upcoming Payments:</span> {payments.length} debts</div>
-          <div><span className="font-semibold">Total Amount Due:</span> {totalDue.toLocaleString()} PHP</div>
+        <div className="mb-4 p-3 rounded-md flex flex-wrap justify-between items-center gap-3" style={{ backgroundColor: "var(--card-secondary-bg)", border: `1px solid var(--border-color)` }}>
+          <div><span className="font-semibold" style={{ color: "var(--text-primary)" }}>Total Upcoming Payments:</span> <span style={{ color: "var(--text-primary)" }}>{payments.length} debts</span></div>
+          <div><span className="font-semibold" style={{ color: "var(--text-primary)" }}>Total Amount Due:</span> <span style={{ color: "var(--text-primary)" }}>{totalDue.toLocaleString()} PHP</span></div>
         </div>
 
         <div className="flex flex-wrap justify-between items-center gap-3 mb-4">
@@ -67,11 +67,15 @@ const PaymentSchedulePage: React.FC = () => {
           <ViewModeToggle mode={filters.viewMode} onChange={(mode) => setFilters(prev => ({ ...prev, viewMode: mode }))} />
         </div>
 
-        {loading && <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--primary-color)]"></div></div>}
-        {error && <div className="text-center py-4 text-red-500">Error: {error}</div>}
+        {loading && <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: "var(--primary-color)" }}></div></div>}
+        {error && <div className="text-center py-4" style={{ color: "var(--danger-color)" }}>Error: {error}</div>}
 
         {!loading && !error && payments.length === 0 && (
-          <div className="text-center py-12 border rounded-md"><Calendar className="w-12 h-12 mx-auto mb-3 text-gray-400" /><p className="text-lg font-medium">No upcoming payments</p><p className="text-sm text-gray-500">All active debts have due dates beyond your selected range.</p></div>
+          <div className="text-center py-12 border rounded-md" style={{ borderColor: "var(--border-color)" }}>
+            <Calendar className="w-12 h-12 mx-auto mb-3" style={{ color: "var(--text-tertiary)" }} />
+            <p className="text-lg font-medium" style={{ color: "var(--text-primary)" }}>No upcoming payments</p>
+            <p className="text-sm" style={{ color: "var(--text-tertiary)" }}>All active debts have due dates beyond your selected range.</p>
+          </div>
         )}
 
         {!loading && !error && payments.length > 0 && (

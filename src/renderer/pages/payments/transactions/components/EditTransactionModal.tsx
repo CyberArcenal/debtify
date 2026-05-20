@@ -25,9 +25,15 @@ const EditTransactionModal: React.FC<EditTransactionModalProps> = ({ isOpen, tra
 
   useEffect(() => {
     if (transaction) {
+      // Safely get paymentDate string
+      let paymentDateStr = "";
+      if (transaction.paymentDate) {
+        const date = new Date(transaction.paymentDate);
+        if (!isNaN(date.getTime())) paymentDateStr = date.toISOString().slice(0, 10);
+      }
       reset({
         amount: transaction.amount,
-        paymentDate: transaction.paymentDate.slice(0, 10),
+        paymentDate: paymentDateStr,
         reference: transaction.reference || "",
         notes: transaction.notes || "",
       });
@@ -45,13 +51,19 @@ const EditTransactionModal: React.FC<EditTransactionModalProps> = ({ isOpen, tra
     }
   };
 
+  const inputStyle = {
+    backgroundColor: "var(--input-bg)",
+    borderColor: "var(--border-color)",
+    color: "var(--text-primary)",
+  };
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Edit Transaction" size="md">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <div><label className="block text-sm font-medium mb-1">Amount</label><input type="number" step="0.01" {...register("amount", { required: true, valueAsNumber: true })} className="w-full px-3 py-2 border rounded" /></div>
-        <div><label className="block text-sm font-medium mb-1">Payment Date</label><input type="date" {...register("paymentDate", { required: true })} className="w-full px-3 py-2 border rounded" /></div>
-        <div><label className="block text-sm font-medium mb-1">Reference</label><input {...register("reference")} className="w-full px-3 py-2 border rounded" /></div>
-        <div><label className="block text-sm font-medium mb-1">Notes</label><textarea {...register("notes")} rows={2} className="w-full px-3 py-2 border rounded" /></div>
+        <div><label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Amount</label><input type="number" step="0.01" {...register("amount", { required: true, valueAsNumber: true })} className="w-full px-3 py-2 border rounded" style={inputStyle} /></div>
+        <div><label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Payment Date</label><input type="date" {...register("paymentDate", { required: true })} className="w-full px-3 py-2 border rounded" style={inputStyle} /></div>
+        <div><label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Reference</label><input {...register("reference")} className="w-full px-3 py-2 border rounded" style={inputStyle} /></div>
+        <div><label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Notes</label><textarea {...register("notes")} rows={2} className="w-full px-3 py-2 border rounded" style={inputStyle} /></div>
         <div className="flex justify-end gap-2"><Button variant="secondary" onClick={onClose}>Cancel</Button><Button type="submit" variant="success" disabled={isSubmitting}>Save</Button></div>
       </form>
     </Modal>

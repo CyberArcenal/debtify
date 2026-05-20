@@ -12,7 +12,6 @@ interface RecordPartialPaymentModalProps {
   onClose: () => void;
   onSuccess: () => void;
 }
-
 const RecordPartialPaymentModal: React.FC<RecordPartialPaymentModalProps> = ({ isOpen, loan, onClose, onSuccess }) => {
   const [amount, setAmount] = useState<number>(0);
   const [paymentDate, setPaymentDate] = useState<string>(new Date().toISOString().slice(0, 10));
@@ -43,12 +42,17 @@ const RecordPartialPaymentModal: React.FC<RecordPartialPaymentModalProps> = ({ i
     <Modal isOpen={isOpen} onClose={onClose} title="Record Payment (Overdue Account)" size="md">
       {loan && (
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="bg-red-50 p-3 rounded-md border border-red-200"><p><strong>Debt:</strong> {loan.name}</p><p><strong>Borrower:</strong> {loan.borrower?.name}</p><p><strong>Remaining:</strong> {loan.remainingAmount}</p><p className="text-red-600 font-bold">Overdue by {loan.daysOverdue} days</p></div>
-          <div><label className="block text-sm font-medium mb-1">Amount *</label><input type="number" step="0.01" required value={amount} onChange={(e) => setAmount(parseFloat(e.target.value) || 0)} className="w-full px-3 py-2 border rounded-md" /></div>
-          <div><label className="block text-sm font-medium mb-1">Payment Date *</label><input type="date" required value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} className="w-full px-3 py-2 border rounded-md" /></div>
-          <div><label className="block text-sm font-medium mb-1">Reference</label><input type="text" value={reference} onChange={(e) => setReference(e.target.value)} className="w-full px-3 py-2 border rounded-md" /></div>
-          <div><label className="block text-sm font-medium mb-1">Notes</label><textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full px-3 py-2 border rounded-md" /></div>
-          <div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="submit" variant="success" disabled={submitting}>{submitting ? "Processing..." : "Record Payment"}</Button></div>
+          <div className="p-3 rounded-md border" style={{ backgroundColor: "var(--card-secondary-bg)", borderColor: "var(--border-color)" }}>
+            <p><strong>Debt:</strong> {loan.name}</p>
+            <p><strong>Borrower:</strong> {loan.borrower?.name}</p>
+            <p><strong>Remaining:</strong> {loan.remainingAmount}</p>
+            <p style={{ color: "var(--status-overdue-text)" }}>Overdue by {loan.daysOverdue} days</p>
+          </div>
+          <div><label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Amount *</label><input type="number" step="0.01" required value={amount} onChange={(e) => setAmount(parseFloat(e.target.value) || 0)} className="w-full px-3 py-2 border rounded-md" style={{ backgroundColor: "var(--input-bg)", borderColor: "var(--border-color)", color: "var(--text-primary)" }} /></div>
+          <div><label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Payment Date *</label><input type="date" required value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} className="w-full px-3 py-2 border rounded-md" /></div>
+          <div><label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Reference</label><input type="text" value={reference} onChange={(e) => setReference(e.target.value)} className="w-full px-3 py-2 border rounded-md" /></div>
+          <div><label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Notes</label><textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full px-3 py-2 border rounded-md" /></div>
+          <div className="flex justify-end gap-2"><Button variant="secondary" onClick={onClose}>Cancel</Button><Button type="submit" variant="success" disabled={submitting}>{submitting ? "Processing..." : "Record Payment"}</Button></div>
         </form>
       )}
     </Modal>

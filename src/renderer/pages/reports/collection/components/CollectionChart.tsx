@@ -19,17 +19,17 @@ interface CollectionChartProps {
 
 const CollectionChart: React.FC<CollectionChartProps> = ({ data }) => {
   return (
-    <div className="bg-white rounded-lg border p-4 shadow-sm">
-      <h3 className="font-semibold mb-3">Collection Trend</h3>
+    <div className="rounded-lg border p-4 shadow-sm" style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--border-color)" }}>
+      <h3 className="font-semibold mb-3" style={{ color: "var(--text-primary)" }}>Collection Trend</h3>
       <ResponsiveContainer width="100%" height={350}>
         <LineChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="date" tick={{ fontSize: 12 }} angle={-45} textAnchor="end" height={60} />
-          <YAxis tickFormatter={(value) => formatCurrency(value)} width={80} />
-          <Tooltip formatter={(value: number) => formatCurrency(value)} labelFormatter={(label) => `Date: ${label}`} />
-          <Legend />
-          <Line type="monotone" dataKey="actualCollected" stroke="#10b981" name="Actual Collected" strokeWidth={2} dot={{ r: 4 }} />
-          <Line type="monotone" dataKey="expectedCollected" stroke="#3b82f6" name="Expected Collection" strokeWidth={2} strokeDasharray="5 5" />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+          <XAxis dataKey="date" tick={{ fontSize: 12, fill: "var(--text-secondary)" }} angle={-45} textAnchor="end" height={60} />
+          <YAxis tickFormatter={(value) => formatCurrency(value)} width={80} tick={{ fill: "var(--text-secondary)" }} />
+          <Tooltip formatter={(value: number) => formatCurrency(value)} labelFormatter={(label) => `Date: ${label}`} contentStyle={{ backgroundColor: "var(--card-bg)", borderColor: "var(--border-color)", color: "var(--text-primary)" }} />
+          <Legend wrapperStyle={{ color: "var(--text-primary)" }} />
+          <Line type="monotone" dataKey="actualCollected" stroke="var(--success-color)" name="Actual Collected" strokeWidth={2} dot={{ r: 4 }} />
+          <Line type="monotone" dataKey="expectedCollected" stroke="var(--accent-blue)" name="Expected Collection" strokeWidth={2} strokeDasharray="5 5" />
         </LineChart>
       </ResponsiveContainer>
     </div>

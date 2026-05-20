@@ -1,12 +1,22 @@
 // src/subscribers/PenaltyTransactionSubscriber.js
-//@ts-check
-const PenaltyTransaction  = require("../entities/PenaltyTransaction");
+const PenaltyTransaction = require("../entities/PenaltyTransaction");
 const { logger } = require("../utils/logger");
+const { AppDataSource } = require("../main/db/data-source");
+const { PenaltyTransactionStateTransitionService } = require("../StateTransitionServices/PenaltyTransaction");
 
 console.log("[Subscriber] Loading PenaltyTransactionSubscriber");
 
 class PenaltyTransactionSubscriber {
-  constructor() {}
+  constructor() {
+    this.transitionService = null;
+  }
+
+  async getTransitionService() {
+    if (!this.transitionService) {
+      this.transitionService = new PenaltyTransactionStateTransitionService(AppDataSource);
+    }
+    return this.transitionService;
+  }
 
   listenTo() {
     return PenaltyTransaction;
@@ -33,6 +43,10 @@ class PenaltyTransactionSubscriber {
         debtId: entity.debt?.id,
         reason: entity.reason,
       });
+      const service = await this.getTransitionService();
+      if (service.onCollect) {
+        await service.onCollect(entity, "system");
+      }
     } catch (err) {
       logger.error("[PenaltyTransactionSubscriber] afterInsert error", err);
     }
@@ -40,9 +54,7 @@ class PenaltyTransactionSubscriber {
 
   async beforeUpdate(entity) {
     try {
-      logger.info("[PenaltyTransactionSubscriber] beforeUpdate", {
-        id: entity.id,
-      });
+      logger.info("[PenaltyTransactionSubscriber] beforeUpdate", { id: entity.id });
     } catch (err) {
       logger.error("[PenaltyTransactionSubscriber] beforeUpdate error", err);
     }
@@ -50,10 +62,15 @@ class PenaltyTransactionSubscriber {
 
   async afterUpdate(event) {
     try {
-      const { entity } = event;
-      logger.info("[PenaltyTransactionSubscriber] afterUpdate", {
-        id: entity.id,
-      });
+      const { entity, databaseEntity } = event;
+      logger.info("[PenaltyTransactionSubscriber] afterUpdate", { id: entity.id });
+      const service = await this.getTransitionService();
+      if (entity.waived && !databaseEntity.waived) {
+        await service.onWaive(entity, "Admin action", "system");
+      }
+      if (entity.reversed && !databaseEntity.reversed) {
+        await service.onReverse(entity, "system");
+      }
     } catch (err) {
       logger.error("[PenaltyTransactionSubscriber] afterUpdate error", err);
     }
@@ -61,9 +78,7 @@ class PenaltyTransactionSubscriber {
 
   async beforeRemove(entity) {
     try {
-      logger.info("[PenaltyTransactionSubscriber] beforeRemove", {
-        id: entity.id,
-      });
+      logger.info("[PenaltyTransactionSubscriber] beforeRemove", { id: entity.id });
     } catch (err) {
       logger.error("[PenaltyTransactionSubscriber] beforeRemove error", err);
     }
@@ -71,9 +86,7 @@ class PenaltyTransactionSubscriber {
 
   async afterRemove(event) {
     try {
-      logger.info("[PenaltyTransactionSubscriber] afterRemove", {
-        id: event.entityId,
-      });
+      logger.info("[PenaltyTransactionSubscriber] afterRemove", { id: event.entityId });
     } catch (err) {
       logger.error("[PenaltyTransactionSubscriber] afterRemove error", err);
     }

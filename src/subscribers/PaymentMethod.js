@@ -1,11 +1,23 @@
 // src/subscribers/PaymentMethodSubscriber.js
-//@ts-check
 const PaymentMethod = require("../entities/PaymentMethod");
 const { logger } = require("../utils/logger");
+const { AppDataSource } = require("../main/db/data-source");
+const { PaymentMethodStateTransitionService } = require("../StateTransitionServices/PaymentMethod");
 
 console.log("[Subscriber] Loading PaymentMethodSubscriber");
 
 class PaymentMethodSubscriber {
+  constructor() {
+    this.transitionService = null;
+  }
+
+  async getTransitionService() {
+    if (!this.transitionService) {
+      this.transitionService = new PaymentMethodStateTransitionService(AppDataSource);
+    }
+    return this.transitionService;
+  }
+
   listenTo() {
     return PaymentMethod;
   }
@@ -29,6 +41,10 @@ class PaymentMethodSubscriber {
         name: entity.name,
         isDefault: entity.isDefault,
       });
+      const service = await this.getTransitionService();
+      if (service.onCreated) {
+        await service.onCreated(entity, "system");
+      }
     } catch (err) {
       logger.error("[PaymentMethodSubscriber] afterInsert error", err);
     }
@@ -44,8 +60,15 @@ class PaymentMethodSubscriber {
 
   async afterUpdate(event) {
     try {
-      const { entity } = event;
+      const { entity, databaseEntity } = event;
       logger.info("[PaymentMethodSubscriber] afterUpdate", { id: entity.id });
+      const service = await this.getTransitionService();
+      if (service.onUpdate) {
+        await service.onUpdate(databaseEntity, entity, "system");
+      }
+      if (entity.isDefault && !databaseEntity.isDefault) {
+        await service.onSetDefault(entity, "system");
+      }
     } catch (err) {
       logger.error("[PaymentMethodSubscriber] afterUpdate error", err);
     }
@@ -54,6 +77,10 @@ class PaymentMethodSubscriber {
   async beforeRemove(entity) {
     try {
       logger.info("[PaymentMethodSubscriber] beforeRemove", { id: entity.id });
+      const service = await this.getTransitionService();
+      if (service.onDelete) {
+        await service.onDelete(entity, "system");
+      }
     } catch (err) {
       logger.error("[PaymentMethodSubscriber] beforeRemove error", err);
     }

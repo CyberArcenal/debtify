@@ -35,11 +35,11 @@ const ReopenConfirmationModal: React.FC<ReopenConfirmationModalProps> = ({ isOpe
     <Modal isOpen={isOpen} onClose={onClose} title="Reopen Closed Loan" size="md">
       {loan && (
         <div className="space-y-4">
-          <div className="bg-yellow-50 p-3 rounded-md border border-yellow-200">
+          <div className="p-3 rounded-md border" style={{ backgroundColor: "var(--card-secondary-bg)", borderColor: "var(--border-color)" }}>
             <p><strong>Debt:</strong> {loan.name}</p>
             <p><strong>Borrower:</strong> {loan.borrower?.name}</p>
             <p><strong>Closed Date:</strong> {new Date(loan.closedAt).toLocaleDateString()}</p>
-            <p className="text-orange-600 font-bold mt-2">Are you sure you want to reopen this loan? It will become active again.</p>
+            <p className="font-bold mt-2" style={{ color: "var(--warning-color)" }}>Are you sure you want to reopen this loan? It will become active again.</p>
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={onClose}>Cancel</Button>

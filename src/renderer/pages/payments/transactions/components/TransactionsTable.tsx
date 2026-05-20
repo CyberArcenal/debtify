@@ -19,33 +19,33 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({ transactions, onS
     return sortConfig.direction === "asc" ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />;
   };
   return (
-    <div className="overflow-x-auto rounded-md border">
+    <div className="overflow-x-auto rounded-md border" style={{ borderColor: "var(--border-color)" }}>
       <table className="min-w-full">
-        <thead className="bg-gray-50">
+        <thead style={{ backgroundColor: "var(--card-secondary-bg)" }}>
           <tr>
-            <th className="px-4 py-2 text-left text-xs font-medium cursor-pointer" onClick={() => onSort("paymentDate")}><div className="flex items-center gap-1">Date {getSortIcon("paymentDate")}</div></th>
-            <th className="px-4 py-2 text-left text-xs font-medium cursor-pointer" onClick={() => onSort("borrower")}><div className="flex items-center gap-1">Borrower {getSortIcon("borrower")}</div></th>
-            <th className="px-4 py-2 text-left text-xs font-medium cursor-pointer" onClick={() => onSort("debtName")}><div className="flex items-center gap-1">Debt {getSortIcon("debtName")}</div></th>
-            <th className="px-4 py-2 text-right text-xs font-medium cursor-pointer" onClick={() => onSort("amount")}><div className="flex items-center gap-1 justify-end">Amount {getSortIcon("amount")}</div></th>
-            <th className="px-4 py-2 text-left text-xs font-medium">Reference</th>
-            <th className="px-4 py-2 text-left text-xs font-medium">Notes</th>
-            {isAdmin && <th className="px-4 py-2 text-right text-xs font-medium">Actions</th>}
+            <th className="px-4 py-2 text-left text-xs font-medium cursor-pointer" onClick={() => onSort("paymentDate")}><div className="flex items-center gap-1" style={{ color: "var(--text-secondary)" }}>Date {getSortIcon("paymentDate")}</div></th>
+            <th className="px-4 py-2 text-left text-xs font-medium cursor-pointer" onClick={() => onSort("borrower")}><div className="flex items-center gap-1" style={{ color: "var(--text-secondary)" }}>Borrower {getSortIcon("borrower")}</div></th>
+            <th className="px-4 py-2 text-left text-xs font-medium cursor-pointer" onClick={() => onSort("debtName")}><div className="flex items-center gap-1" style={{ color: "var(--text-secondary)" }}>Debt {getSortIcon("debtName")}</div></th>
+            <th className="px-4 py-2 text-right text-xs font-medium cursor-pointer" onClick={() => onSort("amount")}><div className="flex items-center gap-1 justify-end" style={{ color: "var(--text-secondary)" }}>Amount {getSortIcon("amount")}</div></th>
+            <th className="px-4 py-2 text-left text-xs font-medium" style={{ color: "var(--text-secondary)" }}>Reference</th>
+            <th className="px-4 py-2 text-left text-xs font-medium" style={{ color: "var(--text-secondary)" }}>Notes</th>
+            {isAdmin && <th className="px-4 py-2 text-right text-xs font-medium" style={{ color: "var(--text-secondary)" }}>Actions</th>}
           </tr>
         </thead>
         <tbody>
           {transactions.map(tx => (
-            <tr key={tx.id} className="border-t hover:bg-gray-50">
-              <td className="px-4 py-2">{formatDate(tx.paymentDate)}</td>
-              <td className="px-4 py-2">{tx.debt?.borrower?.name || "—"}</td>
-              <td className="px-4 py-2">{tx.debt?.name || "—"}</td>
-              <td className="px-4 py-2 text-right font-medium text-green-600">{formatCurrency(tx.amount)}</td>
-              <td className="px-4 py-2">{tx.reference || "—"}</td>
-              <td className="px-4 py-2">{tx.notes || "—"}</td>
+            <tr key={tx.id} className="border-t hover:bg-[var(--card-hover-bg)]" style={{ borderColor: "var(--border-color)" }}>
+              <td className="px-4 py-2" style={{ color: "var(--text-primary)" }}>{formatDate(tx.paymentDate)}</td>
+              <td className="px-4 py-2" style={{ color: "var(--text-primary)" }}>{tx.debt?.borrower?.name || "—"}</td>
+              <td className="px-4 py-2" style={{ color: "var(--text-primary)" }}>{tx.debt?.name || "—"}</td>
+              <td className="px-4 py-2 text-right font-medium" style={{ color: "var(--success-color)" }}>{formatCurrency(tx.amount)}</td>
+              <td className="px-4 py-2" style={{ color: "var(--text-primary)" }}>{tx.reference || "—"}</td>
+              <td className="px-4 py-2" style={{ color: "var(--text-primary)" }}>{tx.notes || "—"}</td>
               {isAdmin && (
                 <td className="px-4 py-2 text-right">
                   <div className="flex justify-end gap-2">
-                    <button onClick={() => onEdit(tx)} className="p-1 text-blue-600 hover:bg-blue-50 rounded"><Edit className="w-4 h-4" /></button>
-                    <button onClick={() => onDelete(tx)} className="p-1 text-red-600 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4" /></button>
+                    <button onClick={() => onEdit(tx)} className="p-1 rounded hover:bg-[var(--card-hover-bg)]" style={{ color: "var(--accent-blue)" }}><Edit className="w-4 h-4" /></button>
+                    <button onClick={() => onDelete(tx)} className="p-1 rounded hover:bg-[var(--card-hover-bg)]" style={{ color: "var(--danger-color)" }}><Trash2 className="w-4 h-4" /></button>
                   </div>
                 </td>
               )}

@@ -2,11 +2,22 @@
 //@ts-check
 const Borrower = require("../entities/Borrower");
 const { logger } = require("../utils/logger");
+const { AppDataSource } = require("../main/db/data-source");
+const { BorrowerStateTransitionService } = require("../StateTransitionServices/Borrower");
 
 console.log("[Subscriber] Loading BorrowerSubscriber");
 
 class BorrowerSubscriber {
-  constructor() {}
+  constructor() {
+    this.transitionService = null;
+  }
+
+  async getTransitionService() {
+    if (!this.transitionService) {
+      this.transitionService = new BorrowerStateTransitionService(AppDataSource);
+    }
+    return this.transitionService;
+  }
 
   listenTo() {
     return Borrower;
@@ -31,6 +42,10 @@ class BorrowerSubscriber {
         name: entity.name,
         email: entity.email,
       });
+      const service = await this.getTransitionService();
+      if (service.onActivate) {
+        await service.onActivate(entity, "system");
+      }
     } catch (err) {
       logger.error("[BorrowerSubscriber] afterInsert error", err);
     }
@@ -48,10 +63,14 @@ class BorrowerSubscriber {
 
   async afterUpdate(event) {
     try {
-      const { entity } = event;
+      const { entity, databaseEntity } = event;
       logger.info("[BorrowerSubscriber] afterUpdate", {
         id: entity.id,
       });
+      const service = await this.getTransitionService();
+      if (service.onAfterUpdate) {
+        await service.onAfterUpdate(databaseEntity, entity, "system");
+      }
     } catch (err) {
       logger.error("[BorrowerSubscriber] afterUpdate error", err);
     }
@@ -72,6 +91,10 @@ class BorrowerSubscriber {
       logger.info("[BorrowerSubscriber] afterRemove", {
         id: event.entityId,
       });
+      const service = await this.getTransitionService();
+      if (service.onDeactivate) {
+        await service.onDeactivate({ id: event.entityId }, "system");
+      }
     } catch (err) {
       logger.error("[BorrowerSubscriber] afterRemove error", err);
     }

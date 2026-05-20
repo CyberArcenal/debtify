@@ -2,11 +2,22 @@
 //@ts-check
 const Notification = require("../entities/Notification");
 const { logger } = require("../utils/logger");
+const { AppDataSource } = require("../main/db/data-source");
+const { NotificationStateTransitionService } = require("../StateTransitionServices/Notification");
 
 console.log("[Subscriber] Loading NotificationSubscriber");
 
 class NotificationSubscriber {
-  constructor() {}
+  constructor() {
+    this.transitionService = null;
+  }
+
+  async getTransitionService() {
+    if (!this.transitionService) {
+      this.transitionService = new NotificationStateTransitionService(AppDataSource);
+    }
+    return this.transitionService;
+  }
 
   listenTo() {
     return Notification;
@@ -33,6 +44,7 @@ class NotificationSubscriber {
         type: entity.type,
         debtId: entity.debt?.id,
       });
+      // Could trigger onSend if scheduledFor is now
     } catch (err) {
       logger.error("[NotificationSubscriber] afterInsert error", err);
     }
@@ -40,9 +52,7 @@ class NotificationSubscriber {
 
   async beforeUpdate(entity) {
     try {
-      logger.info("[NotificationSubscriber] beforeUpdate", {
-        id: entity.id,
-      });
+      logger.info("[NotificationSubscriber] beforeUpdate", { id: entity.id });
     } catch (err) {
       logger.error("[NotificationSubscriber] beforeUpdate error", err);
     }
@@ -50,10 +60,12 @@ class NotificationSubscriber {
 
   async afterUpdate(event) {
     try {
-      const { entity } = event;
-      logger.info("[NotificationSubscriber] afterUpdate", {
-        id: entity.id,
-      });
+      const { entity, databaseEntity } = event;
+      logger.info("[NotificationSubscriber] afterUpdate", { id: entity.id });
+      const service = await this.getTransitionService();
+      if (entity.isRead && !databaseEntity.isRead) {
+        await service.onRead(entity, "system");
+      }
     } catch (err) {
       logger.error("[NotificationSubscriber] afterUpdate error", err);
     }
@@ -61,9 +73,7 @@ class NotificationSubscriber {
 
   async beforeRemove(entity) {
     try {
-      logger.info("[NotificationSubscriber] beforeRemove", {
-        id: entity.id,
-      });
+      logger.info("[NotificationSubscriber] beforeRemove", { id: entity.id });
     } catch (err) {
       logger.error("[NotificationSubscriber] beforeRemove error", err);
     }
@@ -71,9 +81,7 @@ class NotificationSubscriber {
 
   async afterRemove(event) {
     try {
-      logger.info("[NotificationSubscriber] afterRemove", {
-        id: event.entityId,
-      });
+      logger.info("[NotificationSubscriber] afterRemove", { id: event.entityId });
     } catch (err) {
       logger.error("[NotificationSubscriber] afterRemove error", err);
     }

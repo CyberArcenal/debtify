@@ -1,7 +1,8 @@
 // src/renderer/pages/debtors/credit-check/components/PreviousChecksLog.tsx
 import React from "react";
 import { History, Clock } from "lucide-react";
-import type { CreditCheckLog } from "../types";
+import { formatDate } from "../../../../utils/formatters";
+import type { CreditCheckLog } from "../../../../api/core/credit_check";
 
 interface PreviousChecksLogProps {
   logs: CreditCheckLog[];
@@ -20,31 +21,31 @@ const PreviousChecksLog: React.FC<PreviousChecksLogProps> = ({ logs, loading }) 
 
   return (
     <div className="rounded-md border p-4" style={{ backgroundColor: "var(--card-secondary-bg)", borderColor: "var(--border-color)" }}>
-      <h3 className="font-semibold mb-3 flex items-center gap-2" style={{ color: "var(--sidebar-text)" }}>
+      <h3 className="font-semibold mb-3 flex items-center gap-2" style={{ color: "var(--text-primary)" }}>
         <History className="w-4 h-4" /> Previous Credit Checks
       </h3>
       {loading ? (
-        <div className="text-center py-4 text-[var(--text-tertiary)]">Loading history...</div>
+        <div className="text-center py-4" style={{ color: "var(--text-tertiary)" }}>Loading history...</div>
       ) : logs.length === 0 ? (
-        <div className="text-center py-4 text-[var(--text-tertiary)]">No previous credit checks found.</div>
+        <div className="text-center py-4" style={{ color: "var(--text-tertiary)" }}>No previous credit checks found.</div>
       ) : (
         <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
           {logs.map((log) => (
             <div key={log.id} className="p-2 rounded border" style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--border-color)" }}>
               <div className="flex justify-between items-start">
                 <div>
-                  <div className="font-medium">{log.debtorName}</div>
-                  <div className="text-xs text-[var(--text-tertiary)] flex items-center gap-1 mt-1">
+                  <div className="font-medium" style={{ color: "var(--text-primary)" }}>{log.debtorName}</div>
+                  <div className="text-xs flex items-center gap-1 mt-1" style={{ color: "var(--text-tertiary)" }}>
                     <Clock className="w-3 h-3" />
-                    {new Date(log.timestamp).toLocaleString()}
+                    {formatDate(log.dateChecked || log.createdAt)}
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className={`text-sm font-bold ${log.score.score >= 700 ? "text-green-500" : log.score.score >= 500 ? "text-yellow-500" : "text-red-500"}`}>
-                    {log.score.score}
+                  <div className={`text-sm font-bold ${log.score >= 700 ? "text-green-500" : log.score >= 500 ? "text-yellow-500" : "text-red-500"}`}>
+                    {log.score}
                   </div>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${getRiskBadge(log.score.riskLevel)}`}>
-                    {log.score.riskLevel}
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${getRiskBadge(log.riskLevel)}`}>
+                    {log.riskLevel}
                   </span>
                 </div>
               </div>

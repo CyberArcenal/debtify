@@ -20,17 +20,17 @@ const ApprovalConfirmationModal: React.FC<ApprovalConfirmationModalProps> = ({ i
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={type === "approve" ? "Approve Application" : "Reject Application"} size="md">
       <div className="space-y-4">
-        <div className="bg-gray-50 p-3 rounded-md">
-          <p><strong>Debtor:</strong> {application.debtorName}</p>
-          <p><strong>Requested Amount:</strong> {application.requestedAmount}</p>
-          <p><strong>Purpose:</strong> {application.purpose}</p>
+        <div className="p-3 rounded-md" style={{ backgroundColor: "var(--card-secondary-bg)" }}>
+          <p><strong style={{ color: "var(--text-primary)" }}>Debtor:</strong> <span style={{ color: "var(--text-primary)" }}>{application.debtorName}</span></p>
+          <p><strong style={{ color: "var(--text-primary)" }}>Requested Amount:</strong> <span style={{ color: "var(--text-primary)" }}>{application.requestedAmount}</span></p>
+          <p><strong style={{ color: "var(--text-primary)" }}>Purpose:</strong> <span style={{ color: "var(--text-primary)" }}>{application.purpose}</span></p>
         </div>
         {type === "approve" ? (
-          <p className="text-green-600">Approving this application will create an active loan for the debtor. Continue?</p>
+          <p style={{ color: "var(--success-color)" }}>Approving this application will create an active loan for the debtor. Continue?</p>
         ) : (
           <>
-            <p className="text-red-600">Rejecting this application will archive it. The debtor will be notified (if email provided).</p>
-            <div><label className="block text-sm font-medium mb-1">Rejection Reason (optional)</label><textarea rows={2} value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} className="w-full px-3 py-2 border rounded-md" placeholder="Why is this application being rejected?" /></div>
+            <p style={{ color: "var(--danger-color)" }}>Rejecting this application will archive it. The debtor will be notified (if email provided).</p>
+            <div><label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Rejection Reason (optional)</label><textarea rows={2} value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} className="w-full px-3 py-2 border rounded-md" style={{ backgroundColor: "var(--input-bg)", borderColor: "var(--border-color)", color: "var(--text-primary)" }} placeholder="Why is this application being rejected?" /></div>
           </>
         )}
         <div className="flex justify-end gap-2">

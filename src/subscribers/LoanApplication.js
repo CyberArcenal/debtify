@@ -2,10 +2,23 @@
 //@ts-check
 const LoanApplication = require("../entities/LoanApplication");
 const { logger } = require("../utils/logger");
+const { AppDataSource } = require("../main/db/data-source");
+const { LoanApplicationStateTransitionService } = require("../StateTransitionServices/LoanApplication");
 
 console.log("[Subscriber] Loading LoanApplicationSubscriber");
 
 class LoanApplicationSubscriber {
+  constructor() {
+    this.transitionService = null;
+  }
+
+  async getTransitionService() {
+    if (!this.transitionService) {
+      this.transitionService = new LoanApplicationStateTransitionService(AppDataSource);
+    }
+    return this.transitionService;
+  }
+
   listenTo() {
     return LoanApplication;
   }
@@ -31,6 +44,10 @@ class LoanApplicationSubscriber {
         requestedAmount: entity.requestedAmount,
         status: entity.status,
       });
+      const service = await this.getTransitionService();
+      if (service.onSubmit) {
+        await service.onSubmit(entity, "system");
+      }
     } catch (err) {
       logger.error("[LoanApplicationSubscriber] afterInsert error", err);
     }
@@ -46,8 +63,24 @@ class LoanApplicationSubscriber {
 
   async afterUpdate(event) {
     try {
-      const { entity } = event;
+      const { entity, databaseEntity } = event;
       logger.info("[LoanApplicationSubscriber] afterUpdate", { id: entity.id });
+      const service = await this.getTransitionService();
+      if (entity.status !== databaseEntity.status) {
+        switch (entity.status) {
+          case "approved":
+            await service.onApprove(entity, null, "system");
+            break;
+          case "rejected":
+            await service.onReject(entity, entity.rejectionReason, "system");
+            break;
+          case "pending":
+            if (databaseEntity.status === "rejected") {
+              await service.onReopen(entity, "system");
+            }
+            break;
+        }
+      }
     } catch (err) {
       logger.error("[LoanApplicationSubscriber] afterUpdate error", err);
     }

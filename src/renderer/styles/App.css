@@ -105,6 +105,20 @@
   --btn-emerald-hover: var(--accent-green-hover);
   --btn-emerald-text: #ffffff;
 
+  --status-overdue-bg: rgba(239, 68, 68, 0.1);
+  --status-overdue-text: #dc2626;
+  --status-paid-bg: rgba(16, 185, 129, 0.1);
+  --status-paid-text: #10b981;
+  --status-partial-bg: rgba(245, 158, 11, 0.1);
+  --status-partial-text: #f59e0b;
+  --status-pending-bg: rgba(59, 130, 246, 0.1);
+  --status-pending-text: #3b82f6;
+
+
+    --debt-high: #dc2626;
+  --debt-medium: #f59e0b;
+  --debt-low: #10b981;
+
   /* ✅ Size variables */
   --size-xs: 0.25rem; /* 4px */
   --size-sm: 0.5rem; /* 8px */

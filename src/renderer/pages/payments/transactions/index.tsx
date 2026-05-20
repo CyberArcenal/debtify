@@ -11,8 +11,7 @@ import { formatCurrency } from "../../../utils/formatters";
 import { dialogs } from "../../../utils/dialogs";
 import paymentsAPI from "../../../api/core/payment_transaction";
 
-// For demo, assume admin role from settings (you can replace with actual auth)
-const IS_ADMIN = true; // or get from useSettings / user context
+const IS_ADMIN = true; // or get from settings / user context
 
 const TransactionsPage: React.FC = () => {
   const {
@@ -84,27 +83,41 @@ const TransactionsPage: React.FC = () => {
   const { start, end } = getDisplayRange();
 
   return (
-    <div className="p-4">
-      <div className="rounded-md shadow-md border p-4 bg-white">
+    <div className="p-4" style={{ backgroundColor: "var(--background-color)" }}>
+      <div className="rounded-md shadow-md border p-4" style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--border-color)" }}>
         <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center gap-2"><Receipt className="w-6 h-6 text-green-600" /><h1 className="text-xl font-bold">Transaction Log</h1></div>
+          <div className="flex items-center gap-2">
+            <Receipt className="w-6 h-6" style={{ color: "var(--primary-color)" }} />
+            <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>Transaction Log</h1>
+          </div>
           <div className="flex gap-2">
-            <button onClick={() => setShowFilters(!showFilters)} className="px-3 py-2 border rounded flex items-center gap-1"><Filter className="w-4 h-4" /> Filters</button>
-            <button onClick={reload} disabled={loading} className="px-3 py-2 border rounded flex items-center gap-1"><RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> Refresh</button>
-            <button onClick={handleExport} disabled={exporting || pagination.count === 0} className="px-3 py-2 bg-green-600 text-white rounded flex items-center gap-1"><Download className="w-4 h-4" /> Export CSV</button>
+            <button onClick={() => setShowFilters(!showFilters)} className="px-3 py-2 rounded-md flex items-center gap-1 border" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--card-secondary-bg)", color: "var(--text-primary)" }}>
+              <Filter className="w-4 h-4" /> Filters
+            </button>
+            <button onClick={reload} disabled={loading} className="px-3 py-2 rounded-md flex items-center gap-1 border" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--card-secondary-bg)", color: "var(--text-primary)" }}>
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> Refresh
+            </button>
+            <button onClick={handleExport} disabled={exporting || pagination.count === 0} className="px-3 py-2 rounded-md flex items-center gap-1" style={{ backgroundColor: "var(--success-color)", color: "white" }}>
+              <Download className="w-4 h-4" /> Export CSV
+            </button>
           </div>
         </div>
 
         {showFilters && <FilterBar filters={filters} onFilterChange={handleFilterChange} onReset={resetFilters} />}
 
         <div className="mb-3 flex flex-wrap justify-between items-center gap-2">
-          <div className="flex items-center gap-2"><label className="text-sm">Show:</label><select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} className="px-2 py-1 border rounded text-sm">{ [10,25,50,100].map(s => <option key={s}>{s}</option>) }</select></div>
-          <div className="text-sm">Total Amount: <span className="font-bold">{formatCurrency(totalAmount)}</span></div>
-          <div className="text-sm text-gray-500">{pagination.count > 0 ? `Showing ${start} to ${end} of ${pagination.count} entries` : "No entries"}</div>
+          <div className="flex items-center gap-2">
+            <label className="text-sm" style={{ color: "var(--text-secondary)" }}>Show:</label>
+            <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} className="px-2 py-1 border rounded text-sm" style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--border-color)", color: "var(--text-primary)" }}>
+              {[10,25,50,100].map(s => <option key={s}>{s}</option>)}
+            </select>
+          </div>
+          <div className="text-sm" style={{ color: "var(--text-primary)" }}>Total Amount: <span className="font-bold" style={{ color: "var(--success-color)" }}>{formatCurrency(totalAmount)}</span></div>
+          <div className="text-sm" style={{ color: "var(--text-secondary)" }}>{pagination.count > 0 ? `Showing ${start} to ${end} of ${pagination.count} entries` : "No entries"}</div>
         </div>
 
-        {loading && <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div></div>}
-        {error && <div className="text-center py-4 text-red-500">Error: {error}</div>}
+        {loading && <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: "var(--primary-color)" }}></div></div>}
+        {error && <div className="text-center py-4" style={{ color: "var(--danger-color)" }}>Error: {error}</div>}
 
         {!loading && !error && (
           <>
@@ -116,8 +129,14 @@ const TransactionsPage: React.FC = () => {
               onEdit={(tx) => setEditingTx(tx)}
               onDelete={(tx) => setDeletingTx(tx)}
             />
-            {pagination.count === 0 && <div className="text-center py-8 text-gray-500">No transactions found.</div>}
-            {pagination.total_pages > 1 && <div className="mt-4"><Pagination currentPage={currentPage} totalItems={pagination.count} pageSize={pageSize} onPageChange={setCurrentPage} onPageSizeChange={setPageSize} pageSizeOptions={[10,25,50,100]} showPageSize={false} /></div>}
+            {pagination.count === 0 && (
+              <div className="text-center py-8" style={{ color: "var(--text-secondary)" }}>No transactions found.</div>
+            )}
+            {pagination.total_pages > 1 && (
+              <div className="mt-4">
+                <Pagination currentPage={currentPage} totalItems={pagination.count} pageSize={pageSize} onPageChange={setCurrentPage} onPageSizeChange={setPageSize} pageSizeOptions={[10,25,50,100]} showPageSize={false} />
+              </div>
+            )}
           </>
         )}
       </div>

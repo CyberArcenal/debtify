@@ -10,14 +10,14 @@ import PaymentsTable from "./components/PaymentsTable";
 const CollectionReportPage: React.FC = () => {
   const { loading, error, period, target, report, updatePeriod, updateTarget, refresh } = useCollectionReport();
 
-  if (error) return <div className="p-4 text-center text-red-500">Error: {error}</div>;
+  if (error) return <div className="p-4 text-center" style={{ color: "var(--danger-color)" }}>Error: {error}</div>;
 
   return (
-    <div className="p-4">
-      <div className="rounded-md shadow-md border p-4 bg-white">
+    <div className="p-4" style={{ backgroundColor: "var(--background-color)" }}>
+      <div className="rounded-md shadow-md border p-4" style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--border-color)" }}>
         <div className="flex items-center gap-2 mb-4">
-          <BarChart3 className="w-6 h-6 text-blue-600" />
-          <h1 className="text-xl font-bold">Collection Report</h1>
+          <BarChart3 className="w-6 h-6" style={{ color: "var(--primary-color)" }} />
+          <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>Collection Report</h1>
         </div>
 
         <FilterBar
@@ -32,7 +32,7 @@ const CollectionReportPage: React.FC = () => {
         />
 
         {loading ? (
-          <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>
+          <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: "var(--primary-color)" }}></div></div>
         ) : report ? (
           <>
             <KPICards
@@ -47,7 +47,7 @@ const CollectionReportPage: React.FC = () => {
             <PaymentsTable payments={report.paymentsByDebtor} />
           </>
         ) : (
-          <div className="text-center py-8">No data available.</div>
+          <div className="text-center py-8" style={{ color: "var(--text-secondary)" }}>No data available.</div>
         )}
       </div>
     </div>

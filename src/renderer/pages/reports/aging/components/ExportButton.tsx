@@ -41,7 +41,7 @@ const ExportButton: React.FC<ExportButtonProps> = ({ summary }) => {
   };
 
   return (
-    <button onClick={handleExportCSV} className="px-3 py-2 bg-green-600 text-white rounded flex items-center gap-1">
+    <button onClick={handleExportCSV} className="px-3 py-2 rounded flex items-center gap-1" style={{ backgroundColor: "var(--primary-color)", color: "white" }}>
       <Download className="w-4 h-4" /> Export CSV
     </button>
   );
