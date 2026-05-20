@@ -5,10 +5,9 @@ const path = require("path");
 const { DataSource } = require("typeorm");
 const { getDatabaseConfig } = require("./database");
 
-// Import Entity constants
+// Import existing entities
 const LicenseCache = require("../../entities/LicenseCache");
 const { SystemSetting } = require("../../entities/systemSettings");
-
 const NotificationLog = require("../../entities/NotificationLog");
 const Notification = require("../../entities/Notification");
 const Borrower = require("../../entities/Borrower");
@@ -17,6 +16,16 @@ const LoanAgreement = require("../../entities/LoanAgreement");
 const PaymentTransaction = require("../../entities/PaymentTransaction");
 const PenaltyTransaction = require("../../entities/PenaltyTransaction");
 const { AuditLog } = require("../../entities/AuditLog");
+
+// ========== NEW ENTITIES ==========
+const DebtorGroup = require("../../entities/DebtorGroup");
+const DebtorGroupMember = require("../../entities/DebtorGroupMember");
+const LoanApplication = require("../../entities/LoanApplication");
+const PaymentMethod = require("../../entities/PaymentMethod");
+const PaymentMethodStat = require("../../entities/PaymentMethodStat");
+const Printer = require("../../entities/Printer");
+const CreditCheckLog = require("../../entities/CreditCheckLog");
+const TaxChangeLog = require("../../entities/TaxChangeLog");
 
 const config = getDatabaseConfig();
 
@@ -29,8 +38,16 @@ const entities = [
   PenaltyTransaction,
   LicenseCache,
   SystemSetting,
+  TaxChangeLog,
   NotificationLog,
   Notification,
+  DebtorGroup,
+  DebtorGroupMember,
+  LoanApplication,
+  PaymentMethod,
+  PaymentMethodStat,
+  Printer,
+  CreditCheckLog,
 ];
 
 const dataSourceOptions = {
@@ -41,7 +58,6 @@ const dataSourceOptions = {
     : [config.migrations],
 };
 
-// @ts-ignore
 const AppDataSource = new DataSource(dataSourceOptions);
 
 module.exports = { AppDataSource };

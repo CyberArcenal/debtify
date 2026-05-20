@@ -1,4 +1,5 @@
-// systemConfigAPI.ts - Comprehensive System Configuration API
+// src/renderer/api/core/system_config.ts
+// Debt Management System Configuration
 
 export interface PublicSystemSettings {
   general: {
@@ -19,26 +20,20 @@ export interface FrontendSystemInfo {
   logo: string;
   currency: string;
   admin_email: string;
-  tax_enabled: boolean;
+  tax_enabled: boolean;       // for loan interest tax?
   tax_rate: number;
-  shipping_threshold_enabled: boolean;
   system_version: string;
 }
 
-// 📊 Debtify Management Setting Types
+// Debt Management Setting Types
 export const SettingType = {
-  EMAIL: "email",
-  ATTENDANCE: "attendance",
-  DEVICE: "device",
-  INVENTORY_SYNC: "inventory_sync",
   GENERAL: "general",
-  INVENTORY: "inventory",
-  SALES: "sales",
-  CASHIER: "cashier",
+  COLLECTIONS: "collections",
+  LOANS: "loans",
   NOTIFICATIONS: "notifications",
-  DATA_REPORTS: "data_reports",
-  INTEGRATIONS: "integrations",
+  REPORTS: "reports",
   AUDIT_SECURITY: "audit_security",
+  INTEGRATIONS: "integrations",
 } as const;
 
 export type SettingType = (typeof SettingType)[keyof typeof SettingType];
@@ -59,13 +54,12 @@ export interface GroupedSettingsData {
   settings: SystemSettingData[];
   grouped_settings: {
     general: GeneralSettings;
-    inventory: InventorySettings;
-    sales: SalesSettings;
-    cashier: CashierSettings;
+    collections: CollectionsSettings;
+    loans: LoanSettings;
     notifications: NotificationsSettings;
-    data_reports: DataReportsSettings;
-    integrations: IntegrationsSettings;
+    reports: ReportsSettings;
     audit_security: AuditSecuritySettings;
+    integrations: IntegrationsSettings;
   };
   system_info: SystemInfoData;
 }
@@ -73,95 +67,90 @@ export interface GroupedSettingsData {
 // 1. GENERAL SETTINGS
 export interface GeneralSettings {
   company_name?: string;
-  store_location?: string;
+  branch_location?: string;
   default_timezone?: string;
   currency?: string;
   language?: string;
   receipt_footer_message?: string;
   auto_logout_minutes?: number;
+  date_format?: string;
 }
 
-// 3. INVENTORY SETTINGS
-export interface InventorySettings {
-  auto_reorder_enabled?: boolean;
-  reorder_level_default?: number;
-  reorder_qty_default?: number;
-  stock_alert_threshold?: number;
-  allow_negative_stock?: boolean;
-  inventory_sync_enabled?: boolean;
+// 2. COLLECTIONS SETTINGS
+export interface CollectionsSettings {
+  default_interest_rate?: number;       // default interest rate for new loans
+  default_penalty_rate?: number;        // default penalty rate (% per overdue day or fixed)
+  penalty_calculation_method?: "percentage" | "fixed"; // how penalty is applied
+  enable_auto_penalty?: boolean;        // auto apply penalty when overdue
+  penalty_grace_days?: number;          // days after due before penalty starts
+  overdue_reminder_days?: number[];     // array of days to send reminders (e.g., [7,3,1])
+  max_loan_amount?: number;             // global max loan amount (optional)
+  min_loan_amount?: number;             // global min loan amount
+  enforce_credit_check?: boolean;       // require credit check before loan approval
 }
 
-// 4. SALES SETTINGS
-export interface SalesSettings {
-  discount_enabled?: boolean;
-  max_discount_percent?: number;
-  allow_refunds?: boolean;
-  refund_window_days?: number;
-  loyalty_points_enabled?: boolean;
-  loyalty_points_rate?: number; // points per currency unit
+// 3. LOANS SETTINGS
+export interface LoanSettings {
+  allowed_loan_statuses?: string[];     // custom statuses: active, paid, overdue, defaulted
+  enable_partial_payment?: boolean;
+  enable_early_payment_discount?: boolean;
+  early_payment_discount_rate?: number;
+  require_loan_agreement?: boolean;
+  loan_agreement_template?: string;     // path to template file
+  amortization_type?: "flat" | "declining"; // how interest is computed
+  default_loan_term_months?: number;
 }
 
-// 5. CASHIER SETTINGS
-export interface CashierSettings {
-  enable_cash_drawer?: boolean;
-  drawer_open_code?: string;
-  enable_receipt_printing?: boolean;
-  receipt_printer_type?: string; // thermal, dot-matrix
-  enable_barcode_scanning?: boolean;
-  enable_touchscreen_mode?: boolean;
-  quick_sale_enabled?: boolean;
-}
-
-// 6. NOTIFICATIONS SETTINGS
+// 4. NOTIFICATIONS SETTINGS
 export interface NotificationsSettings {
   email_enabled?: boolean;
   email_smtp_host?: string;
   email_smtp_port?: number;
   email_from_address?: string;
   sms_enabled?: boolean;
-  sms_provider?: string;
-  push_notifications_enabled?: boolean;
-  low_stock_alert_enabled?: boolean;
-  daily_sales_summary_enabled?: boolean;
+  sms_provider?: string;                // e.g., "twilio"
+  reminder_days_before_due?: number[];  // days before due to send reminders
+  overdue_notification_frequency?: "daily" | "weekly";
+  notify_on_payment?: boolean;          // notify debtor when payment is recorded
+  notify_on_penalty?: boolean;          // notify when penalty is applied
 
+  // Twilio settings
   twilio_account_sid?: string;
   twilio_auth_token?: string;
   twilio_phone_number?: string;
   twilio_messaging_service_sid?: string;
-
-  // Supplier notifications
-  notify_supplier_with_sms?: boolean;
-  notify_supplier_with_email?: boolean;
-  notify_supplier_on_complete_email?: boolean;
-  notify_supplier_on_complete_sms?: boolean;
-  notify_supplier_on_cancel_email?: boolean;
-  notify_supplier_on_cancel_sms?: boolean;
-
-  // Customer notifications for return/refund
-  notify_customer_return_processed_email?: boolean;
-  notify_customer_return_processed_sms?: boolean;
-  notify_customer_return_cancelled_email?: boolean;
-  notify_customer_return_cancelled_sms?: boolean;
 }
 
-// 7. DATA & REPORTS SETTINGS
-export interface DataReportsSettings {
-  export_formats?: string[]; // CSV, Excel, PDF
+// 5. REPORTS SETTINGS
+export interface ReportsSettings {
+  export_formats?: string[];            // CSV, Excel, PDF
   default_export_format?: string;
   auto_backup_enabled?: boolean;
-  backup_schedule?: string;
+  backup_schedule?: string;             // e.g., "daily", "weekly"
   backup_location?: string;
   data_retention_days?: number;
+  include_audit_in_backup?: boolean;
 }
 
-// 8. INTEGRATIONS SETTINGS
+// 6. AUDIT & SECURITY SETTINGS
+export interface AuditSecuritySettings {
+  audit_log_enabled?: boolean;
+  log_retention_days?: number;
+  log_events?: string[];                // e.g., "CREATE", "UPDATE", "DELETE", "LOGIN"
+  force_https?: boolean;
+  session_encryption_enabled?: boolean;
+  gdpr_compliance_enabled?: boolean;
+  require_mfa_for_admin?: boolean;
+}
+
+// 7. INTEGRATIONS SETTINGS
 export interface IntegrationsSettings {
   accounting_integration_enabled?: boolean;
   accounting_api_url?: string;
   accounting_api_key?: string;
-  payment_gateway_enabled?: boolean;
-  payment_gateway_provider?: string;
-  payment_gateway_api_key?: string;
+  credit_bureau_api_enabled?: boolean;
+  credit_bureau_api_key?: string;
+  credit_bureau_endpoint?: string;
   webhooks_enabled?: boolean;
   webhooks?: WebhookSetting[];
 }
@@ -171,16 +160,6 @@ export interface WebhookSetting {
   events: string[];
   enabled: boolean;
   secret?: string;
-}
-
-// 9. AUDIT & SECURITY SETTINGS
-export interface AuditSecuritySettings {
-  audit_log_enabled?: boolean;
-  log_retention_days?: number;
-  log_events?: string[];
-  force_https?: boolean;
-  session_encryption_enabled?: boolean;
-  gdpr_compliance_enabled?: boolean;
 }
 
 export interface SystemInfoData {
@@ -193,7 +172,7 @@ export interface SystemInfoData {
   setting_types: string[];
 }
 
-// 📊 API Responses
+// API Responses (unchanged)
 export interface SystemConfigResponse {
   status: boolean;
   message: string;
@@ -253,7 +232,7 @@ export interface BulkOperationResponse {
   }>;
 }
 
-// 📝 Request Payloads
+// Request Payloads
 export interface CreateSettingData {
   key: string;
   value: any;
@@ -294,967 +273,354 @@ export interface UpdateCategorySettingsData {
   [category: string]: Record<string, any>;
 }
 
-// 🛠️ API Class
+// API Class (same structure, but updated default settings)
 class SystemConfigAPI {
-  // 🔧 Core Methods
-
-  /**
-   * Get all system configuration grouped by category
-   */
   async getGroupedConfig(): Promise<SystemConfigResponse> {
-    try {
-      if (!window.backendAPI || !window.backendAPI.systemConfig) {
-        throw new Error("Electron API not available");
-      }
-
-      const response = await window.backendAPI.systemConfig({
-        method: "getGroupedConfig",
-        params: {},
-      });
-
-      if (response.status) {
-        return response;
-      }
-      throw new Error(
-        response.message || "Failed to fetch system configuration",
-      );
-    } catch (error: any) {
-      throw new Error(error.message || "Failed to fetch system configuration");
-    }
+    if (!window.backendAPI?.systemConfig) throw new Error("Electron API not available");
+    const response = await window.backendAPI.systemConfig({ method: "getGroupedConfig", params: {} });
+    if (response.status) return response;
+    throw new Error(response.message || "Failed to fetch system configuration");
   }
 
-  /**
-   * Update multiple settings by category
-   */
-  async updateGroupedConfig(
-    configData: UpdateCategorySettingsData,
-  ): Promise<SystemConfigResponse> {
-    try {
-      if (!window.backendAPI || !window.backendAPI.systemConfig) {
-        throw new Error("Electron API not available");
-      }
-
-      const response = await window.backendAPI.systemConfig({
-        method: "updateGroupedConfig",
-        params: { configData },
-      });
-
-      if (response.status) {
-        return response;
-      }
-      throw new Error(
-        response.message || "Failed to update system configuration",
-      );
-    } catch (error: any) {
-      throw new Error(error.message || "Failed to update system configuration");
-    }
+  async updateGroupedConfig(configData: UpdateCategorySettingsData): Promise<SystemConfigResponse> {
+    if (!window.backendAPI?.systemConfig) throw new Error("Electron API not available");
+    const response = await window.backendAPI.systemConfig({ method: "updateGroupedConfig", params: { configData } });
+    if (response.status) return response;
+    throw new Error(response.message || "Failed to update system configuration");
   }
 
-  /**
-   * Get system information
-   */
   async getSystemInfo(): Promise<SystemInfoResponse> {
-    try {
-      if (!window.backendAPI || !window.backendAPI.systemConfig) {
-        throw new Error("Electron API not available");
-      }
-
-      const response = await window.backendAPI.systemConfig({
-        method: "getSystemInfo",
-        params: {},
-      });
-
-      if (response.status) {
-        return response;
-      }
-      throw new Error(response.message || "Failed to fetch system information");
-    } catch (error: any) {
-      throw new Error(error.message || "Failed to fetch system information");
-    }
+    if (!window.backendAPI?.systemConfig) throw new Error("Electron API not available");
+    const response = await window.backendAPI.systemConfig({ method: "getSystemInfo", params: {} });
+    if (response.status) return response;
+    throw new Error(response.message || "Failed to fetch system information");
   }
 
-  /**
-   * Get all settings
-   */
   async getAllSettings(): Promise<SettingsListResponse> {
-    try {
-      if (!window.backendAPI || !window.backendAPI.systemConfig) {
-        throw new Error("Electron API not available");
-      }
-
-      const response = await window.backendAPI.systemConfig({
-        method: "getAllSettings",
-        params: {},
-      });
-
-      if (response.status) {
-        return response;
-      }
-      throw new Error(response.message || "Failed to fetch all settings");
-    } catch (error: any) {
-      throw new Error(error.message || "Failed to fetch all settings");
-    }
+    if (!window.backendAPI?.systemConfig) throw new Error("Electron API not available");
+    const response = await window.backendAPI.systemConfig({ method: "getAllSettings", params: {} });
+    if (response.status) return response;
+    throw new Error(response.message || "Failed to fetch all settings");
   }
 
-  /**
-   * Get public settings only
-   */
   async getPublicSettings(): Promise<SettingsListResponse> {
-    try {
-      if (!window.backendAPI || !window.backendAPI.systemConfig) {
-        throw new Error("Electron API not available");
-      }
-
-      const response = await window.backendAPI.systemConfig({
-        method: "getPublicSettings",
-        params: {},
-      });
-
-      if (response.status) {
-        return response;
-      }
-      throw new Error(response.message || "Failed to fetch public settings");
-    } catch (error: any) {
-      throw new Error(error.message || "Failed to fetch public settings");
-    }
+    if (!window.backendAPI?.systemConfig) throw new Error("Electron API not available");
+    const response = await window.backendAPI.systemConfig({ method: "getPublicSettings", params: {} });
+    if (response.status) return response;
+    throw new Error(response.message || "Failed to fetch public settings");
   }
 
-  /**
-   * Get setting by key
-   */
-  async getSettingByKey(
-    key: string,
-    settingType?: SettingType,
-  ): Promise<SettingResponse> {
-    try {
-      if (!window.backendAPI || !window.backendAPI.systemConfig) {
-        throw new Error("Electron API not available");
-      }
-
-      const response = await window.backendAPI.systemConfig({
-        method: "getSettingByKey",
-        params: { key, settingType },
-      });
-
-      if (response.status) {
-        return response;
-      }
-      throw new Error(response.message || "Failed to fetch setting");
-    } catch (error: any) {
-      throw new Error(error.message || "Failed to fetch setting");
-    }
+  async getSettingByKey(key: string, settingType?: SettingType): Promise<SettingResponse> {
+    if (!window.backendAPI?.systemConfig) throw new Error("Electron API not available");
+    const response = await window.backendAPI.systemConfig({ method: "getSettingByKey", params: { key, settingType } });
+    if (response.status) return response;
+    throw new Error(response.message || "Failed to fetch setting");
   }
 
-  /**
-   * Create a new setting
-   */
-  async createSetting(
-    settingData: CreateSettingData,
-  ): Promise<SettingResponse> {
-    try {
-      if (!window.backendAPI || !window.backendAPI.systemConfig) {
-        throw new Error("Electron API not available");
-      }
-
-      const response = await window.backendAPI.systemConfig({
-        method: "createSetting",
-        params: { settingData },
-      });
-
-      if (response.status) {
-        return response;
-      }
-      throw new Error(response.message || "Failed to create setting");
-    } catch (error: any) {
-      throw new Error(error.message || "Failed to create setting");
-    }
+  async createSetting(settingData: CreateSettingData): Promise<SettingResponse> {
+    if (!window.backendAPI?.systemConfig) throw new Error("Electron API not available");
+    const response = await window.backendAPI.systemConfig({ method: "createSetting", params: { settingData } });
+    if (response.status) return response;
+    throw new Error(response.message || "Failed to create setting");
   }
 
-  /**
-   * Update an existing setting
-   */
-  async updateSetting(
-    id: number,
-    settingData: UpdateSettingData,
-  ): Promise<SettingResponse> {
-    try {
-      if (!window.backendAPI || !window.backendAPI.systemConfig) {
-        throw new Error("Electron API not available");
-      }
-
-      const response = await window.backendAPI.systemConfig({
-        method: "updateSetting",
-        params: { id, settingData },
-      });
-
-      if (response.status) {
-        return response;
-      }
-      throw new Error(response.message || "Failed to update setting");
-    } catch (error: any) {
-      throw new Error(error.message || "Failed to update setting");
-    }
+  async updateSetting(id: number, settingData: UpdateSettingData): Promise<SettingResponse> {
+    if (!window.backendAPI?.systemConfig) throw new Error("Electron API not available");
+    const response = await window.backendAPI.systemConfig({ method: "updateSetting", params: { id, settingData } });
+    if (response.status) return response;
+    throw new Error(response.message || "Failed to update setting");
   }
 
-  /**
-   * Delete a setting (soft delete)
-   */
   async deleteSetting(id: number): Promise<OperationResponse> {
-    try {
-      if (!window.backendAPI || !window.backendAPI.systemConfig) {
-        throw new Error("Electron API not available");
-      }
-
-      const response = await window.backendAPI.systemConfig({
-        method: "deleteSetting",
-        params: { id },
-      });
-
-      if (response.status) {
-        return response;
-      }
-      throw new Error(response.message || "Failed to delete setting");
-    } catch (error: any) {
-      throw new Error(error.message || "Failed to delete setting");
-    }
+    if (!window.backendAPI?.systemConfig) throw new Error("Electron API not available");
+    const response = await window.backendAPI.systemConfig({ method: "deleteSetting", params: { id } });
+    if (response.status) return response;
+    throw new Error(response.message || "Failed to delete setting");
   }
 
-  /**
-   * Get settings by type
-   */
   async getByType(settingType: SettingType): Promise<SettingsListResponse> {
-    try {
-      if (!window.backendAPI || !window.backendAPI.systemConfig) {
-        throw new Error("Electron API not available");
-      }
-
-      const response = await window.backendAPI.systemConfig({
-        method: "getByType",
-        params: { settingType },
-      });
-
-      if (response.status) {
-        return response;
-      }
-      throw new Error(response.message || "Failed to fetch settings by type");
-    } catch (error: any) {
-      throw new Error(error.message || "Failed to fetch settings by type");
-    }
+    if (!window.backendAPI?.systemConfig) throw new Error("Electron API not available");
+    const response = await window.backendAPI.systemConfig({ method: "getByType", params: { settingType } });
+    if (response.status) return response;
+    throw new Error(response.message || "Failed to fetch settings by type");
   }
 
-  /**
-   * Get value by key
-   */
-  async getValueByKey(
-    key: string,
-    defaultValue?: any,
-  ): Promise<SettingResponse> {
-    try {
-      if (!window.backendAPI || !window.backendAPI.systemConfig) {
-        throw new Error("Electron API not available");
-      }
-
-      const response = await window.backendAPI.systemConfig({
-        method: "getValueByKey",
-        params: { key, defaultValue },
-      });
-
-      if (response.status) {
-        return response;
-      }
-      throw new Error(response.message || "Failed to get value by key");
-    } catch (error: any) {
-      throw new Error(error.message || "Failed to get value by key");
-    }
+  async getValueByKey(key: string, defaultValue?: any): Promise<SettingResponse> {
+    if (!window.backendAPI?.systemConfig) throw new Error("Electron API not available");
+    const response = await window.backendAPI.systemConfig({ method: "getValueByKey", params: { key, defaultValue } });
+    if (response.status) return response;
+    throw new Error(response.message || "Failed to get value by key");
   }
 
-  /**
-   * Set value by key (creates or updates)
-   */
-  async setValueByKey(
-    key: string,
-    value: any,
-    options?: Partial<SetValueByKeyData>,
-  ): Promise<SettingResponse> {
-    try {
-      if (!window.backendAPI || !window.backendAPI.systemConfig) {
-        throw new Error("Electron API not available");
-      }
-
-      const response = await window.backendAPI.systemConfig({
-        method: "setValueByKey",
-        params: { key, value, options },
-      });
-
-      if (response.status) {
-        return response;
-      }
-      throw new Error(response.message || "Failed to set value by key");
-    } catch (error: any) {
-      throw new Error(error.message || "Failed to set value by key");
-    }
+  async setValueByKey(key: string, value: any, options?: Partial<SetValueByKeyData>): Promise<SettingResponse> {
+    if (!window.backendAPI?.systemConfig) throw new Error("Electron API not available");
+    const response = await window.backendAPI.systemConfig({ method: "setValueByKey", params: { key, value, options } });
+    if (response.status) return response;
+    throw new Error(response.message || "Failed to set value by key");
   }
 
-  /**
-   * Bulk update multiple settings
-   */
-  async bulkUpdate(
-    settingsData: BulkUpdateData["settingsData"],
-  ): Promise<BulkOperationResponse> {
-    try {
-      if (!window.backendAPI || !window.backendAPI.systemConfig) {
-        throw new Error("Electron API not available");
-      }
-
-      const response = await window.backendAPI.systemConfig({
-        method: "bulkUpdate",
-        params: { settingsData },
-      });
-
-      if (response.status) {
-        return response;
-      }
-      throw new Error(response.message || "Failed to bulk update settings");
-    } catch (error: any) {
-      throw new Error(error.message || "Failed to bulk update settings");
-    }
+  async bulkUpdate(settingsData: BulkUpdateData["settingsData"]): Promise<BulkOperationResponse> {
+    if (!window.backendAPI?.systemConfig) throw new Error("Electron API not available");
+    const response = await window.backendAPI.systemConfig({ method: "bulkUpdate", params: { settingsData } });
+    if (response.status) return response;
+    throw new Error(response.message || "Failed to bulk update settings");
   }
 
-  /**
-   * Bulk delete settings
-   */
   async bulkDelete(ids: number[]): Promise<BulkOperationResponse> {
-    try {
-      if (!window.backendAPI || !window.backendAPI.systemConfig) {
-        throw new Error("Electron API not available");
-      }
-
-      const response = await window.backendAPI.systemConfig({
-        method: "bulkDelete",
-        params: { ids },
-      });
-
-      if (response.status) {
-        return response;
-      }
-      throw new Error(response.message || "Failed to bulk delete settings");
-    } catch (error: any) {
-      throw new Error(error.message || "Failed to bulk delete settings");
-    }
+    if (!window.backendAPI?.systemConfig) throw new Error("Electron API not available");
+    const response = await window.backendAPI.systemConfig({ method: "bulkDelete", params: { ids } });
+    if (response.status) return response;
+    throw new Error(response.message || "Failed to bulk delete settings");
   }
 
-  /**
-   * Get settings statistics
-   */
   async getSettingsStats(): Promise<SettingsStatsResponse> {
-    try {
-      if (!window.backendAPI || !window.backendAPI.systemConfig) {
-        throw new Error("Electron API not available");
-      }
-
-      const response = await window.backendAPI.systemConfig({
-        method: "getSettingsStats",
-        params: {},
-      });
-
-      if (response.status) {
-        return response;
-      }
-      throw new Error(response.message || "Failed to get settings statistics");
-    } catch (error: any) {
-      throw new Error(error.message || "Failed to get settings statistics");
-    }
+    if (!window.backendAPI?.systemConfig) throw new Error("Electron API not available");
+    const response = await window.backendAPI.systemConfig({ method: "getSettingsStats", params: {} });
+    if (response.status) return response;
+    throw new Error(response.message || "Failed to get settings statistics");
   }
 
-  // 🎯 Category-Specific Methods
-
-  /**
-   * Get general settings
-   */
+  // Category-specific convenience methods
   async getGeneralSettings(): Promise<GeneralSettings> {
     try {
       const config = await this.getGroupedConfig();
-      if (config.data?.grouped_settings?.general) {
-        return config.data.grouped_settings.general;
-      }
-      return {};
-    } catch (error) {
-      console.error("Error getting general settings:", error);
-      return {};
-    }
+      return config.data?.grouped_settings?.general || {};
+    } catch { return {}; }
   }
 
-  /**
-   * Get notifications settings
-   */
+  async getCollectionsSettings(): Promise<CollectionsSettings> {
+    try {
+      const config = await this.getGroupedConfig();
+      return config.data?.grouped_settings?.collections || {};
+    } catch { return {}; }
+  }
+
+  async getLoanSettings(): Promise<LoanSettings> {
+    try {
+      const config = await this.getGroupedConfig();
+      return config.data?.grouped_settings?.loans || {};
+    } catch { return {}; }
+  }
+
   async getNotificationsSettings(): Promise<NotificationsSettings> {
     try {
       const config = await this.getGroupedConfig();
-      if (config.data?.grouped_settings?.notifications) {
-        return config.data.grouped_settings.notifications;
-      }
-      return {};
-    } catch (error) {
-      console.error("Error getting notifications settings:", error);
-      return {};
-    }
+      return config.data?.grouped_settings?.notifications || {};
+    } catch { return {}; }
   }
 
-  /**
-   * Get data and reports settings
-   */
-  async getDataReportsSettings(): Promise<DataReportsSettings> {
+  async getReportsSettings(): Promise<ReportsSettings> {
     try {
       const config = await this.getGroupedConfig();
-      if (config.data?.grouped_settings?.data_reports) {
-        return config.data.grouped_settings.data_reports;
-      }
-      return {};
-    } catch (error) {
-      console.error("Error getting data & reports settings:", error);
-      return {};
-    }
+      return config.data?.grouped_settings?.reports || {};
+    } catch { return {}; }
   }
 
-  /**
-   * Get integrations settings
-   */
-  async getIntegrationsSettings(): Promise<IntegrationsSettings> {
-    try {
-      const config = await this.getGroupedConfig();
-      if (config.data?.grouped_settings?.integrations) {
-        return config.data.grouped_settings.integrations;
-      }
-      return {};
-    } catch (error) {
-      console.error("Error getting integrations settings:", error);
-      return {};
-    }
-  }
-
-  /**
-   * Get audit and security settings
-   */
   async getAuditSecuritySettings(): Promise<AuditSecuritySettings> {
     try {
       const config = await this.getGroupedConfig();
-      if (config.data?.grouped_settings?.audit_security) {
-        return config.data.grouped_settings.audit_security;
-      }
-      return {};
-    } catch (error) {
-      console.error("Error getting audit & security settings:", error);
-      return {};
-    }
+      return config.data?.grouped_settings?.audit_security || {};
+    } catch { return {}; }
   }
 
-  /**
-   * Update general settings
-   */
-  async updateGeneralSettings(
-    settings: Partial<GeneralSettings>,
-  ): Promise<SystemConfigResponse> {
+  async getIntegrationsSettings(): Promise<IntegrationsSettings> {
+    try {
+      const config = await this.getGroupedConfig();
+      return config.data?.grouped_settings?.integrations || {};
+    } catch { return {}; }
+  }
+
+  async updateGeneralSettings(settings: Partial<GeneralSettings>): Promise<SystemConfigResponse> {
     return this.updateCategorySettings("general", settings);
   }
 
-  /**
-   * Update notifications settings
-   */
-  async updateNotificationsSettings(
-    settings: Partial<NotificationsSettings>,
-  ): Promise<SystemConfigResponse> {
+  async updateCollectionsSettings(settings: Partial<CollectionsSettings>): Promise<SystemConfigResponse> {
+    return this.updateCategorySettings("collections", settings);
+  }
+
+  async updateLoanSettings(settings: Partial<LoanSettings>): Promise<SystemConfigResponse> {
+    return this.updateCategorySettings("loans", settings);
+  }
+
+  async updateNotificationsSettings(settings: Partial<NotificationsSettings>): Promise<SystemConfigResponse> {
     return this.updateCategorySettings("notifications", settings);
   }
 
-  /**
-   * Update data and reports settings
-   */
-  async updateDataReportsSettings(
-    settings: Partial<DataReportsSettings>,
-  ): Promise<SystemConfigResponse> {
-    return this.updateCategorySettings("data_reports", settings);
+  async updateReportsSettings(settings: Partial<ReportsSettings>): Promise<SystemConfigResponse> {
+    return this.updateCategorySettings("reports", settings);
   }
 
-  /**
-   * Update integrations settings
-   */
-  async updateIntegrationsSettings(
-    settings: Partial<IntegrationsSettings>,
-  ): Promise<SystemConfigResponse> {
-    return this.updateCategorySettings("integrations", settings);
-  }
-
-  /**
-   * Update audit and security settings
-   */
-  async updateAuditSecuritySettings(
-    settings: Partial<AuditSecuritySettings>,
-  ): Promise<SystemConfigResponse> {
+  async updateAuditSecuritySettings(settings: Partial<AuditSecuritySettings>): Promise<SystemConfigResponse> {
     return this.updateCategorySettings("audit_security", settings);
   }
 
-  /**
-   * Update settings for a specific category
-   */
-  async updateCategorySettings(
-    category: string,
-    settings: Record<string, any>,
-  ): Promise<SystemConfigResponse> {
-    const configData = {
-      [category]: settings,
-    };
-    return this.updateGroupedConfig(configData);
+  async updateIntegrationsSettings(settings: Partial<IntegrationsSettings>): Promise<SystemConfigResponse> {
+    return this.updateCategorySettings("integrations", settings);
   }
 
-  // 🔧 Utility Methods
+  async updateCategorySettings(category: string, settings: Record<string, any>): Promise<SystemConfigResponse> {
+    return this.updateGroupedConfig({ [category]: settings });
+  }
 
-  /**
-   * Get all settings as a flat object
-   */
   async getAllSettingsAsObject(): Promise<Record<string, any>> {
     try {
-      const settings = await this.getAllSettings();
+      const response = await this.getAllSettings();
       const result: Record<string, any> = {};
-
-      if (settings.data) {
-        settings.data.forEach((setting) => {
+      if (response.data) {
+        response.data.forEach(setting => {
           result[`${setting.setting_type}.${setting.key}`] = setting.value;
         });
       }
-
       return result;
-    } catch (error) {
-      console.error("Error getting all settings as object:", error);
-      return {};
-    }
+    } catch { return {}; }
   }
 
-  /**
-   * Get setting value by category and key
-   */
-  async getSetting(
-    category: string,
-    key: string,
-    defaultValue?: any,
-  ): Promise<any> {
+  async getSetting(category: string, key: string, defaultValue?: any): Promise<any> {
     try {
       const fullKey = `${category}.${key}`;
       const settings = await this.getAllSettingsAsObject();
       return settings[fullKey] ?? defaultValue;
-    } catch (error) {
-      console.error(`Error getting setting ${category}.${key}:`, error);
-      return defaultValue;
-    }
+    } catch { return defaultValue; }
   }
 
-  /**
-   * Set setting value by category and key
-   */
-  async setSetting(
-    category: string,
-    key: string,
-    value: any,
-    description?: string,
-  ): Promise<SettingResponse> {
-    const options = {
+  async setSetting(category: string, key: string, value: any, description?: string): Promise<SettingResponse> {
+    return this.setValueByKey(key, value, {
       setting_type: category as SettingType,
       description: description || `Setting for ${category}.${key}`,
       isPublic: false,
-    };
-
-    return this.setValueByKey(key, value, options);
+    });
   }
 
-  /**
-   * Check if a setting exists
-   */
-  async settingExists(
-    key: string,
-    settingType?: SettingType,
-  ): Promise<boolean> {
+  async settingExists(key: string, settingType?: SettingType): Promise<boolean> {
     try {
       const response = await this.getSettingByKey(key, settingType);
       return response.status && response.data !== null;
-    } catch (error) {
-      return false;
-    }
+    } catch { return false; }
   }
 
-  /**
-   * Get boolean setting value
-   */
-  async getBooleanSetting(
-    category: string,
-    key: string,
-    defaultValue: boolean = false,
-  ): Promise<boolean> {
-    try {
-      const value = await this.getSetting(category, key, defaultValue);
-
-      if (typeof value === "boolean") return value;
-      if (typeof value === "string") {
-        return value.toLowerCase() === "true" || value === "1";
-      }
-      if (typeof value === "number") {
-        return value === 1;
-      }
-
-      return defaultValue;
-    } catch (error) {
-      console.error(`Error getting boolean setting ${category}.${key}:`, error);
-      return defaultValue;
-    }
+  async getBooleanSetting(category: string, key: string, defaultValue = false): Promise<boolean> {
+    const value = await this.getSetting(category, key, defaultValue);
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string") return value.toLowerCase() === "true" || value === "1";
+    if (typeof value === "number") return value === 1;
+    return defaultValue;
   }
 
-  /**
-   * Get numeric setting value
-   */
-  async getNumberSetting(
-    category: string,
-    key: string,
-    defaultValue: number = 0,
-  ): Promise<number> {
-    try {
-      const value = await this.getSetting(category, key, defaultValue);
-      const num = parseFloat(value);
-      return isNaN(num) ? defaultValue : num;
-    } catch (error) {
-      console.error(`Error getting number setting ${category}.${key}:`, error);
-      return defaultValue;
-    }
+  async getNumberSetting(category: string, key: string, defaultValue = 0): Promise<number> {
+    const value = await this.getSetting(category, key, defaultValue);
+    const num = parseFloat(value);
+    return isNaN(num) ? defaultValue : num;
   }
 
-  /**
-   * Get string setting value
-   */
-  async getStringSetting(
-    category: string,
-    key: string,
-    defaultValue: string = "",
-  ): Promise<string> {
-    try {
-      const value = await this.getSetting(category, key, defaultValue);
-      return String(value);
-    } catch (error) {
-      console.error(`Error getting string setting ${category}.${key}:`, error);
-      return defaultValue;
-    }
+  async getStringSetting(category: string, key: string, defaultValue = ""): Promise<string> {
+    const value = await this.getSetting(category, key, defaultValue);
+    return String(value);
   }
 
-  /**
-   * Get array setting value
-   */
-  async getArraySetting(
-    category: string,
-    key: string,
-    defaultValue: any[] = [],
-  ): Promise<any[]> {
-    try {
-      const value = await this.getSetting(category, key, defaultValue);
-
-      if (Array.isArray(value)) return value;
-      if (typeof value === "string") {
-        try {
-          return JSON.parse(value);
-        } catch {
-          return defaultValue;
-        }
-      }
-
-      return defaultValue;
-    } catch (error) {
-      console.error(`Error getting array setting ${category}.${key}:`, error);
-      return defaultValue;
+  async getArraySetting(category: string, key: string, defaultValue: any[] = []): Promise<any[]> {
+    const value = await this.getSetting(category, key, defaultValue);
+    if (Array.isArray(value)) return value;
+    if (typeof value === "string") {
+      try { return JSON.parse(value); } catch { return defaultValue; }
     }
+    return defaultValue;
   }
 
-  /**
-   * Get object setting value
-   */
-  async getObjectSetting(
-    category: string,
-    key: string,
-    defaultValue: object = {},
-  ): Promise<object> {
-    try {
-      const value = await this.getSetting(category, key, defaultValue);
-
-      if (typeof value === "object" && value !== null && !Array.isArray(value))
-        return value;
-      if (typeof value === "string") {
-        try {
-          const parsed = JSON.parse(value);
-          if (
-            typeof parsed === "object" &&
-            parsed !== null &&
-            !Array.isArray(parsed)
-          ) {
-            return parsed;
-          }
-        } catch {
-          return defaultValue;
-        }
-      }
-
-      return defaultValue;
-    } catch (error) {
-      console.error(`Error getting object setting ${category}.${key}:`, error);
-      return defaultValue;
+  async getObjectSetting(category: string, key: string, defaultValue: object = {}): Promise<object> {
+    const value = await this.getSetting(category, key, defaultValue);
+    if (typeof value === "object" && value !== null && !Array.isArray(value)) return value;
+    if (typeof value === "string") {
+      try { const parsed = JSON.parse(value); if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) return parsed; } catch {}
     }
+    return defaultValue;
   }
 
-  /**
-   * Initialize default settings if they don't exist
-   */
   async initializeDefaultSettings(): Promise<void> {
-    try {
-      // Default general settings
-      const defaultSettings = [
-        {
-          key: "company_name",
-          value: "Debtify",
-          setting_type: SettingType.GENERAL,
-          description: "Company name",
-        },
-        {
-          key: "default_timezone",
-          value: "Asia/Manila",
-          setting_type: SettingType.GENERAL,
-          description: "Default timezone",
-        },
-      ];
-
-      for (const setting of defaultSettings) {
-        const exists = await this.settingExists(
-          setting.key,
-          setting.setting_type,
-        );
-        if (!exists) {
-          await this.createSetting({
-            key: setting.key,
-            value: setting.value,
-            setting_type: setting.setting_type,
-            description: setting.description,
-            isPublic: false,
-          });
-        }
-      }
-    } catch (error) {
-      console.error("Error initializing default settings:", error);
+    const defaults: CreateSettingData[] = [
+      { key: "company_name", value: "Debtify", setting_type: SettingType.GENERAL, description: "Company name", isPublic: false },
+      { key: "default_timezone", value: "Asia/Manila", setting_type: SettingType.GENERAL, description: "Default timezone", isPublic: false },
+      { key: "currency", value: "PHP", setting_type: SettingType.GENERAL, description: "Currency", isPublic: true },
+      { key: "default_interest_rate", value: 10, setting_type: SettingType.COLLECTIONS, description: "Default interest rate (%)", isPublic: false },
+      { key: "default_penalty_rate", value: 2, setting_type: SettingType.COLLECTIONS, description: "Default penalty rate (%) per day", isPublic: false },
+      { key: "overdue_reminder_days", value: [7,3,1], setting_type: SettingType.COLLECTIONS, description: "Days before due to send reminders", isPublic: false },
+      { key: "enable_auto_penalty", value: true, setting_type: SettingType.COLLECTIONS, description: "Automatically apply penalty on overdue", isPublic: false },
+      { key: "email_enabled", value: false, setting_type: SettingType.NOTIFICATIONS, description: "Enable email notifications", isPublic: false },
+      { key: "sms_enabled", value: false, setting_type: SettingType.NOTIFICATIONS, description: "Enable SMS notifications", isPublic: false },
+      { key: "audit_log_enabled", value: true, setting_type: SettingType.AUDIT_SECURITY, description: "Enable audit logging", isPublic: false },
+    ];
+    for (const def of defaults) {
+      const exists = await this.settingExists(def.key, def.setting_type);
+      if (!exists) await this.createSetting(def);
     }
   }
 
-  /**
-   * Export settings to JSON file
-   */
   async exportSettingsToFile(): Promise<string> {
-    try {
-      const config = await this.getGroupedConfig();
-      const jsonStr = JSON.stringify(config.data, null, 2);
-
-      // In a real implementation, you would use the file system API
-      // For now, we'll return the JSON string
-      return jsonStr;
-    } catch (error) {
-      console.error("Error exporting settings:", error);
-      throw error;
-    }
+    const config = await this.getGroupedConfig();
+    return JSON.stringify(config.data, null, 2);
   }
 
-  /**
-   * Import settings from JSON file
-   */
-  async importSettingsFromFile(
-    jsonData: string,
-  ): Promise<SystemConfigResponse> {
-    try {
-      const configData = JSON.parse(jsonData);
-      return this.updateGroupedConfig(configData);
-    } catch (error) {
-      console.error("Error importing settings:", error);
-      throw error;
-    }
+  async importSettingsFromFile(jsonData: string): Promise<SystemConfigResponse> {
+    const configData = JSON.parse(jsonData);
+    return this.updateGroupedConfig(configData);
   }
 
-  /**
-   * Reset settings to default values
-   */
   async resetToDefaults(): Promise<SystemConfigResponse> {
-    try {
-      // Clear all existing settings
-      const allSettings = await this.getAllSettings();
-      const ids = allSettings.data?.map((setting) => setting.id) || [];
-
-      if (ids.length > 0) {
-        await this.bulkDelete(ids);
-      }
-
-      // Initialize default settings
-      await this.initializeDefaultSettings();
-
-      // Return updated configuration
-      return this.getGroupedConfig();
-    } catch (error) {
-      console.error("Error resetting settings to defaults:", error);
-      throw error;
-    }
+    const all = await this.getAllSettings();
+    const ids = all.data?.map(s => s.id) || [];
+    if (ids.length) await this.bulkDelete(ids);
+    await this.initializeDefaultSettings();
+    return this.getGroupedConfig();
   }
 
-  /**
-   * Get system health status
-   */
-  async getSystemHealth(): Promise<{
-    settings_count: number;
-    last_updated: string;
-    has_errors: boolean;
-    categories: string[];
-  }> {
+  async getSystemHealth(): Promise<{ settings_count: number; last_updated: string; has_errors: boolean; categories: string[] }> {
     try {
       const stats = await this.getSettingsStats();
       const config = await this.getGroupedConfig();
-
       return {
         settings_count: stats.data?.total || 0,
-        last_updated:
-          config.data?.system_info?.current_time || new Date().toISOString(),
+        last_updated: config.data?.system_info?.current_time || new Date().toISOString(),
         has_errors: false,
         categories: config.data?.system_info?.setting_types || [],
       };
-    } catch (error) {
-      console.error("Error getting system health:", error);
-      return {
-        settings_count: 0,
-        last_updated: new Date().toISOString(),
-        has_errors: true,
-        categories: [],
-      };
+    } catch {
+      return { settings_count: 0, last_updated: new Date().toISOString(), has_errors: true, categories: [] };
     }
   }
 
-  /**
-   * Validate settings configuration
-   */
-  async validateSettings(): Promise<{
-    valid: boolean;
-    errors: string[];
-    warnings: string[];
-  }> {
+  async validateSettings(): Promise<{ valid: boolean; errors: string[]; warnings: string[] }> {
+    const errors: string[] = [];
+    const warnings: string[] = [];
     try {
       const config = await this.getGroupedConfig();
-      const errors: string[] = [];
-      const warnings: string[] = [];
-
-      // Basic validation
-      if (!config.data) {
-        errors.push("No configuration data found");
-        return { valid: false, errors, warnings };
-      }
-
-      const settings = config.data.settings || [];
-
-      // Check for required settings
-      const requiredSettings = [
-        { category: "general", key: "company_name" },
-        { category: "general", key: "default_timezone" },
-        { category: "booking_rules", key: "default_appointment_duration" },
-      ];
-
-      for (const required of requiredSettings) {
-        const exists = settings.some(
-          (s) =>
-            s.setting_type === required.category &&
-            s.key === required.key &&
-            !s.is_deleted,
-        );
-
-        if (!exists) {
-          warnings.push(
-            `Missing setting: ${required.category}.${required.key}`,
-          );
-        }
-      }
-
-      // Validate email settings if email is enabled
-      const emailEnabled = await this.getBooleanSetting(
-        "notifications",
-        "email_enabled",
-      );
+      if (!config.data) errors.push("No configuration data found");
+      const general = config.data?.grouped_settings?.general;
+      if (general && !general.company_name) warnings.push("Company name not set");
+      const emailEnabled = await this.getBooleanSetting("notifications", "email_enabled");
       if (emailEnabled) {
-        const emailSettings = [
-          "email_smtp_host",
-          "email_smtp_port",
-          "email_from_address",
-        ];
-        for (const setting of emailSettings) {
-          const value = await this.getStringSetting("notifications", setting);
-          if (!value) {
-            warnings.push(
-              `Email setting ${setting} is empty but email is enabled`,
-            );
-          }
-        }
+        const host = await this.getStringSetting("notifications", "email_smtp_host");
+        if (!host) warnings.push("Email enabled but SMTP host not configured");
       }
-
-      return {
-        valid: errors.length === 0,
-        errors,
-        warnings,
-      };
-    } catch (error) {
-      console.error("Error validating settings:", error);
-      return {
-        valid: false,
-        errors: [`Validation error: ${error}`],
-        warnings: [],
-      };
+      return { valid: errors.length === 0, errors, warnings };
+    } catch (e: any) {
+      errors.push(e.message);
+      return { valid: false, errors, warnings };
     }
   }
 
   async getPublicSystemSettings(): Promise<PublicSystemSettings> {
-    try {
-      if (!window.backendAPI || !window.backendAPI.systemConfig) {
-        throw new Error("Electron API not available");
-      }
-
-      const response = await window.backendAPI.systemConfig({
-        method: "getPublicSystemSettings",
-        params: {},
-      });
-
-      if (response.status) {
-        return response.data;
-      }
-      throw new Error(response.message || "Failed to fetch public settings");
-    } catch (error: any) {
-      throw new Error(error.message || "Failed to fetch public settings");
-    }
+    if (!window.backendAPI?.systemConfig) throw new Error("Electron API not available");
+    const response = await window.backendAPI.systemConfig({ method: "getPublicSystemSettings", params: {} });
+    if (response.status) return response.data;
+    throw new Error(response.message || "Failed to fetch public settings");
   }
 
-  async getSystemInfoForFrontend(): Promise<{
-    system_info: FrontendSystemInfo;
-    public_settings: any;
-    cache_timestamp: string;
-  }> {
-    try {
-      if (!window.backendAPI || !window.backendAPI.systemConfig) {
-        throw new Error("Electron API not available");
-      }
-
-      const response = await window.backendAPI.systemConfig({
-        method: "getSystemInfoForFrontend",
-        params: {},
-      });
-
-      if (response.status) {
-        return response.data;
-      }
-      throw new Error(response.message || "Failed to fetch system info");
-    } catch (error: any) {
-      throw new Error(error.message || "Failed to fetch system info");
-    }
+  async getSystemInfoForFrontend(): Promise<{ system_info: FrontendSystemInfo; public_settings: any; cache_timestamp: string }> {
+    if (!window.backendAPI?.systemConfig) throw new Error("Electron API not available");
+    const response = await window.backendAPI.systemConfig({ method: "getSystemInfoForFrontend", params: {} });
+    if (response.status) return response.data;
+    throw new Error(response.message || "Failed to fetch system info");
   }
 }
 
 const systemConfigAPI = new SystemConfigAPI();
-
 export default systemConfigAPI;

@@ -4,8 +4,8 @@ import Modal from "../../../../components/UI/Modal";
 import Button from "../../../../components/UI/Button";
 import { dialogs } from "../../../../utils/dialogs";
 import borrowersAPI from "../../../../api/core/borrower";
+import loanApplicationsAPI from "../../../../api/core/loan_application";
 import type { Borrower } from "../../../../api/core/borrower";
-import { createApplication } from "../services/mockApplicationService";
 
 interface ApplicationFormModalProps {
   isOpen: boolean;
@@ -62,6 +62,8 @@ const ApplicationFormModal: React.FC<ApplicationFormModalProps> = ({ isOpen, onC
     if (formData.requestedAmount <= 0) { dialogs.error("Requested amount must be greater than zero"); return; }
     if (!formData.purpose.trim()) { dialogs.error("Purpose is required"); return; }
     if (!formData.proposedDueDate) { dialogs.error("Due date is required"); return; }
+    if (formData.debtorType === "existing" && !formData.debtorId) { dialogs.error("Please select a debtor"); return; }
+    if (formData.debtorType === "new" && !formData.newDebtorName.trim()) { dialogs.error("New debtor name is required"); return; }
 
     setSubmitting(true);
     try {
@@ -71,7 +73,7 @@ const ApplicationFormModal: React.FC<ApplicationFormModalProps> = ({ isOpen, onC
         proposedDueDate: formData.proposedDueDate,
         interestRate: formData.interestRate || null,
       };
-      if (formData.debtorType === "existing" && formData.debtorId) {
+      if (formData.debtorType === "existing") {
         createData.debtorId = formData.debtorId;
       } else {
         createData.newDebtor = {
@@ -81,10 +83,14 @@ const ApplicationFormModal: React.FC<ApplicationFormModalProps> = ({ isOpen, onC
           address: formData.newDebtorAddress || null,
         };
       }
-      await createApplication(createData);
-      dialogs.success("Loan application submitted successfully");
-      onSuccess();
-      onClose();
+      const response = await loanApplicationsAPI.create(createData);
+      if (response.status) {
+        dialogs.success("Loan application submitted successfully");
+        onSuccess();
+        onClose();
+      } else {
+        throw new Error(response.message);
+      }
     } catch (err: any) {
       dialogs.error(err.message);
     } finally {

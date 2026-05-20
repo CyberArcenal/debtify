@@ -1,10 +1,10 @@
 // src/renderer/pages/payments/schedule/components/MarkPaidModal.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Modal from "../../../../components/UI/Modal";
 import Button from "../../../../components/UI/Button";
 import { dialogs } from "../../../../utils/dialogs";
 import type { ScheduledPayment } from "../types";
-import { formatCurrency } from "../../../../utils/formatters";
+import { formatCurrency, formatDate } from "../../../../utils/formatters";
 
 interface MarkPaidModalProps {
   isOpen: boolean;
@@ -25,7 +25,7 @@ const MarkPaidModal: React.FC<MarkPaidModalProps> = ({
   );
   const [submitting, setSubmitting] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (payment) setAmount(payment.amountDue);
   }, [payment]);
 
@@ -42,7 +42,7 @@ const MarkPaidModal: React.FC<MarkPaidModalProps> = ({
     }
     setSubmitting(true);
     try {
-      await onConfirm(amount, paymentDate);
+      await onConfirm(Number(payment.amountDue.toFixed(2)), paymentDate);
       dialogs.success("Payment recorded successfully");
       onClose();
     } catch (err: any) {
@@ -64,7 +64,7 @@ const MarkPaidModal: React.FC<MarkPaidModalProps> = ({
               <strong>Debt:</strong> {payment.debtName}
             </p>
             <p>
-              <strong>Due Date:</strong> {payment.dueDate}
+              <strong>Due Date:</strong> {formatDate(payment.dueDate)}
             </p>
             <p>
               <strong>Amount Due:</strong> {formatCurrency(payment.amountDue)}
@@ -78,7 +78,7 @@ const MarkPaidModal: React.FC<MarkPaidModalProps> = ({
               type="number"
               step="0.01"
               required
-              value={amount}
+              value={amount.toFixed(2)}
               onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
               className="w-full px-3 py-2 border rounded-md"
             />

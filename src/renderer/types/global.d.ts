@@ -5,7 +5,7 @@ export {};
 declare global {
   interface Window {
     backendAPI: {
-      // ========== CORE MODULES (existing) ==========
+      // ========== CORE MODULES ==========
       auditLog: (payload: any) => Promise<any>;
       activation: (payload: any) => Promise<any>;
       notification: (payload: any) => Promise<any>;
@@ -28,6 +28,20 @@ declare global {
       loanAgreement: (payload: any) => Promise<any>;
       paymentTransaction: (payload: any) => Promise<any>;
       penaltyTransaction: (payload: any) => Promise<any>;
+
+      // ========== NEW DEBT MANAGEMENT MODULES ==========
+      group: (payload: any) => Promise<any>;
+      loanApplication: (payload: any) => Promise<any>;
+      paymentMethod: (payload: any) => Promise<any>;
+      printer: (payload: any) => Promise<any>;
+      creditCheck: (payload: any) => Promise<any>;
+
+      // ========== PRINTER CONVENIENCE METHODS ==========
+      printerGetStatus: () => Promise<{ driverLoaded: boolean; isReady: boolean }>;
+      printerIsAvailable: () => Promise<boolean>;
+      printerReload: () => Promise<{ driverLoaded: boolean; isReady: boolean }>;
+      printerPrint: (sale: any) => Promise<boolean>;
+      printerTestPrint: () => Promise<boolean>;
 
       // ========== UTILITIES & WINDOW CONTROL ==========
       windowControl: (payload: {

@@ -1,4 +1,4 @@
-// src/main/ipc/paymenttransaction/index.ipc.js
+// src/main/ipc/core/paymenttransaction/index.ipc.js
 //@ts-check
 const { ipcMain } = require("electron");
 const { logger } = require("../../../../utils/logger");

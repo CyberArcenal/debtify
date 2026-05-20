@@ -32,7 +32,7 @@ import {
 } from "lucide-react";
 import { formatCurrency } from "../utils/formatters";
 import { useSettings } from "../contexts/SettingsContext";
-import dashboardAPI from "../api/core/analytics";
+import dashboardAPI from "../api/analytics/analytics";
 import debtsAPI from "../api/core/debt";
 
 interface SidebarProps {
@@ -101,7 +101,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen }) => {
         { path: "/payments/schedule", name: "Payment Schedule", icon: CalendarDays },
         { path: "/payments/transactions", name: "Transaction Log", icon: Receipt },
         { path: "/payments/methods", name: "Payment Methods", icon: CreditCard },
-        // { path: "/payments/reminders", name: "Reminders", icon: Bell },
+        { path: "/notification-logs", name: "Reminders", icon: Bell },
       ],
     },
     {
@@ -123,7 +123,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen }) => {
       category: "system",
       children: [
         { path: "/system/audit", name: "Audit Trail", icon: ListChecks },
-        { path: "/notification-logs", name: "Notification Logs", icon: Bell },
+        // { path: "/notification-logs", name: "Notification Logs", icon: Bell },
         { path: "/devices", name: "Device Manager", icon: ComputerIcon },
         { path: "/system/settings", name: "System Settings", icon: Sliders },
       ],

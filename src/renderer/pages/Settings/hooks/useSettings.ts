@@ -1,55 +1,52 @@
+// src/renderer/pages/Settings/hooks/useSettings.ts
 import { useState, useEffect, useCallback } from "react";
 import systemConfigAPI, {
   type GroupedSettingsData,
   type SystemInfoData,
   type GeneralSettings,
-  type InventorySettings,
-  type SalesSettings,
-  type CashierSettings,
+  type CollectionsSettings,
+  type LoanSettings,
   type NotificationsSettings,
-  type DataReportsSettings,
+  type ReportsSettings,
   type IntegrationsSettings,
   type AuditSecuritySettings,
 } from "../../../api/utils/system_config";
 import { dialogs } from "../../../utils/dialogs";
-import { useSettings as useSettings1 } from "../../../contexts/SettingsContext";
-// ========== Default values for every category ==========
+import { useSettings as useSettingsContext } from "../../../contexts/SettingsContext";
+
+// ========== Default values for each category ==========
 const DEFAULT_GENERAL: GeneralSettings = {
   company_name: "Debtify",
-  store_location: "",
+  branch_location: "",
   default_timezone: "Asia/Manila",
-  currency: "USD",
+  currency: "PHP",
   language: "en",
-  receipt_footer_message: "Thank you for your purchase!",
+  receipt_footer_message: "Thank you for your payment!",
   auto_logout_minutes: 30,
+  date_format: "YYYY-MM-DD",
 };
 
-const DEFAULT_INVENTORY: InventorySettings = {
-  auto_reorder_enabled: false,
-  reorder_level_default: 10,
-  reorder_qty_default: 20,
-  stock_alert_threshold: 5,
-  allow_negative_stock: false,
-  inventory_sync_enabled: false,
+const DEFAULT_COLLECTIONS: CollectionsSettings = {
+  default_interest_rate: 10,
+  default_penalty_rate: 2,
+  penalty_calculation_method: "percentage",
+  enable_auto_penalty: true,
+  penalty_grace_days: 0,
+  overdue_reminder_days: [7, 3, 1],
+  max_loan_amount: 0,
+  min_loan_amount: 0,
+  enforce_credit_check: false,
 };
 
-const DEFAULT_SALES: SalesSettings = {
-  discount_enabled: true,
-  max_discount_percent: 50,
-  allow_refunds: true,
-  refund_window_days: 7,
-  loyalty_points_enabled: false,
-  loyalty_points_rate: 100,
-};
-
-const DEFAULT_CASHIER: CashierSettings = {
-  enable_cash_drawer: false,
-  drawer_open_code: "",
-  enable_receipt_printing: true,
-  receipt_printer_type: "thermal",
-  enable_barcode_scanning: true,
-  enable_touchscreen_mode: false,
-  quick_sale_enabled: false,
+const DEFAULT_LOANS: LoanSettings = {
+  allowed_loan_statuses: ["active", "paid", "overdue", "defaulted"],
+  enable_partial_payment: true,
+  enable_early_payment_discount: false,
+  early_payment_discount_rate: 0,
+  require_loan_agreement: false,
+  loan_agreement_template: "",
+  amortization_type: "flat",
+  default_loan_term_months: 12,
 };
 
 const DEFAULT_NOTIFICATIONS: NotificationsSettings = {
@@ -59,41 +56,33 @@ const DEFAULT_NOTIFICATIONS: NotificationsSettings = {
   email_from_address: "",
   sms_enabled: false,
   sms_provider: "twilio",
-  push_notifications_enabled: false,
-  low_stock_alert_enabled: true,
-  daily_sales_summary_enabled: false,
+  reminder_days_before_due: [7, 3, 1],
+  overdue_notification_frequency: "daily",
+  notify_on_payment: true,
+  notify_on_penalty: true,
   twilio_account_sid: "",
   twilio_auth_token: "",
   twilio_phone_number: "",
   twilio_messaging_service_sid: "",
-  notify_supplier_with_sms: false,
-  notify_supplier_with_email: false,
-  notify_supplier_on_complete_email: false,
-  notify_supplier_on_complete_sms: false,
-  notify_supplier_on_cancel_email: false,
-  notify_supplier_on_cancel_sms: false,
-  notify_customer_return_processed_email: false,
-  notify_customer_return_processed_sms: false,
-  notify_customer_return_cancelled_email: false,
-  notify_customer_return_cancelled_sms: false,
 };
 
-const DEFAULT_DATA_REPORTS: DataReportsSettings = {
+const DEFAULT_REPORTS: ReportsSettings = {
   export_formats: ["CSV", "Excel", "PDF"],
   default_export_format: "CSV",
   auto_backup_enabled: false,
   backup_schedule: "0 2 * * *",
   backup_location: "./backups",
   data_retention_days: 365,
+  include_audit_in_backup: false,
 };
 
 const DEFAULT_INTEGRATIONS: IntegrationsSettings = {
   accounting_integration_enabled: false,
   accounting_api_url: "",
   accounting_api_key: "",
-  payment_gateway_enabled: false,
-  payment_gateway_provider: "",
-  payment_gateway_api_key: "",
+  credit_bureau_api_enabled: false,
+  credit_bureau_api_key: "",
+  credit_bureau_endpoint: "",
   webhooks_enabled: false,
   webhooks: [],
 };
@@ -101,59 +90,55 @@ const DEFAULT_INTEGRATIONS: IntegrationsSettings = {
 const DEFAULT_AUDIT_SECURITY: AuditSecuritySettings = {
   audit_log_enabled: true,
   log_retention_days: 30,
-  log_events: ["login", "logout", "create", "update", "delete"],
+  log_events: ["CREATE", "UPDATE", "DELETE", "LOGIN", "LOGOUT"],
   force_https: false,
   session_encryption_enabled: true,
   gdpr_compliance_enabled: false,
+  require_mfa_for_admin: false,
 };
 
-// Combined defaults
 const DEFAULTS = {
   general: DEFAULT_GENERAL,
-  inventory: DEFAULT_INVENTORY,
-  sales: DEFAULT_SALES,
-  cashier: DEFAULT_CASHIER,
+  collections: DEFAULT_COLLECTIONS,
+  loans: DEFAULT_LOANS,
   notifications: DEFAULT_NOTIFICATIONS,
-  data_reports: DEFAULT_DATA_REPORTS,
+  reports: DEFAULT_REPORTS,
   integrations: DEFAULT_INTEGRATIONS,
   audit_security: DEFAULT_AUDIT_SECURITY,
 };
 
-// Allowed keys per category – derived from the interfaces
+// Allowed keys per category
 const ALLOWED_KEYS: Record<keyof typeof DEFAULTS, string[]> = {
   general: [
     "company_name",
-    "store_location",
+    "branch_location",
     "default_timezone",
     "currency",
     "language",
     "receipt_footer_message",
     "auto_logout_minutes",
+    "date_format",
   ],
-  inventory: [
-    "auto_reorder_enabled",
-    "reorder_level_default",
-    "reorder_qty_default",
-    "stock_alert_threshold",
-    "allow_negative_stock",
-    "inventory_sync_enabled",
+  collections: [
+    "default_interest_rate",
+    "default_penalty_rate",
+    "penalty_calculation_method",
+    "enable_auto_penalty",
+    "penalty_grace_days",
+    "overdue_reminder_days",
+    "max_loan_amount",
+    "min_loan_amount",
+    "enforce_credit_check",
   ],
-  sales: [
-    "discount_enabled",
-    "max_discount_percent",
-    "allow_refunds",
-    "refund_window_days",
-    "loyalty_points_enabled",
-    "loyalty_points_rate",
-  ],
-  cashier: [
-    "enable_cash_drawer",
-    "drawer_open_code",
-    "enable_receipt_printing",
-    "receipt_printer_type",
-    "enable_barcode_scanning",
-    "enable_touchscreen_mode",
-    "quick_sale_enabled",
+  loans: [
+    "allowed_loan_statuses",
+    "enable_partial_payment",
+    "enable_early_payment_discount",
+    "early_payment_discount_rate",
+    "require_loan_agreement",
+    "loan_agreement_template",
+    "amortization_type",
+    "default_loan_term_months",
   ],
   notifications: [
     "email_enabled",
@@ -162,39 +147,31 @@ const ALLOWED_KEYS: Record<keyof typeof DEFAULTS, string[]> = {
     "email_from_address",
     "sms_enabled",
     "sms_provider",
-    "push_notifications_enabled",
-    "low_stock_alert_enabled",
-    "daily_sales_summary_enabled",
+    "reminder_days_before_due",
+    "overdue_notification_frequency",
+    "notify_on_payment",
+    "notify_on_penalty",
     "twilio_account_sid",
     "twilio_auth_token",
     "twilio_phone_number",
     "twilio_messaging_service_sid",
-    "notify_supplier_with_sms",
-    "notify_supplier_with_email",
-    "notify_supplier_on_complete_email",
-    "notify_supplier_on_complete_sms",
-    "notify_supplier_on_cancel_email",
-    "notify_supplier_on_cancel_sms",
-    "notify_customer_return_processed_email",
-    "notify_customer_return_processed_sms",
-    "notify_customer_return_cancelled_email",
-    "notify_customer_return_cancelled_sms",
   ],
-  data_reports: [
+  reports: [
     "export_formats",
     "default_export_format",
     "auto_backup_enabled",
     "backup_schedule",
     "backup_location",
     "data_retention_days",
+    "include_audit_in_backup",
   ],
   integrations: [
     "accounting_integration_enabled",
     "accounting_api_url",
     "accounting_api_key",
-    "payment_gateway_enabled",
-    "payment_gateway_provider",
-    "payment_gateway_api_key",
+    "credit_bureau_api_enabled",
+    "credit_bureau_api_key",
+    "credit_bureau_endpoint",
     "webhooks_enabled",
     "webhooks",
   ],
@@ -205,6 +182,7 @@ const ALLOWED_KEYS: Record<keyof typeof DEFAULTS, string[]> = {
     "force_https",
     "session_encryption_enabled",
     "gdpr_compliance_enabled",
+    "require_mfa_for_admin",
   ],
 };
 
@@ -223,7 +201,7 @@ function sanitizeSettings<T extends Record<string, any>>(
 }
 
 export const useSettings = () => {
-  const { refreshSettings } = useSettings1();
+  const { refreshSettings } = useSettingsContext();
   const [groupedConfig, setGroupedConfig] = useState(DEFAULTS);
   const [systemInfo, setSystemInfo] = useState<SystemInfoData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -244,17 +222,13 @@ export const useSettings = () => {
         const apiSettings = configRes.data.grouped_settings;
         setGroupedConfig({
           general: { ...DEFAULTS.general, ...apiSettings.general },
-          inventory: { ...DEFAULTS.inventory, ...apiSettings.inventory },
-          sales: { ...DEFAULTS.sales, ...apiSettings.sales },
-          cashier: { ...DEFAULTS.cashier, ...apiSettings.cashier },
+          collections: { ...DEFAULTS.collections, ...apiSettings.collections },
+          loans: { ...DEFAULTS.loans, ...apiSettings.loans },
           notifications: {
             ...DEFAULTS.notifications,
             ...apiSettings.notifications,
           },
-          data_reports: {
-            ...DEFAULTS.data_reports,
-            ...apiSettings.data_reports,
-          },
+          reports: { ...DEFAULTS.reports, ...apiSettings.reports },
           integrations: {
             ...DEFAULTS.integrations,
             ...apiSettings.integrations,
@@ -297,18 +271,16 @@ export const useSettings = () => {
   // Category-specific updaters
   const updateGeneral = (field: keyof GeneralSettings, value: any) =>
     updateCategoryField("general", field, value);
-  const updateInventory = (field: keyof InventorySettings, value: any) =>
-    updateCategoryField("inventory", field, value);
-  const updateSales = (field: keyof SalesSettings, value: any) =>
-    updateCategoryField("sales", field, value);
-  const updateCashier = (field: keyof CashierSettings, value: any) =>
-    updateCategoryField("cashier", field, value);
+  const updateCollections = (field: keyof CollectionsSettings, value: any) =>
+    updateCategoryField("collections", field, value);
+  const updateLoans = (field: keyof LoanSettings, value: any) =>
+    updateCategoryField("loans", field, value);
   const updateNotifications = (
     field: keyof NotificationsSettings,
     value: any,
   ) => updateCategoryField("notifications", field, value);
-  const updateDataReports = (field: keyof DataReportsSettings, value: any) =>
-    updateCategoryField("data_reports", field, value);
+  const updateReports = (field: keyof ReportsSettings, value: any) =>
+    updateCategoryField("reports", field, value);
   const updateIntegrations = (field: keyof IntegrationsSettings, value: any) =>
     updateCategoryField("integrations", field, value);
   const updateAuditSecurity = (
@@ -322,36 +294,38 @@ export const useSettings = () => {
     setError(null);
     setSuccessMessage(null);
 
+    // Combine ALL categories into ONE payload
+    const combinedConfig: Record<string, any> = {};
     const categories = Object.keys(groupedConfig) as Array<
       keyof typeof DEFAULTS
     >;
-    const results = await Promise.allSettled(
-      categories.map(async (category) => {
-        const dataToSend = sanitizeSettings(
-          groupedConfig[category],
-          ALLOWED_KEYS[category],
-        );
-        return systemConfigAPI.updateGroupedConfig({
-          [category]: dataToSend,
-        });
-      }),
-    );
 
-    const failed = results.filter((r) => r.status === "rejected");
-    if (failed.length > 0) {
-      const errors = failed.map(
-        (f) => (f as PromiseRejectedResult).reason?.message || "Unknown error",
+    for (const category of categories) {
+      const dataToSend = sanitizeSettings(
+        groupedConfig[category],
+        ALLOWED_KEYS[category],
       );
-      setError(
-        `Failed to save ${failed.length} category(s): ${errors.join("; ")}`,
-      );
-    } else {
-      setSuccessMessage("All settings saved successfully");
-      fetchSettings(); // refresh to get latest timestamps
+      if (Object.keys(dataToSend).length > 0) {
+        combinedConfig[category] = dataToSend;
+      }
     }
 
-    setSaving(false);
-    refreshSettings();
+    try {
+      // Send a single request instead of Promise.all
+      const response =
+        await systemConfigAPI.updateGroupedConfig(combinedConfig);
+      if (response.status) {
+        setSuccessMessage("All settings saved successfully");
+        await fetchSettings(); // refresh to get latest timestamps
+      } else {
+        throw new Error(response.message);
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to save settings");
+    } finally {
+      setSaving(false);
+      refreshSettings();
+    }
   };
 
   const resetToDefaults = async () => {
@@ -447,11 +421,10 @@ export const useSettings = () => {
     setError,
     setSuccessMessage,
     updateGeneral,
-    updateInventory,
-    updateSales,
-    updateCashier,
+    updateCollections,
+    updateLoans,
     updateNotifications,
-    updateDataReports,
+    updateReports,
     updateIntegrations,
     updateAuditSecurity,
     saveSettings,

@@ -4,11 +4,10 @@ import { SettingType } from "../../../api/utils/system_config";
 
 const tabs: { id: SettingType; label: string }[] = [
   { id: "general", label: "General" },
-  { id: "inventory", label: "Inventory" },
-  { id: "sales", label: "Sales" },
-  { id: "cashier", label: "Cashier" },
+  { id: "collections", label: "Collections" },
+  { id: "loans", label: "Loans" },
   { id: "notifications", label: "Notifications" },
-  { id: "data_reports", label: "Data & Reports" },
+  { id: "reports", label: "Reports" },
   { id: "integrations", label: "Integrations" },
   { id: "audit_security", label: "Audit & Security" },
 ];

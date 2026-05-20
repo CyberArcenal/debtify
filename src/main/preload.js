@@ -1,4 +1,4 @@
-// preload.js
+// preload.js (updated with printer-specific methods)
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("backendAPI", {
@@ -14,12 +14,29 @@ contextBridge.exposeInMainWorld("backendAPI", {
   notification: (payload) => ipcRenderer.invoke("notification", payload),
   updater: (payload) => ipcRenderer.invoke("updater", payload),
 
-  // ========== DEBT MANAGEMENT MODULES ==========
+  // ========== CORE DEBT MANAGEMENT MODULES ==========
   borrower: (payload) => ipcRenderer.invoke("borrower", payload),
   debt: (payload) => ipcRenderer.invoke("debt", payload),
   loanAgreement: (payload) => ipcRenderer.invoke("loanAgreement", payload),
   paymentTransaction: (payload) => ipcRenderer.invoke("paymentTransaction", payload),
   penaltyTransaction: (payload) => ipcRenderer.invoke("penaltyTransaction", payload),
+
+  // ========== NEW DEBT MANAGEMENT MODULES ==========
+  group: (payload) => ipcRenderer.invoke("group", payload),
+  loanApplication: (payload) => ipcRenderer.invoke("loanApplication", payload),
+  paymentMethod: (payload) => ipcRenderer.invoke("paymentMethod", payload),
+  creditCheck: (payload) => ipcRenderer.invoke("creditCheck", payload),
+
+  // ========== PRINTER MODULE (generic + specific methods) ==========
+  // Generic handler for printer configuration (CRUD, test, etc.)
+  printer: (payload) => ipcRenderer.invoke("printer", payload),
+
+  // Dedicated printer convenience methods
+  printerGetStatus: () => ipcRenderer.invoke("printer:get-status"),
+  printerIsAvailable: () => ipcRenderer.invoke("printer:is-available"),
+  printerReload: () => ipcRenderer.invoke("printer:reload"),
+  printerPrint: (sale) => ipcRenderer.invoke("printer:print", sale),
+  printerTestPrint: () => ipcRenderer.invoke("printer:test-print"),
 
   // ========== UTILITIES ==========
   openExternal: (url) => ipcRenderer.invoke("open-external", url),

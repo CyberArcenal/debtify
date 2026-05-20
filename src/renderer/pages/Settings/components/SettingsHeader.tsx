@@ -27,9 +27,9 @@ const SettingsHeader: React.FC<Props> = ({
     <div className="flex flex-wrap items-center justify-between gap-4 mb-6 p-4 bg-[var(--card-bg)] border border-[var(--border-color)]/20 rounded-lg">
       <div>
         <h1 className="text-2xl font-bold text-[var(--text-primary)]">System Settings</h1>
-        <p className="text-sm text-[var(--text-secondary)] mt-1">
-          Configure your POS system preferences
-        </p>
+   <p className="text-sm text-[var(--text-secondary)] mt-1">
+  Configure your debt management system preferences
+</p>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { format, subDays, isAfter, isBefore, differenceInDays } from 'date-fns';
-import dashboardAPI from '../../../api/core/analytics';
+import dashboardAPI from '../../../api/analytics/analytics';
 import paymentsAPI from '../../../api/core/payment_transaction';
 import debtsAPI from '../../../api/core/debt';
 import borrowersAPI from '../../../api/core/borrower';

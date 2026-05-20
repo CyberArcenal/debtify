@@ -2,19 +2,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { dialogs } from "../../../../utils/dialogs";
 import borrowersAPI from "../../../../api/core/borrower";
+import groupsAPI from "../../../../api/core/group";
 import type { Borrower } from "../../../../api/core/borrower";
-import type { DebtorGroup } from "../types";
-import {
-  getGroups,
-  createGroup,
-  updateGroup,
-  deleteGroup,
-  getDebtorIdsForGroup,
-  assignDebtorToGroup,
-  removeDebtorFromGroup,
-  bulkAssignDebtorsToGroup,
-  removeAllDebtorsFromGroup,
-} from "../mockGroupService";
+import type { DebtorGroup } from "../../../../api/core/group";
 
 interface UseDebtorGroupsReturn {
   groups: DebtorGroup[];
@@ -54,60 +44,80 @@ const useDebtorGroups = (): UseDebtorGroupsReturn => {
   const [editGroupModalOpen, setEditGroupModalOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<DebtorGroup | null>(null);
 
-  const loadGroups = useCallback(() => {
+  // Load all groups from API
+  const loadGroups = useCallback(async () => {
     setLoadingGroups(true);
     try {
-      const allGroups = getGroups();
-      setGroups(allGroups);
-    } catch (err) {
-      console.error(err);
+      const response = await groupsAPI.getAll();
+      if (response.status) {
+        setGroups(response.data);
+      } else {
+        throw new Error(response.message);
+      }
+    } catch (err: any) {
+      console.error("Failed to load groups:", err);
+      dialogs.error(err.message || "Failed to load groups");
     } finally {
       setLoadingGroups(false);
     }
   }, []);
 
+  // Load members of the selected group
   const loadGroupMembers = useCallback(async (groupId: number) => {
     setLoadingMembers(true);
     try {
-      const debtorIds = getDebtorIdsForGroup(groupId);
-      if (debtorIds.length === 0) {
-        setGroupMembers([]);
-        return;
+      const response = await groupsAPI.getMembers(groupId);
+      if (response.status) {
+        const members = response.data.map(m => ({
+          id: m.debtor.id,
+          name: m.debtor.name,
+          contact: m.debtor.contact,
+          email: m.debtor.email,
+          address: null,
+          notes: null,
+          createdAt: m.assignedAt,
+          updatedAt: m.assignedAt,
+          deletedAt: null,
+        } as Borrower));
+        setGroupMembers(members);
+      } else {
+        throw new Error(response.message);
       }
-      // Fetch debtors one by one (or batch if API supports)
-      const members: Borrower[] = [];
-      for (const id of debtorIds) {
-        try {
-          const res = await borrowersAPI.getById(id);
-          if (res.status) members.push(res.data);
-        } catch (e) { console.error(e); }
-      }
-      setGroupMembers(members);
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      console.error("Failed to load group members:", err);
+      dialogs.error(err.message || "Failed to load group members");
+      setGroupMembers([]);
     } finally {
       setLoadingMembers(false);
     }
   }, []);
 
+  // Load all active debtors for assignment dropdown
   const loadAvailableDebtors = useCallback(async () => {
     setLoadingDebtors(true);
     try {
       const res = await borrowersAPI.getAll({ includeDeleted: false, limit: 1000 });
-      if (res.status) setAvailableDebtors(res.data);
-      else setAvailableDebtors([]);
-    } catch (err) {
-      console.error(err);
+      if (res.status) {
+        setAvailableDebtors(res.data);
+      } else {
+        throw new Error(res.message);
+      }
+    } catch (err: any) {
+      console.error("Failed to load debtors:", err);
+      dialogs.error(err.message || "Failed to load debtors");
+      setAvailableDebtors([]);
     } finally {
       setLoadingDebtors(false);
     }
   }, []);
 
+  // Initial load
   useEffect(() => {
     loadGroups();
     loadAvailableDebtors();
   }, [loadGroups, loadAvailableDebtors]);
 
+  // Reload members when selected group changes
   useEffect(() => {
     if (selectedGroup) {
       loadGroupMembers(selectedGroup.id);
@@ -116,11 +126,20 @@ const useDebtorGroups = (): UseDebtorGroupsReturn => {
     }
   }, [selectedGroup, loadGroupMembers]);
 
+  // --- CRUD operations ---
   const handleCreateGroup = async (data: { name: string; description: string; color: string }) => {
     try {
-      createGroup(data);
-      loadGroups();
-      dialogs.success("Group created successfully");
+      const response = await groupsAPI.create({
+        name: data.name,
+        description: data.description || null,
+        color: data.color,
+      });
+      if (response.status) {
+        await loadGroups();
+        dialogs.success("Group created successfully");
+      } else {
+        throw new Error(response.message);
+      }
     } catch (err: any) {
       dialogs.error(err.message);
     }
@@ -128,13 +147,20 @@ const useDebtorGroups = (): UseDebtorGroupsReturn => {
 
   const handleUpdateGroup = async (id: number, data: Partial<DebtorGroup>) => {
     try {
-      updateGroup(id, data);
-      loadGroups();
-      if (selectedGroup?.id === id) {
-        const updated = getGroups().find(g => g.id === id);
-        setSelectedGroup(updated || null);
+      const response = await groupsAPI.update(id, {
+        name: data.name,
+        description: data.description ?? null,
+        color: data.color,
+      });
+      if (response.status) {
+        await loadGroups();
+        if (selectedGroup?.id === id) {
+          setSelectedGroup(response.data);
+        }
+        dialogs.success("Group updated");
+      } else {
+        throw new Error(response.message);
       }
-      dialogs.success("Group updated");
     } catch (err: any) {
       dialogs.error(err.message);
     }
@@ -147,21 +173,30 @@ const useDebtorGroups = (): UseDebtorGroupsReturn => {
     });
     if (!confirmed) return;
     try {
-      deleteGroup(id);
-      if (selectedGroup?.id === id) setSelectedGroup(null);
-      loadGroups();
-      dialogs.success("Group deleted");
+      const response = await groupsAPI.delete(id);
+      if (response.status) {
+        if (selectedGroup?.id === id) setSelectedGroup(null);
+        await loadGroups();
+        dialogs.success("Group deleted");
+      } else {
+        throw new Error(response.message);
+      }
     } catch (err: any) {
       dialogs.error(err.message);
     }
   };
 
+  // --- Assignment operations ---
   const assignDebtor = async (debtorId: number) => {
     if (!selectedGroup) return;
     try {
-      assignDebtorToGroup(debtorId, selectedGroup.id);
-      await loadGroupMembers(selectedGroup.id);
-      dialogs.success("Debtor assigned");
+      const response = await groupsAPI.assignDebtor(selectedGroup.id, debtorId);
+      if (response.status) {
+        await loadGroupMembers(selectedGroup.id);
+        dialogs.success("Debtor assigned");
+      } else {
+        throw new Error(response.message);
+      }
     } catch (err: any) {
       dialogs.error(err.message);
     }
@@ -170,9 +205,13 @@ const useDebtorGroups = (): UseDebtorGroupsReturn => {
   const removeDebtor = async (debtorId: number) => {
     if (!selectedGroup) return;
     try {
-      removeDebtorFromGroup(debtorId, selectedGroup.id);
-      await loadGroupMembers(selectedGroup.id);
-      dialogs.success("Debtor removed from group");
+      const response = await groupsAPI.removeDebtor(selectedGroup.id, debtorId);
+      if (response.status) {
+        await loadGroupMembers(selectedGroup.id);
+        dialogs.success("Debtor removed from group");
+      } else {
+        throw new Error(response.message);
+      }
     } catch (err: any) {
       dialogs.error(err.message);
     }
@@ -181,9 +220,13 @@ const useDebtorGroups = (): UseDebtorGroupsReturn => {
   const bulkAssign = async (debtorIds: number[]) => {
     if (!selectedGroup || debtorIds.length === 0) return;
     try {
-      bulkAssignDebtorsToGroup(debtorIds, selectedGroup.id);
-      await loadGroupMembers(selectedGroup.id);
-      dialogs.success(`${debtorIds.length} debtor(s) assigned to group`);
+      const response = await groupsAPI.bulkAssign(selectedGroup.id, debtorIds);
+      if (response.status) {
+        await loadGroupMembers(selectedGroup.id);
+        dialogs.success(`${debtorIds.length} debtor(s) assigned to group`);
+      } else {
+        throw new Error(response.message);
+      }
     } catch (err: any) {
       dialogs.error(err.message);
     }

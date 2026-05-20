@@ -5,262 +5,110 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Debtify - Loading</title>
     <style>
+      /* (same styles, no changes) */
       * {
         margin: 0;
         padding: 0;
         box-sizing: border-box;
       }
-
       body {
         font-family:
           -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        background: #0f172a; /* Deep slate base */
-        color: #f1f5f9;
+        background: transparent; /* ← Binago ko ito */
+        color: #1e293b;
         height: 100vh;
         width: 100vw;
         display: flex;
-        flex-direction: column;
         justify-content: center;
         align-items: center;
         text-align: center;
-        overflow: hidden;
-        position: fixed;
-        top: 0;
-        left: 0;
         padding: 20px;
-      }
-
-      /* Debt‑themed pattern (red tint) */
-      .bg-pattern {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        opacity: 0.03;
-        background-image:
-          radial-gradient(circle at 25% 25%, #dc2626 1px, transparent 1px),
-          linear-gradient(
-            45deg,
-            transparent 49%,
-            rgba(220, 38, 38, 0.1) 50%,
-            transparent 51%
-          );
-        background-size:
-          50px 50px,
-          100px 100px;
-        z-index: 1;
-        pointer-events: none;
-      }
-
-      .main-container {
-        max-width: 550px;
-        width: 90%;
-        position: relative;
-        z-index: 2;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 2.2rem;
-      }
-
-      /* App name – debt style */
-      .app-name {
-        font-size: 4rem;
-        font-weight: 800;
-        letter-spacing: -0.02em;
-        background: linear-gradient(135deg, #ffffff 0%, #dc2626 60%, #991b1b 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        text-shadow: 0 4px 20px rgba(220, 38, 38, 0.4);
-        line-height: 1.2;
-        margin-bottom: 0.25rem;
-        animation: fadeIn 0.8s ease-out;
-      }
-
-      .app-subtext {
-        font-size: 0.9rem;
-        font-weight: 600;
-        letter-spacing: 3px;
-        text-transform: uppercase;
-        color: #94a3b8;
-        background: rgba(220, 38, 38, 0.08);
-        padding: 0.5rem 1.2rem;
-        border-radius: 40px;
-        backdrop-filter: blur(4px);
-        display: inline-block;
-        border: 1px solid rgba(220, 38, 38, 0.3);
-      }
-
-      /* Loading bar – refined */
-      .loading-container {
-        width: 100%;
-        max-width: 340px;
-      }
-
-      .loading-bar {
-        width: 100%;
-        height: 6px;
-        background: #1e293b;
-        border-radius: 12px;
         overflow: hidden;
-        box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
+      }
+      .container {
+        max-width: 400px;
+        width: 90%;
+        background: white; /* Ito lang ang mananatiling light/white */
+        border-radius: 20px;
+        box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.25); /* slightly stronger shadow para lumabas sa transparent bg */
+        padding: 2rem 1.5rem;
+        border: 1px solid #e5e7eb;
+      }
+      .logo {
+        width: 64px;
+        height: 64px;
+        background: linear-gradient(135deg, #0e9d7c, #0b7a60);
+        border-radius: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1.2rem;
+        box-shadow: 0 8px 16px -6px rgba(14, 157, 124, 0.3);
+      }
+      .logo svg {
+        width: 36px;
+        height: 36px;
+        color: white;
+      }
+      h1 {
+        font-size: 1.8rem;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        background: linear-gradient(135deg, #0e9d7c, #0b7a60);
+        background-clip: text;
+        -webkit-background-clip: text;
+        color: transparent;
+        margin-bottom: 0.25rem;
+      }
+      .sub {
+        font-size: 0.75rem;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 1.8rem;
+      }
+      .progress-bar {
+        width: 100%;
+        height: 4px;
+        background: #e5e7eb;
+        border-radius: 10px;
+        overflow: hidden;
         margin-bottom: 1rem;
       }
-
-      .loading-progress {
-        height: 100%;
+      .progress-fill {
         width: 0%;
-        background: linear-gradient(90deg, #dc2626, #b91c1c, #7f1d1d);
-        border-radius: 12px;
-        animation: loading 2.2s ease-in-out infinite;
-        box-shadow: 0 0 8px #dc2626;
+        height: 100%;
+        background: #0e9d7c;
+        border-radius: 10px;
+        animation: loading 2s ease-in-out infinite;
       }
-
       .loading-text {
-        font-size: 1rem;
-        font-weight: 500;
-        color: #cbd5e1;
-        height: 1.5rem;
-        transition: opacity 0.3s;
-      }
-
-      /* Migration status */
-      .migration-status {
-        margin-top: 1.2rem;
-        padding: 0.6rem 1rem;
-        background: rgba(220, 38, 38, 0.1);
-        border-radius: 30px;
-        border: 1px solid rgba(220, 38, 38, 0.35);
         font-size: 0.85rem;
-        color: #f87171;
-        display: none;
-        backdrop-filter: blur(4px);
-        width: fit-content;
-        margin-left: auto;
-        margin-right: auto;
-      }
-
-      .migration-count {
-        font-weight: 600;
-        margin-left: 0.25rem;
-        color: #fbbf24;
-      }
-
-      /* Status cards – glassmorphism with red accents */
-      .status-container {
-        width: 100%;
-        background: rgba(30, 27, 46, 0.7);
-        backdrop-filter: blur(12px);
-        border-radius: 24px;
-        padding: 1.5rem;
-        border: 1px solid rgba(220, 38, 38, 0.2);
-        display: flex;
-        flex-direction: column;
-        gap: 1rem;
-        box-shadow: 0 20px 30px -10px rgba(0, 0, 0, 0.6);
-      }
-
-      .status-item {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        font-size: 0.95rem;
-        color: #e2e8f0;
-        padding: 0.2rem 0;
-      }
-
-      .status-icon {
-        width: 26px;
-        height: 26px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 0.8rem;
-        font-weight: 700;
-        flex-shrink: 0;
-        transition: transform 0.2s ease;
-      }
-
-      .status-icon.pending {
-        background: rgba(245, 158, 11, 0.15);
-        color: #fbbf24;
-        border: 1px solid rgba(245, 158, 11, 0.4);
-      }
-
-      .status-icon.success {
-        background: rgba(16, 185, 129, 0.15);
-        color: #34d399;
-        border: 1px solid rgba(16, 185, 129, 0.4);
-      }
-
-      .status-icon.error {
-        background: rgba(239, 68, 68, 0.15);
-        color: #f87171;
-        border: 1px solid rgba(239, 68, 68, 0.4);
-      }
-
-      /* Feature badges – debt management focus */
-      .features-container {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 0.75rem;
-        width: 100%;
-        margin-top: 0.2rem;
-      }
-
-      .feature-badge {
-        background: rgba(220, 38, 38, 0.08);
-        padding: 0.5rem 1.2rem;
-        border-radius: 40px;
-        font-size: 0.8rem;
         font-weight: 500;
-        color: #cbd5e1;
-        border: 1px solid rgba(220, 38, 38, 0.25);
-        backdrop-filter: blur(4px);
-        transition: all 0.25s ease;
-        letter-spacing: 0.3px;
+        color: #4b5563;
+        margin-bottom: 1rem;
+        min-height: 2rem;
+        transition: opacity 0.2s;
       }
-
-      .feature-badge:hover {
-        background: rgba(220, 38, 38, 0.2);
-        border-color: rgba(220, 38, 38, 0.6);
-        color: white;
-        transform: translateY(-2px);
-        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
-      }
-
-      /* Version info */
-      .version-info {
-        position: absolute;
-        bottom: 20px;
-        text-align: center;
+      .migration-status {
+        display: none;
         font-size: 0.75rem;
-        color: #475569;
-        width: 100%;
-        z-index: 2;
-        font-weight: 400;
-        letter-spacing: 0.5px;
+        background: #f0fdf4;
+        color: #166534;
+        padding: 0.4rem 0.8rem;
+        border-radius: 20px;
+        border: 1px solid #bbf7d0;
+        margin-top: 0.8rem;
       }
-
-      /* Animations */
-      @keyframes fadeIn {
-        from {
-          opacity: 0;
-          transform: translateY(-10px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
+      .version {
+        margin-top: 2rem;
+        font-size: 0.7rem;
+        color: #9ca3af;
       }
-
       @keyframes loading {
         0% {
           width: 0%;
-          opacity: 0.8;
+          opacity: 0.7;
         }
         50% {
           width: 100%;
@@ -268,233 +116,113 @@
         }
         100% {
           width: 0%;
-          opacity: 0.8;
-        }
-      }
-
-      @keyframes pulse {
-        0%,
-        100% {
-          opacity: 1;
-        }
-        50% {
           opacity: 0.7;
         }
       }
-
-      /* Responsive */
-      @media (max-height: 600px) {
-        .main-container {
-          gap: 1.5rem;
-          transform: scale(0.9);
-        }
-        .app-name {
-          font-size: 3rem;
-        }
-        .features-container {
-          display: none;
-        }
-      }
-
-      @media (max-height: 500px) {
-        .main-container {
-          transform: scale(0.8);
-        }
-        .status-container {
-          padding: 1rem;
-        }
+      .ready {
+        color: #0e9d7c;
+        font-weight: 600;
       }
     </style>
   </head>
   <body>
-    <div class="bg-pattern"></div>
+    <div class="container">
+      <div class="logo">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path
+            d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"
+          />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+      </div>
+      <h1>Debtify</h1>
+      <div class="sub">Debt Management System</div>
 
-    <div class="main-container">
-      <div class="app-name">Debtify</div>
-      <div class="app-subtext">Debt & Collection System</div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progress-fill"></div>
+      </div>
+      <div class="loading-text" id="loading-text">Initializing...</div>
 
-      <!-- Loading section -->
-      <div class="loading-container">
-        <div class="loading-bar">
-          <div class="loading-progress"></div>
-        </div>
-        <div class="loading-text" id="loading-text">
-          Initializing Debtify...
-        </div>
-        <div class="migration-status" id="migration-status">
-          <span id="migration-text">Applying loan schema updates...</span>
-          <span class="migration-count" id="migration-count"></span>
-        </div>
+      <div class="migration-status" id="migration-status">
+        <span id="migration-message"></span>
       </div>
 
-      <!-- Status cards (debt specific) -->
-      <div class="status-container">
-        <div class="status-item" id="status-db">
-          <div class="status-icon pending">⟳</div>
-          <span>Debt Database Connection</span>
-        </div>
-        <div class="status-item" id="status-migrations">
-          <div class="status-icon pending">⟳</div>
-          <span>Loan & Borrower Modules</span>
-        </div>
-        <div class="status-item" id="status-services">
-          <div class="status-icon pending">⟳</div>
-          <span>Collection Engine & Overdue Tracker</span>
-        </div>
-        <div class="status-item" id="status-ui">
-          <div class="status-icon pending">⟳</div>
-          <span>Debt Management Interface</span>
-        </div>
-      </div>
-
-      <!-- Feature badges – debt/loan oriented -->
-      <div class="features-container">
-        <div class="feature-badge">Loan Origination</div>
-        <div class="feature-badge">Payment Scheduling</div>
-        <div class="feature-badge">Overdue Alerts</div>
-        <div class="feature-badge">Borrower Profiles</div>
-        <div class="feature-badge">Collection Reports</div>
-        <div class="feature-badge">Aging Analysis</div>
-        <div class="feature-badge">Amortization Tables</div>
-        <div class="feature-badge">Penalty Calculator</div>
-      </div>
-    </div>
-
-    <div class="version-info">
-      Debtify v1.0.11 • Secure Debt Management
+      <div class="version" id="version-text">v1.0.11</div>
     </div>
 
     <script>
-      // Loading phases for debt management
-      const loadingPhases = [
-        "Initializing Debtify...",
-        "Loading loan modules...",
-        "Connecting to borrower database...",
-        "Starting collection engine...",
-        "Syncing overdue tracker...",
-        "Preparing aging reports...",
-        "Ready to manage debts ✓",
+      // Dynamic loading messages (optional)
+      const loadingMessages = [
+        "Loading modules...",
+        "Connecting to database...",
+        "Preparing collections engine...",
+        "Syncing borrower profiles...",
+        "Almost ready...",
+        "Welcome!",
       ];
+      let step = 0;
+      const loadingEl = document.getElementById("loading-text");
+      const migrationStatusDiv = document.getElementById("migration-status");
+      const migrationMsgSpan = document.getElementById("migration-message");
 
-      let phase = 0;
-      const loadingText = document.getElementById("loading-text");
-      const migrationStatus = document.getElementById("migration-status");
-      const migrationText = document.getElementById("migration-text");
-      const migrationCount = document.getElementById("migration-count");
-
-      const textInterval = setInterval(() => {
-        loadingText.style.opacity = "0.5";
+      // Rotate messages (only if no migration is active)
+      let msgInterval = setInterval(() => {
+        if (migrationStatusDiv.style.display === "block") return; // stop rotating if migration showing
+        loadingEl.style.opacity = "0.5";
         setTimeout(() => {
-          phase = (phase + 1) % loadingPhases.length;
-          loadingText.textContent = loadingPhases[phase];
-          loadingText.style.opacity = "1";
-
-          // Simulate status updates as phases progress
-          if (phase < 4) updateStatus(phase, true);
-          if (phase === 2) {
-            setTimeout(() => showMigrationStatus(3), 1000); // 3 migrations mock
-          }
-        }, 200);
-      }, 2000);
-
-      const statusItems = [
-        "status-db",
-        "status-migrations",
-        "status-services",
-        "status-ui",
-      ];
-
-      function updateStatus(index, success) {
-        const item = document.getElementById(statusItems[index]);
-        const icon = item.querySelector(".status-icon");
-        if (success) {
-          icon.className = "status-icon success";
-          icon.textContent = "✓";
-          icon.style.transform = "scale(1.3)";
-          setTimeout(() => (icon.style.transform = "scale(1)"), 200);
-          item.style.color = "#34d399";
-        } else {
-          icon.className = "status-icon error";
-          icon.textContent = "✗";
-          item.style.color = "#f87171";
-        }
-      }
-
-      function showMigrationStatus(count) {
-        if (count > 0) {
-          migrationStatus.style.display = "block";
-          migrationText.textContent = "Applying loan schema updates: ";
-          migrationCount.textContent = count + " migration(s)";
-          migrationStatus.style.animation = "fadeIn 0.5s ease";
-
-          let progress = 0;
-          const progressInterval = setInterval(() => {
-            progress += 20;
-            if (progress >= 100) {
-              clearInterval(progressInterval);
-              migrationText.textContent = "Database ready ✓";
-              migrationCount.textContent = "";
-              migrationStatus.style.borderColor = "#10b981";
-              migrationStatus.style.color = "#10b981";
-              updateStatus(1, true);
-            }
-          }, 500);
-        }
-      }
-
-      // Simulated startup timeline (realistic delays)
-      setTimeout(() => {
-        updateStatus(0, true);
-        loadingText.textContent = "Connecting to debt database...";
-      }, 800);
-      setTimeout(() => {
-        loadingText.textContent = "Checking loan tables & indexes...";
+          step = (step + 1) % loadingMessages.length;
+          loadingEl.textContent = loadingMessages[step];
+          loadingEl.style.opacity = "1";
+        }, 150);
       }, 1800);
-      setTimeout(() => {
-        loadingText.textContent = "Loading borrower profiles...";
-        updateStatus(1, true);
-      }, 3200);
-      setTimeout(() => {
-        loadingText.textContent = "Starting collection services...";
-        updateStatus(2, true);
-      }, 4500);
-      setTimeout(() => {
-        loadingText.textContent = "Loading Debtify interface...";
-        updateStatus(3, true);
-      }, 5800);
 
-      // Final ready state
-      setTimeout(() => {
-        loadingText.textContent = "Debtify Ready ✓";
-        loadingText.style.color = "#34d399";
-        loadingText.style.fontWeight = "600";
-        document.querySelector(".loading-progress").style.background =
-          "linear-gradient(90deg, #10b981, #dc2626)";
-        clearInterval(textInterval);
-        loadingText.style.animation = "pulse 1s infinite";
-      }, 7000);
+      // Listen for actual migration status from main process
+      if (window.backendAPI) {
+        window.backendAPI.on("migration:status", (event, data) => {
+          // Stop rotating messages
+          clearInterval(msgInterval);
 
-      // IPC listeners (keep similar but adapt for debt migrations)
-      if (window.electronAPI) {
-        window.electronAPI.onMigrationStart((data) => {
-          showMigrationStatus(data.pendingCount || 1);
+          // Show migration status div
+          migrationStatusDiv.style.display = "block";
+
+          if (data.status === "running") {
+            migrationMsgSpan.textContent =
+              data.message || "Updating database structure...";
+            migrationStatusDiv.style.background = "#fefce8";
+            migrationStatusDiv.style.borderColor = "#fde047";
+            migrationStatusDiv.style.color = "#854d0e";
+            loadingEl.textContent = "Applying updates...";
+          } else if (data.status === "completed") {
+            migrationMsgSpan.textContent =
+              data.message || "Database update completed ✓";
+            migrationStatusDiv.style.background = "#ecfdf5";
+            migrationStatusDiv.style.borderColor = "#a7f3d0";
+            migrationStatusDiv.style.color = "#065f46";
+            loadingEl.textContent = "Ready ✓";
+            loadingEl.classList.add("ready");
+            document.getElementById("progress-fill").style.animation = "none";
+            document.getElementById("progress-fill").style.width = "100%";
+          } else if (data.status === "failed") {
+            migrationMsgSpan.textContent = data.message || "Migration failed ✗";
+            migrationStatusDiv.style.background = "#fef2f2";
+            migrationStatusDiv.style.borderColor = "#fecaca";
+            migrationStatusDiv.style.color = "#991b1b";
+            loadingEl.textContent = "Database issue detected";
+          }
         });
-        window.electronAPI.onMigrationComplete((data) => {
-          migrationText.textContent =
-            data.message || "Loan schema updated successfully ✓";
-          migrationCount.textContent = data.appliedCount
-            ? data.appliedCount + " migration(s) applied"
-            : "";
-          migrationStatus.style.borderColor = "#10b981";
-          migrationStatus.style.color = "#10b981";
-        });
-        window.electronAPI.onMigrationFailed((data) => {
-          migrationText.textContent =
-            data.message || "Loan database update failed ✗";
-          migrationStatus.style.background = "rgba(239, 68, 68, 0.1)";
-          migrationStatus.style.borderColor = "rgba(239, 68, 68, 0.3)";
-          migrationCount.textContent = "";
-        });
+      } else {
+        // Fallback if backendAPI not available (just in case)
+        console.warn(
+          "backendAPI not available, cannot listen to migration events",
+        );
       }
     </script>
   </body>

@@ -2,20 +2,34 @@
 import { useState, useCallback } from "react";
 import { dialogs } from "../../../../utils/dialogs";
 import borrowersAPI from "../../../../api/core/borrower";
-import debtsAPI from "../../../../api/core/debt";
 import type { Borrower } from "../../../../api/core/borrower";
-import type { CreditScore, CreditCheckLog, CreditReport } from "../types";
-import {
-  performCreditCheck,
-  saveCreditCheckLog,
-  getLogsForDebtor,
-  generateMockReport,
-} from "../mockCreditService";
+import creditCheckAPI, { type CreditCheckLog, type CreditScore } from "../../../../api/core/credit_check";
+import type { CreditReport } from "../types";
+
+// Helper to generate a report from the API response (no more mock scoring)
+const generateReportFromScore = (debtor: Borrower, score: CreditScore): CreditReport => {
+  // For a real report, you might fetch additional data (payment history, etc.)
+  // This is a simplified version.
+  return {
+    debtorId: debtor.id,
+    debtorName: debtor.name,
+    score,
+    paymentHistory: "Payment history retrieved from system",
+    outstandingDebts: 0, // can be fetched separately if needed
+    overdueDebts: 0,
+    recommendations:
+      score.score >= 700
+        ? "Low risk – eligible for loan."
+        : score.score >= 500
+        ? "Medium risk – may require collateral."
+        : "High risk – improve credit history before applying.",
+  };
+};
 
 interface UseCreditCheckReturn {
   searchTerm: string;
   setSearchTerm: (term: string) => void;
-  searchDebtors: () => void;
+  searchDebtors: () => Promise<void>;
   searchResults: Borrower[];
   searching: boolean;
   selectedDebtor: Borrower | null;
@@ -43,8 +57,8 @@ const useCreditCheck = (): UseCreditCheckReturn => {
   const [previousChecks, setPreviousChecks] = useState<CreditCheckLog[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
 
-  // Search debtors
-  const handleSearch = useCallback(async () => {
+  // Search debtors (unchanged, uses real borrowersAPI)
+  const searchDebtors = useCallback(async () => {
     if (!searchTerm.trim()) {
       setSearchResults([]);
       return;
@@ -69,74 +83,67 @@ const useCreditCheck = (): UseCreditCheckReturn => {
     }
   }, [searchTerm]);
 
-  // Load previous checks when debtor selected
+  // Load previous checks using real API
   const loadPreviousChecks = useCallback(async (debtorId: number) => {
     setLoadingLogs(true);
     try {
-      // In a real API, you'd fetch from backend; here we use localStorage
-      const logs = getLogsForDebtor(debtorId);
-      setPreviousChecks(logs);
+      const response = await creditCheckAPI.getHistory(debtorId);
+      if (response.status) {
+        // Transform backend logs to frontend type (they might have slightly different field names)
+        // The backend returns CreditCheckLog with dateChecked and createdAt; we'll map them.
+        const logs: CreditCheckLog[] = response.data.map((log) => ({
+          id: log.id,
+          debtorId: log.debtorId,
+          debtorName: log.debtorName,
+          score: log.score,
+          riskLevel: log.riskLevel,
+          remarks: log.remarks,
+          dateChecked: log.dateChecked || log.createdAt,
+          createdAt: log.createdAt,
+        }));
+        setPreviousChecks(logs);
+      } else {
+        setPreviousChecks([]);
+      }
     } catch (err) {
       console.error(err);
+      setPreviousChecks([]);
     } finally {
       setLoadingLogs(false);
     }
   }, []);
 
-  // Perform credit check
+  // Perform credit check using real API
   const performCheck = useCallback(
     async (debtor: Borrower) => {
       setCheckingCredit(true);
       setCreditScore(null);
       setReport(null);
       try {
-        // Fetch debts to know if debtor has overdue
-        const debtsRes = await debtsAPI.getAll({
-          borrowerId: debtor.id,
-          limit: 1000,
-        });
-        const debts = debtsRes.data;
-        const hasOverdue = debts.some((d) => d.status === "overdue");
-        const totalDebt = debts.reduce((sum, d) => sum + d.remainingAmount, 0);
-
-        const score = await performCreditCheck({
-          id: debtor.id,
-          name: debtor.name,
-          total_debt: totalDebt,
-          hasOverdueDebts: hasOverdue,
-        });
-
-        setCreditScore(score);
-
-        // Save log
-        const log: CreditCheckLog = {
-          id: `${Date.now()}-${debtor.id}`,
-          debtorId: debtor.id,
-          debtorName: debtor.name,
-          score,
-          timestamp: new Date().toISOString(),
-        };
-        saveCreditCheckLog(log);
-        await loadPreviousChecks(debtor.id);
-
-        // Generate report (but not auto-download)
-        const newReport = generateMockReport(
-          { ...debtor, total_debt: totalDebt, hasOverdueDebts: hasOverdue },
-          score,
-        );
-        setReport(newReport);
+        const response = await creditCheckAPI.performCheck(debtor.id);
+        if (response.status) {
+          const score = response.data;
+          setCreditScore(score);
+          // Save and reload logs
+          await loadPreviousChecks(debtor.id);
+          // Generate report from the returned score
+          const newReport = generateReportFromScore(debtor, score);
+          setReport(newReport);
+        } else {
+          throw new Error(response.message);
+        }
       } catch (err: any) {
         dialogs.error(err.message || "Credit check failed");
       } finally {
         setCheckingCredit(false);
       }
     },
-    [loadPreviousChecks],
+    [loadPreviousChecks]
   );
 
   const downloadReport = useCallback(() => {
     if (!report) return;
-    // Create a simple text/HTML report and trigger download
+    // Build report content from the data (could be enhanced with PDF generation)
     const content = `
       CREDIT REPORT
       =============
@@ -163,31 +170,6 @@ const useCreditCheck = (): UseCreditCheckReturn => {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }, [report]);
-
-  const searchDebtors = useCallback(async () => {
-    if (!searchTerm.trim()) {
-      setSearchResults([]);
-      return;
-    }
-    setSearching(true);
-    try {
-      const response = await borrowersAPI.getAll({
-        search: searchTerm,
-        includeDeleted: false,
-        limit: 20,
-      });
-      if (response.status) {
-        setSearchResults(response.data);
-      } else {
-        setSearchResults([]);
-      }
-    } catch (err: any) {
-      dialogs.error(err.message);
-      setSearchResults([]);
-    } finally {
-      setSearching(false);
-    }
-  }, [searchTerm]);
 
   const reset = useCallback(() => {
     setSearchTerm("");

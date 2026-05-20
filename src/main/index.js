@@ -27,8 +27,8 @@ const url = require("url");
 // TypeORM and Database
 require("reflect-metadata");
 const MigrationManager = require("../utils/dbUtils/migrationManager");
-const PrinterService = require("../services/PrinterService");
 const { registerImageProtocol } = require("./protocols/imageProtocol.js");
+const printerService = require("../services/Printer.js");
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -147,7 +147,7 @@ async function log(level, message, data = null, writeToFile = false) {
 
       const logFile = path.join(
         logDir,
-        `POS-${new Date().toISOString().split("T")[0]}.log`
+        `POS-${new Date().toISOString().split("T")[0]}.log`,
       );
       const logEntry = `${logMessage}${
         data ? "\n" + JSON.stringify(data, null, 2) : ""
@@ -220,7 +220,7 @@ function setupGlobalErrorHandlers() {
         stack: error.stack,
         timestamp: new Date().toISOString(),
       },
-      true
+      true,
     );
 
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -241,7 +241,7 @@ function setupGlobalErrorHandlers() {
         promise: promise.toString(),
         timestamp: new Date().toISOString(),
       },
-      true
+      true,
     );
   });
 
@@ -256,7 +256,7 @@ function setupGlobalErrorHandlers() {
         webContentsId: webContents.id,
         timestamp: new Date().toISOString(),
       },
-      true
+      true,
     );
   });
 }
@@ -280,7 +280,7 @@ async function initializeDatabase() {
     if (status.needsMigration) {
       log(
         LogLevel.INFO,
-        `Found ${status.pending} pending migration(s). Running now...`
+        `Found ${status.pending} pending migration(s). Running now...`,
       );
 
       if (splashWindow && !splashWindow.isDestroyed()) {
@@ -302,6 +302,13 @@ async function initializeDatabase() {
         }
       } else {
         log(LogLevel.ERROR, "Migration failed:", result.error);
+        // Send failed status to splash
+        if (splashWindow && !splashWindow.isDestroyed()) {
+          splashWindow.webContents.send("migration:status", {
+            status: "failed",
+            message: "Database update failed. Continuing with existing schema.",
+          });
+        }
         dialog.showMessageBoxSync({
           type: "warning",
           title: "Migration Warning",
@@ -396,6 +403,7 @@ async function createSplashWindow() {
       movable: true,
       skipTaskbar: true,
       show: false,
+      backgroundColor: "#00000000", // ← Important addition
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
@@ -420,7 +428,7 @@ async function createSplashWindow() {
     throw new WindowError(
       // @ts-ignore
       `Failed to create splash window: ${error.message}`,
-      "splash"
+      "splash",
     );
   }
 }
@@ -456,7 +464,7 @@ async function getAppUrl() {
   }
 
   throw new Error(
-    `Production build not found. Checked paths:\n${possiblePaths.join("\n")}`
+    `Production build not found. Checked paths:\n${possiblePaths.join("\n")}`,
   );
 }
 
@@ -525,13 +533,13 @@ async function createMainWindow() {
     mainWindow.once("ready-to-show", () => {
       log(
         LogLevel.INFO,
-        "Main window ready-to-show, waiting for renderer-ready signal..."
+        "Main window ready-to-show, waiting for renderer-ready signal...",
       );
 
       const timeoutId = setTimeout(() => {
         log(
           LogLevel.WARN,
-          "Renderer-ready timeout reached, closing splash anyway"
+          "Renderer-ready timeout reached, closing splash anyway",
         );
         closeSplashAndShowMain();
       }, 8000); // fallback: 8 seconds
@@ -576,7 +584,7 @@ async function createMainWindow() {
     throw new WindowError(
       // @ts-ignore
       `Failed to create main window: ${error.message}`,
-      "main"
+      "main",
     );
   }
 }
@@ -690,8 +698,8 @@ function showErrorPage(window, title, message, details = "") {
                 </div>
                 <div style="margin-top: 20px; font-size: 12px; opacity: 0.8;">
                     v${APP_CONFIG.version} • ${
-    APP_CONFIG.isDev ? "Development" : "Production"
-  }
+                      APP_CONFIG.isDev ? "Development" : "Production"
+                    }
                 </div>
             </div>
         </body>
@@ -699,7 +707,7 @@ function showErrorPage(window, title, message, details = "") {
     `;
 
   window.loadURL(
-    `data:text/html;charset=utf-8,${encodeURIComponent(errorHTML)}`
+    `data:text/html;charset=utf-8,${encodeURIComponent(errorHTML)}`,
   );
 }
 
@@ -709,7 +717,6 @@ function showErrorPage(window, title, message, details = "") {
  */
 function registerIpcHandlers() {
   log(LogLevel.INFO, "Registering IPC handlers...");
-  let printerService = new PrinterService();
 
   // Window Control Handlers
   ipcMain.on("window:minimize", () => {
@@ -802,7 +809,6 @@ function registerIpcHandlers() {
   ipcMain.handle("printer:is-available", () => printerService.isAvailable());
 
   ipcMain.handle("printer:reload", () => {
-    printerService = new PrinterService();
     return printerService.getStatus();
   });
 
@@ -836,7 +842,8 @@ function registerIpcHandlers() {
       "./ipc/core/notification_log/index.ipc.js",
       "./ipc/core/dashboard/index.ipc.js",
       "./ipc/utils/activation.ipc.js",
-      "./ipc/utils/system_config.ipc.js",
+      "./ipc/utils/printer/index.ipc.js",
+      "./ipc/utils/system_config/index.ipc.js",
       "./ipc/utils/windows_control.ipc.js",
       "./ipc/core/notification/index.ipc.js",
       "./ipc/utils/updater/index.ipc.js",
@@ -848,6 +855,10 @@ function registerIpcHandlers() {
       "./ipc/core/loanagreement/index.ipc.js",
       "./ipc/core/paymenttransaction/index.ipc.js",
       "./ipc/core/penaltytransaction/index.ipc.js",
+      "./ipc/core/creditCheck/index.ipc.js",
+      "./ipc/core/group/index.ipc.js",
+      "./ipc/core/loanApplication/index.ipc.js",
+      "./ipc/core/paymentMethod/index.ipc.js",
     ];
 
     ipcModules.forEach((modulePath) => {
@@ -878,11 +889,11 @@ async function startupSequence() {
   try {
     log(
       LogLevel.INFO,
-      `🚀 Starting ${APP_CONFIG.appName} v${APP_CONFIG.version}...`
+      `🚀 Starting ${APP_CONFIG.appName} v${APP_CONFIG.version}...`,
     );
     log(
       LogLevel.INFO,
-      `Environment: ${APP_CONFIG.isDev ? "Development" : "Production"}`
+      `Environment: ${APP_CONFIG.isDev ? "Development" : "Production"}`,
     );
     log(LogLevel.INFO, `User Data Path: ${APP_CONFIG.userDataPath}`);
 
@@ -954,7 +965,7 @@ async function startupSequence() {
       "Startup Failed",
       "The application failed to start properly.",
       // @ts-ignore
-      error.message
+      error.message,
     );
 
     errorWindow.show();

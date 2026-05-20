@@ -19,6 +19,9 @@ import TransactionsPage from "../pages/payments/transactions";
 import PaymentMethodsPage from "../pages/payments/methods";
 import AgingAnalysisPage from "../pages/reports/aging";
 import CollectionReportPage from "../pages/reports/collection";
+import DebtorStatementPage from "../pages/reports/debtor-stmt";
+import ExpectedPaymentsPage from "../pages/reports/expected";
+import DevicesPage from "../pages/devices";
 // import DebtDashboard from "../pages/dashboard";
 
 function App() {
@@ -83,6 +86,9 @@ function App() {
         <Route path="payments/methods" element={<PaymentMethodsPage />} />
         <Route path="reports/aging" element={<AgingAnalysisPage />} />
         <Route path="reports/collection" element={<CollectionReportPage />} />
+        <Route path="reports/debtor-stmt" element={<DebtorStatementPage />} />
+        <Route path="reports/expected" element={<ExpectedPaymentsPage />} />
+        <Route path="devices" element={<DevicesPage />} />
 
         {/* 404 Page */}
         <Route path="*" element={<div>Not found page</div>} />

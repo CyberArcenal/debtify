@@ -1,9 +1,15 @@
 // src/renderer/pages/reports/collection/hooks/useCollectionReport.ts
 import { useState, useEffect, useCallback } from "react";
 import { format, eachDayOfInterval, subDays } from "date-fns";
-import debtsAPI from "../../../../api/core/debt";
 import type { CollectionReport, CollectionDataPoint } from "../types";
 import paymentsAPI from "../../../../api/core/payment_transaction";
+
+// Helper to safely format a date to YYYY-MM-DD
+const formatDateKey = (date: string | Date): string => {
+  const d = typeof date === "string" ? new Date(date) : date;
+  if (isNaN(d.getTime())) return "";
+  return d.toISOString().slice(0, 10);
+};
 
 const useCollectionReport = () => {
   const [loading, setLoading] = useState(true);
@@ -13,14 +19,13 @@ const useCollectionReport = () => {
     const from = subDays(to, 30);
     return { from: format(from, "yyyy-MM-dd"), to: format(to, "yyyy-MM-dd") };
   });
-  const [target, setTarget] = useState<number>(100000); // monthly target, can be adjustable
+  const [target, setTarget] = useState<number>(100000);
   const [report, setReport] = useState<CollectionReport | null>(null);
 
   const fetchReport = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      // Fetch all payments within date range
       const paymentsRes = await paymentsAPI.getAll({
         paymentDateFrom: period.from,
         paymentDateTo: period.to,
@@ -29,12 +34,13 @@ const useCollectionReport = () => {
       if (!paymentsRes.status) throw new Error(paymentsRes.message);
       const payments = paymentsRes.data;
 
-      // Group payments by date and by debtor
       const paymentsByDate: Record<string, number> = {};
       const debtorMap = new Map<number, { name: string; total: number; count: number; lastDate: string }>();
 
       for (const p of payments) {
-        const dateKey = p.paymentDate.slice(0, 10);
+        // Safely get date key
+        const dateKey = formatDateKey(p.paymentDate);
+        if (!dateKey) continue;
         paymentsByDate[dateKey] = (paymentsByDate[dateKey] || 0) + p.amount;
 
         const debtorId = p.debt?.borrower?.id;
@@ -42,7 +48,8 @@ const useCollectionReport = () => {
           const existing = debtorMap.get(debtorId);
           const newTotal = (existing?.total || 0) + p.amount;
           const newCount = (existing?.count || 0) + 1;
-          const lastDate = !existing?.lastDate || p.paymentDate > existing.lastDate ? p.paymentDate : existing.lastDate;
+          const paymentDateStr = formatDateKey(p.paymentDate);
+          const lastDate = !existing?.lastDate || paymentDateStr > existing.lastDate ? paymentDateStr : existing.lastDate;
           debtorMap.set(debtorId, {
             name: p.debt?.borrower?.name || `Debtor ${debtorId}`,
             total: newTotal,
@@ -52,13 +59,11 @@ const useCollectionReport = () => {
         }
       }
 
-      // Generate expected collection: daily target based on total target for period
       const start = new Date(period.from);
       const end = new Date(period.to);
       const daysInPeriod = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
       const dailyExpected = target / daysInPeriod;
 
-      // Build data points for each day in the period
       const dateRange = eachDayOfInterval({ start, end });
       const dataPoints: CollectionDataPoint[] = dateRange.map(date => {
         const dateStr = format(date, "yyyy-MM-dd");
@@ -74,7 +79,6 @@ const useCollectionReport = () => {
       const collectionRate = totalExpected > 0 ? (totalActual / totalExpected) * 100 : 0;
       const averagePerDay = totalActual / daysInPeriod;
 
-      // Payments per debtor
       const paymentsByDebtor = Array.from(debtorMap.entries()).map(([debtorId, data]) => ({
         debtorId,
         debtorName: data.name,

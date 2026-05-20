@@ -20,7 +20,7 @@ const NotificationsTab: React.FC<Props> = ({
         Notification Settings
       </h3>
 
-      {/* General toggles */}
+      {/* General toggles - Debt Management Specific */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="flex items-center gap-2">
           <input
@@ -57,59 +57,99 @@ const NotificationsTab: React.FC<Props> = ({
         <div className="flex items-center gap-2">
           <input
             type="checkbox"
-            id="push_notifications_enabled"
-            checked={settings.push_notifications_enabled || false}
-            onChange={(e) =>
-              onUpdate("push_notifications_enabled", e.target.checked)
-            }
+            id="notify_on_payment"
+            checked={settings.notify_on_payment || false}
+            onChange={(e) => onUpdate("notify_on_payment", e.target.checked)}
             className="windows-checkbox"
           />
           <label
-            htmlFor="push_notifications_enabled"
+            htmlFor="notify_on_payment"
             className="text-sm text-[var(--text-secondary)]"
           >
-            Enable Push Notifications
+            Notify debtor on payment received
           </label>
         </div>
 
         <div className="flex items-center gap-2">
           <input
             type="checkbox"
-            id="low_stock_alert_enabled"
-            checked={settings.low_stock_alert_enabled || false}
-            onChange={(e) =>
-              onUpdate("low_stock_alert_enabled", e.target.checked)
-            }
+            id="notify_on_penalty"
+            checked={settings.notify_on_penalty || false}
+            onChange={(e) => onUpdate("notify_on_penalty", e.target.checked)}
             className="windows-checkbox"
           />
           <label
-            htmlFor="low_stock_alert_enabled"
+            htmlFor="notify_on_penalty"
             className="text-sm text-[var(--text-secondary)]"
           >
-            Enable Low Stock Alerts
+            Notify debtor when penalty is applied
           </label>
         </div>
 
         <div className="flex items-center gap-2">
           <input
             type="checkbox"
-            id="daily_sales_summary_enabled"
-            checked={settings.daily_sales_summary_enabled || false}
-            onChange={(e) =>
-              onUpdate("daily_sales_summary_enabled", e.target.checked)
-            }
+            id="send_reminders"
+            checked={(settings.reminder_days_before_due?.length ?? 0) > 0}
+            onChange={(e) => {
+              if (e.target.checked) {
+                // Default to 7,3,1 if enabling
+                onUpdate("reminder_days_before_due", [7, 3, 1]);
+              } else {
+                onUpdate("reminder_days_before_due", []);
+              }
+            }}
             className="windows-checkbox"
           />
           <label
-            htmlFor="daily_sales_summary_enabled"
+            htmlFor="send_reminders"
             className="text-sm text-[var(--text-secondary)]"
           >
-            Enable Daily Sales Summary
+            Send overdue reminders
           </label>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
+            Reminder Days Before Due (comma separated)
+          </label>
+          <input
+            type="text"
+            value={
+              Array.isArray(settings.reminder_days_before_due)
+                ? settings.reminder_days_before_due.join(", ")
+                : ""
+            }
+            onChange={(e) => {
+              const days = e.target.value
+                .split(",")
+                .map((d) => parseInt(d.trim(), 10))
+                .filter((d) => !isNaN(d));
+              onUpdate("reminder_days_before_due", days);
+            }}
+            className="windows-input w-full"
+            placeholder="e.g., 7, 3, 1"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
+            Overdue Notification Frequency
+          </label>
+          <select
+            value={settings.overdue_notification_frequency || "daily"}
+            onChange={(e) =>
+              onUpdate("overdue_notification_frequency", e.target.value)
+            }
+            className="windows-input w-full"
+          >
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+          </select>
         </div>
       </div>
 
-      {/* Email SMTP Settings */}
+      {/* Email SMTP Settings (unchanged) */}
       <div className="border-t border-[var(--border-color)] pt-4">
         <h4 className="text-md font-medium text-[var(--text-primary)] mb-3">
           Email (SMTP) Settings
@@ -135,7 +175,7 @@ const NotificationsTab: React.FC<Props> = ({
               type="number"
               value={settings.email_smtp_port || 587}
               onChange={(e) =>
-                onUpdate("email_smtp_port", parseInt(e.target.value) || 0)
+                onUpdate("email_smtp_port", parseInt(e.target.value, 10) || 0)
               }
               className="windows-input w-full"
               placeholder="587"
@@ -164,7 +204,7 @@ const NotificationsTab: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* SMS (Twilio) Settings */}
+      {/* SMS (Twilio) Settings (unchanged) */}
       <div className="border-t border-[var(--border-color)] pt-4">
         <h4 className="text-md font-medium text-[var(--text-primary)] mb-3">
           SMS (Twilio) Settings
@@ -232,207 +272,6 @@ const NotificationsTab: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Supplier Notifications */}
-      <div className="border-t border-[var(--border-color)] pt-4">
-        <h4 className="text-md font-medium text-[var(--text-primary)] mb-3">
-          Supplier Notifications
-        </h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="notify_supplier_with_sms"
-              checked={settings.notify_supplier_with_sms || false}
-              onChange={(e) =>
-                onUpdate("notify_supplier_with_sms", e.target.checked)
-              }
-              className="windows-checkbox"
-            />
-            <label
-              htmlFor="notify_supplier_with_sms"
-              className="text-sm text-[var(--text-secondary)]"
-            >
-              Notify Supplier via SMS (on order)
-            </label>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="notify_supplier_with_email"
-              checked={settings.notify_supplier_with_email || false}
-              onChange={(e) =>
-                onUpdate("notify_supplier_with_email", e.target.checked)
-              }
-              className="windows-checkbox"
-            />
-            <label
-              htmlFor="notify_supplier_with_email"
-              className="text-sm text-[var(--text-secondary)]"
-            >
-              Notify Supplier via Email (on order)
-            </label>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="notify_supplier_on_complete_email"
-              checked={settings.notify_supplier_on_complete_email || false}
-              onChange={(e) =>
-                onUpdate("notify_supplier_on_complete_email", e.target.checked)
-              }
-              className="windows-checkbox"
-            />
-            <label
-              htmlFor="notify_supplier_on_complete_email"
-              className="text-sm text-[var(--text-secondary)]"
-            >
-              Notify Supplier on Complete (Email)
-            </label>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="notify_supplier_on_complete_sms"
-              checked={settings.notify_supplier_on_complete_sms || false}
-              onChange={(e) =>
-                onUpdate("notify_supplier_on_complete_sms", e.target.checked)
-              }
-              className="windows-checkbox"
-            />
-            <label
-              htmlFor="notify_supplier_on_complete_sms"
-              className="text-sm text-[var(--text-secondary)]"
-            >
-              Notify Supplier on Complete (SMS)
-            </label>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="notify_supplier_on_cancel_email"
-              checked={settings.notify_supplier_on_cancel_email || false}
-              onChange={(e) =>
-                onUpdate("notify_supplier_on_cancel_email", e.target.checked)
-              }
-              className="windows-checkbox"
-            />
-            <label
-              htmlFor="notify_supplier_on_cancel_email"
-              className="text-sm text-[var(--text-secondary)]"
-            >
-              Notify Supplier on Cancel (Email)
-            </label>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="notify_supplier_on_cancel_sms"
-              checked={settings.notify_supplier_on_cancel_sms || false}
-              onChange={(e) =>
-                onUpdate("notify_supplier_on_cancel_sms", e.target.checked)
-              }
-              className="windows-checkbox"
-            />
-            <label
-              htmlFor="notify_supplier_on_cancel_sms"
-              className="text-sm text-[var(--text-secondary)]"
-            >
-              Notify Supplier on Cancel (SMS)
-            </label>
-          </div>
-        </div>
-      </div>
-
-      {/* Customer Return Notifications */}
-      <div className="border-t border-[var(--border-color)] pt-4">
-        <h4 className="text-md font-medium text-[var(--text-primary)] mb-3">
-          Customer Return Notifications
-        </h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="notify_customer_return_processed_email"
-              checked={settings.notify_customer_return_processed_email || false}
-              onChange={(e) =>
-                onUpdate(
-                  "notify_customer_return_processed_email",
-                  e.target.checked,
-                )
-              }
-              className="windows-checkbox"
-            />
-            <label
-              htmlFor="notify_customer_return_processed_email"
-              className="text-sm text-[var(--text-secondary)]"
-            >
-              Notify Customer when Return Processed (Email)
-            </label>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="notify_customer_return_processed_sms"
-              checked={settings.notify_customer_return_processed_sms || false}
-              onChange={(e) =>
-                onUpdate(
-                  "notify_customer_return_processed_sms",
-                  e.target.checked,
-                )
-              }
-              className="windows-checkbox"
-            />
-            <label
-              htmlFor="notify_customer_return_processed_sms"
-              className="text-sm text-[var(--text-secondary)]"
-            >
-              Notify Customer when Return Processed (SMS)
-            </label>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="notify_customer_return_cancelled_email"
-              checked={settings.notify_customer_return_cancelled_email || false}
-              onChange={(e) =>
-                onUpdate(
-                  "notify_customer_return_cancelled_email",
-                  e.target.checked,
-                )
-              }
-              className="windows-checkbox"
-            />
-            <label
-              htmlFor="notify_customer_return_cancelled_email"
-              className="text-sm text-[var(--text-secondary)]"
-            >
-              Notify Customer when Return Cancelled (Email)
-            </label>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="notify_customer_return_cancelled_sms"
-              checked={settings.notify_customer_return_cancelled_sms || false}
-              onChange={(e) =>
-                onUpdate(
-                  "notify_customer_return_cancelled_sms",
-                  e.target.checked,
-                )
-              }
-              className="windows-checkbox"
-            />
-            <label
-              htmlFor="notify_customer_return_cancelled_sms"
-              className="text-sm text-[var(--text-secondary)]"
-            >
-              Notify Customer when Return Cancelled (SMS)
-            </label>
-          </div>
-        </div>
-      </div>
-
-      {/* Test SMS Button (if needed) */}
       <div className="flex justify-end">
         <button
           onClick={onTestSms}

@@ -1,4 +1,4 @@
-// src/main/ipc/notification/index.ipc.js
+// src/main/ipc/core/notification/index.ipc.js
 //@ts-check
 const { ipcMain } = require("electron");
 const { withErrorHandling } = require("../../../../middlewares/errorHandler");

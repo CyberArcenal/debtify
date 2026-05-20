@@ -1,0 +1,124 @@
+/* ========== DARK THEME ========== */
+[data-theme="dark"] {
+  --primary-color: #1ab394;
+  --primary-hover: #2cceb0;
+  --secondary-color: #94a3b8;
+  --success-color: #34d399;
+  --warning-color: #fbbf24;
+  --danger-color: #f87171;
+
+  /* Dark theme backgrounds */
+  --background-color: #0f172a; /* slate-900 */
+  --sidebar-bg: #1e293b; /* slate-800 */
+  --sidebar-border: #334155;
+  --sidebar-text: #f1f5f9;
+  --header-bg: #1e293b;
+
+  /* Text colors */
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-tertiary: #64748b;
+
+  /* Shadows */
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.4);
+
+  /* Accent colors */
+  --accent-blue: #3b82f6;
+  --accent-blue-hover: #60a5fa;
+  --accent-blue-light: #1e3a8a;
+
+  --accent-green: #10b981;
+  --accent-green-hover: #34d399;
+  --accent-green-light: #064e3b;
+
+  --accent-orange: #f59e0b;
+  --accent-orange-hover: #fbbf24;
+  --accent-orange-light: #78350f;
+
+  --accent-purple: #8b5cf6;
+  --accent-purple-hover: #a78bfa;
+  --accent-purple-light: #4c1d95;
+
+  --accent-indigo: #6366f1;
+  --accent-indigo-light: #312e81;
+
+  --accent-red: #ef4444;
+  --accent-red-light: #7f1d1d;
+
+  --accent-emerald: #10b981;
+  --accent-emerald-light: #022c22;
+
+  /* Cards */
+  --card-bg: #1e293b;
+  --card-secondary-bg: #0f172a;
+
+  /* Borders */
+  --border-color: #334155;
+  --border-light: #475569;
+
+  /* Status colors */
+  --status-success-bg: rgba(16, 185, 129, 0.2);
+  --status-success-text: #34d399;
+  --status-inactive-bg: rgba(100, 116, 139, 0.2);
+  --status-inactive-text: #94a3b8;
+
+  /* Hover states */
+  --card-hover-bg: #334155;
+  --danger-hover: #ef4444;
+  --danger-hover-light: rgba(239, 68, 68, 0.3);
+
+  /* Form elements */
+  --input-bg: #0f172a;
+  --input-text: #f1f5f9;
+  --input-border: #475569;
+  --input-focus-ring: var(--accent-blue);
+
+  /* Buttons */
+  --btn-primary-bg: var(--accent-blue);
+  --btn-primary-hover: var(--accent-blue-hover);
+  --btn-primary-text: #ffffff;
+
+  --btn-secondary-bg: #334155;
+  --btn-secondary-hover: #475569;
+  --btn-secondary-text: #f1f5f9;
+  --btn-secondary-border: #475569;
+
+  --btn-success-bg: var(--accent-green);
+  --btn-success-hover: var(--accent-green-hover);
+  --btn-success-text: #ffffff;
+
+  --btn-warning-bg: var(--accent-orange);
+  --btn-warning-hover: var(--accent-orange-hover);
+  --btn-warning-text: #ffffff;
+
+  --btn-danger-bg: var(--accent-red);
+  --btn-danger-hover: var(--danger-hover);
+  --btn-danger-text: #ffffff;
+
+  --btn-purple-bg: var(--accent-purple);
+  --btn-purple-hover: var(--accent-purple-hover);
+  --btn-purple-text: #ffffff;
+
+  --btn-emerald-bg: var(--accent-emerald);
+  --btn-emerald-hover: var(--accent-green-hover);
+  --btn-emerald-text: #ffffff;
+
+  /* Pagination (existing variables might be used) */
+  --pagination-bg: #1e293b;
+  --pagination-text: #f1f5f9;
+  --pagination-border: #475569;
+  --pagination-bg-hover: #334155;
+  --pagination-active-bg: var(--accent-blue);
+  --pagination-active-text: #ffffff;
+  --pagination-disabled-bg: #0f172a;
+  --pagination-disabled-text: #64748b;
+  --pagination-disabled-border: #334155;
+
+  /* Additional overrides for sidebar stats */
+  --status-overdue-bg: rgba(239, 68, 68, 0.2);
+  --status-overdue: #f87171;
+  --status-partial-bg: rgba(245, 158, 11, 0.2);
+  --status-partial: #fbbf24;
+  --status-paid-bg: rgba(16, 185, 129, 0.2);
+  --status-paid: #34d399;
+}

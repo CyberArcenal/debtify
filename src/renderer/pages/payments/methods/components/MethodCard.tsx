@@ -1,7 +1,7 @@
 import React from 'react';
 import { Edit, Trash2, Star } from 'lucide-react';
-import type { PaymentMethod } from '../types';
 import * as Icons from 'lucide-react';
+import type { PaymentMethod } from '../../../../api/core/payment_method';
 
 interface MethodCardProps {
   method: PaymentMethod;

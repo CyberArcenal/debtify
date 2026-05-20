@@ -1,6 +1,6 @@
 // src/subscribers/SystemSettingSubscriber.js
-//@ts-check
 const { SystemSetting } = require("../entities/systemSettings");
+const TaxChangeLog = require("../entities/TaxChangeLog");
 const { logger } = require("../utils/logger");
 
 console.log("[Subscriber] Loading SystemSettingSubscriber");
@@ -48,10 +48,39 @@ class SystemSettingSubscriber {
 
   async afterUpdate(event) {
     try {
-      const { entity } = event;
-      logger.info("[SystemSettingSubscriber] afterUpdate", {
-        id: entity.id,
-      });
+      const { entity, databaseEntity } = event;
+      logger.info("[SystemSettingSubscriber] afterUpdate", { id: entity.id });
+
+      // --- TAX CHANGE LOGGING ---
+      // Only log if the setting key is tax‑related and the value changed
+      const taxKeys = [
+        "tax_rate",
+        "tax_enabled",
+        "tax_type",
+        "vat_rate",
+        "gst_rate",
+      ];
+      if (
+        taxKeys.includes(entity.key) &&
+        entity.value !== databaseEntity.value
+      ) {
+        const { AppDataSource } = require("../main/db/data-source");
+        const logRepo = AppDataSource.getRepository(TaxChangeLog);
+        const log = logRepo.create({
+          setting_key: entity.key,
+          old_value: databaseEntity.value,
+          new_value: entity.value,
+          changed_by: "system", // TODO: get current user from context (e.g., from global state)
+          reason: "Auto‑logged on setting update",
+          setting_id: entity.id,
+        });
+        await logRepo.save(log);
+        logger.info("[SystemSettingSubscriber] Tax change logged", {
+          key: entity.key,
+          old: databaseEntity.value,
+          new: entity.value,
+        });
+      }
     } catch (err) {
       logger.error("[SystemSettingSubscriber] afterUpdate error", err);
     }

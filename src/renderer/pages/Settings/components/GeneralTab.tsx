@@ -27,12 +27,12 @@ const GeneralTab: React.FC<Props> = ({ settings, onUpdate }) => {
         </div>
         <div>
           <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
-            Store Location
+            Branch Location
           </label>
           <input
             type="text"
-            value={settings.store_location || ""}
-            onChange={(e) => onUpdate("store_location", e.target.value)}
+            value={settings.branch_location || ""}
+            onChange={(e) => onUpdate("branch_location", e.target.value)}
             className="windows-input w-full"
           />
         </div>
@@ -47,7 +47,6 @@ const GeneralTab: React.FC<Props> = ({ settings, onUpdate }) => {
           >
             <option value="Asia/Manila">Asia/Manila (UTC+8)</option>
             <option value="UTC">UTC</option>
-            {/* add more as needed */}
           </select>
         </div>
         <div>
@@ -56,7 +55,7 @@ const GeneralTab: React.FC<Props> = ({ settings, onUpdate }) => {
           </label>
           <input
             type="text"
-            value={settings.currency || "USD"}
+            value={settings.currency || "PHP"}
             onChange={(e) => onUpdate("currency", e.target.value)}
             className="windows-input w-full"
           />
@@ -83,13 +82,25 @@ const GeneralTab: React.FC<Props> = ({ settings, onUpdate }) => {
             type="number"
             value={settings.auto_logout_minutes || 30}
             onChange={(e) =>
-              onUpdate("auto_logout_minutes", parseInt(e.target.value))
+              onUpdate("auto_logout_minutes", parseInt(e.target.value, 10) || 0)
             }
             className="windows-input w-full"
+            min="0"
           />
         </div>
-
         <div>
+          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
+            Date Format
+          </label>
+          <input
+            type="text"
+            value={settings.date_format || "YYYY-MM-DD"}
+            onChange={(e) => onUpdate("date_format", e.target.value)}
+            className="windows-input w-full"
+            placeholder="YYYY-MM-DD"
+          />
+        </div>
+        <div className="col-span-2">
           <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
             Receipt Footer Message
           </label>
