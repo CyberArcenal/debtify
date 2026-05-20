@@ -1,4 +1,3 @@
-# .github/workflows/build-release.yml
 name: Build & Release Debtify
 
 on:
@@ -38,22 +37,18 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Rebuild native modules (electron-rebuild)
-        run: npx electron-rebuild
+      - name: Rebuild native modules
+        run: npx electron-builder install-app-deps
 
       - name: Build and package (macOS)
         if: runner.os == 'macOS'
-        run: npm run dist:mac
+        run: npm run build
         env:
-          CSC_IDENTITY_AUTO_DISCOVERY: false   # skip code signing in CI
+          CSC_IDENTITY_AUTO_DISCOVERY: false   # disables code signing in CI
 
-      - name: Build and package (Windows)
-        if: runner.os == 'Windows'
-        run: npm run dist:win
-
-      - name: Build and package (Linux)
-        if: runner.os == 'Linux'
-        run: npm run dist:linux
+      - name: Build and package (Windows / Linux)
+        if: runner.os != 'macOS'
+        run: npm run build
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
