@@ -24,7 +24,7 @@ class InterestRateChangeLogStateTransitionService {
         userId: 1,
         title: "Interest Rate Changed",
         message: `Interest rate "${logEntry.setting_key}" has been changed from "${logEntry.old_value}" to "${logEntry.new_value}".`,
-        type: "warning",
+        type: "info",
         metadata: {
           settingKey: logEntry.setting_key,
           oldValue: logEntry.old_value,

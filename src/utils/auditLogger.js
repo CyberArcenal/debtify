@@ -53,6 +53,8 @@ class AuditLogger {
         await this.initialize();
       }
 
+      if(action === 'VIEW')return null;
+
       // if(!await auditTrailEnabled())return;
 
       // @ts-ignore

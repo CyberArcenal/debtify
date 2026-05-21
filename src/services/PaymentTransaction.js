@@ -2,27 +2,30 @@
 
 const auditLogger = require("../utils/auditLogger");
 const { validatePaymentData } = require("../utils/paymentUtils");
-const {
-  enableEarlyPaymentDiscount,
-  earlyPaymentDiscountRate,
-} = require("../utils/system");
+const { enableEarlyPaymentDiscount, earlyPaymentDiscountRate } = require("../utils/system");
+
+// Time limit for editing payments (in hours)
+const EDIT_TIME_LIMIT_HOURS = 24;
 
 class PaymentTransactionService {
   constructor() {
     this.paymentRepository = null;
     this.debtRepository = null;
+    this.methodRepository = null;
   }
 
   async initialize() {
     const { AppDataSource } = require("../main/db/data-source");
     const PaymentTransaction = require("../entities/PaymentTransaction");
     const Debt = require("../entities/Debt");
+    const PaymentMethod = require("../entities/PaymentMethod");
 
     if (!AppDataSource.isInitialized) {
       await AppDataSource.initialize();
     }
     this.paymentRepository = AppDataSource.getRepository(PaymentTransaction);
     this.debtRepository = AppDataSource.getRepository(Debt);
+    this.methodRepository = AppDataSource.getRepository(PaymentMethod);
     console.log("PaymentTransactionService initialized");
   }
 
@@ -33,6 +36,7 @@ class PaymentTransactionService {
     return {
       payment: this.paymentRepository,
       debt: this.debtRepository,
+      method: this.methodRepository,
     };
   }
 
@@ -51,49 +55,7 @@ class PaymentTransactionService {
   }
 
   /**
-   * Recalculate debt's paidAmount and remainingAmount from all payments
-   * @param {number} debtId
-   * @param {import("typeorm").QueryRunner | null} qr
-   * @returns {Promise<{ totalPaid: number, remainingAmount: number }>}
-   */
-  async _recalculateDebtAmounts(debtId, qr = null) {
-    const Debt = require("../entities/Debt");
-    const PaymentTransaction = require("../entities/PaymentTransaction");
-    const debtRepo = this._getRepo(qr, Debt);
-    const paymentRepo = this._getRepo(qr, PaymentTransaction);
-
-    const debt = await debtRepo.findOne({ where: { id: debtId } });
-    if (!debt) {
-      throw new Error(`Debt with ID ${debtId} not found`);
-    }
-
-    // Sum all non-deleted payments
-    const payments = await paymentRepo.find({
-      where: { debt: { id: debtId }, deletedAt: null },
-    });
-    const totalPaid = payments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
-    const newRemaining = debt.totalAmount - totalPaid;
-    const remainingAmount = newRemaining < 0 ? 0 : newRemaining;
-
-    // Update debt if changed
-    if (debt.paidAmount !== totalPaid || debt.remainingAmount !== remainingAmount) {
-      debt.paidAmount = totalPaid;
-      debt.remainingAmount = remainingAmount;
-      debt.updatedAt = new Date();
-      // Optionally update status to 'paid' if remainingAmount === 0
-      if (remainingAmount === 0 && debt.status !== 'paid') {
-        debt.status = 'paid';
-      } else if (remainingAmount > 0 && debt.status === 'paid') {
-        debt.status = 'active';
-      }
-      await debtRepo.save(debt);
-    }
-
-    return { totalPaid, remainingAmount };
-  }
-
-  /**
-   * Create a new payment transaction
+   * Create a new payment transaction (no side effects – debt not updated here)
    * @param {Object} paymentData
    * @param {string} user
    * @param {import("typeorm").QueryRunner | null} qr
@@ -103,6 +65,7 @@ class PaymentTransactionService {
     const PaymentTransaction = require("../entities/PaymentTransaction");
     const paymentRepo = this._getRepo(qr, PaymentTransaction);
     const debtRepo = this._getRepo(qr, require("../entities/Debt"));
+    const methodRepo = this._getRepo(qr, require("../entities/PaymentMethod"));
 
     try {
       const validation = validatePaymentData(paymentData);
@@ -110,27 +73,35 @@ class PaymentTransactionService {
         throw new Error(validation.errors.join(", "));
       }
 
-      let { amount, paymentDate, reference, notes, debtId } = paymentData;
+      let { amount, paymentDate, reference, notes, debtId, methodId } = paymentData;
       let originalAmount = amount;
 
-      // Validate debt existence and remaining balance
+      // Validate debt existence
       const debt = await debtRepo.findOne({ where: { id: debtId } });
       if (!debt) {
         throw new Error(`Debt with ID ${debtId} not found`);
       }
 
-      // Get current remaining amount (considering only non-deleted payments)
-      const currentRemaining = debt.totalAmount - debt.paidAmount;
-      if (parseFloat(amount) > currentRemaining) {
-        throw new Error(`Payment amount (${amount}) exceeds remaining balance (${currentRemaining})`);
+      // Validate payment method if provided
+      if (methodId) {
+        const paymentMethod = await methodRepo.findOne({ where: { id: methodId } });
+        if (!paymentMethod) {
+          throw new Error(`Payment method with ID ${methodId} not found`);
+        }
       }
 
-      // --- Early Payment Discount Logic ---
+      // Early payment discount logic (only compute discounted amount, but do NOT update debt)
       const discountEnabled = await enableEarlyPaymentDiscount();
+      let discountApplied = false;
       if (discountEnabled) {
         const dueDate = new Date(debt.dueDate);
         const paymentDateObj = new Date(paymentDate);
         const isEarly = paymentDateObj < dueDate;
+        // We need current remaining balance to know if it's full payment, but we don't have it recalculated here.
+        // Since we removed debt recalculation, we must rely on the frontend or calculate remaining on the fly.
+        // For simplicity, we'll still fetch the latest remaining amount from debt (but we won't modify debt).
+        // This is a read-only check.
+        const currentRemaining = debt.totalAmount - debt.paidAmount;
         const isFullPayment = Math.abs(parseFloat(amount) - currentRemaining) < 0.01;
 
         if (isEarly && isFullPayment) {
@@ -140,25 +111,24 @@ class PaymentTransactionService {
             amount = parseFloat(discountedAmount.toFixed(2));
             const discountNote = `[Early payment discount ${discountRate}% applied – original amount ${originalAmount}]`;
             notes = notes ? `${discountNote} ${notes}` : discountNote;
+            discountApplied = true;
             console.log(`Early payment discount applied: original ${originalAmount} → discounted ${amount}`);
           }
         }
       }
 
+      // Create payment record (no debt update here)
       const payment = paymentRepo.create({
         amount: parseFloat(amount),
         paymentDate: new Date(paymentDate),
         reference: reference || null,
         notes: notes || null,
         recordedAt: new Date(),
+        methodId: methodId || null,
         debt,
       });
 
       const saved = await saveDb(paymentRepo, payment);
-
-      // Recalculate debt totals
-      await this._recalculateDebtAmounts(debtId, qr);
-
       await auditLogger.logCreate("PaymentTransaction", saved.id, saved, user);
       return saved;
     } catch (error) {
@@ -168,16 +138,19 @@ class PaymentTransactionService {
   }
 
   /**
-   * Update an existing payment transaction
+   * Update an existing payment transaction (no side effects)
    * @param {number} id
    * @param {Object} paymentData
    * @param {string} user
    * @param {import("typeorm").QueryRunner | null} qr
+   * @param {boolean} isAdmin - allows bypassing time limit
    */
-  async update(id, paymentData, user = "system", qr = null) {
+  async update(id, paymentData, user = "system", qr = null, isAdmin = false) {
     const { updateDb } = require("../utils/dbUtils/dbActions");
     const PaymentTransaction = require("../entities/PaymentTransaction");
+    const PaymentMethod = require("../entities/PaymentMethod");
     const paymentRepo = this._getRepo(qr, PaymentTransaction);
+    const methodRepo = this._getRepo(qr, PaymentMethod);
     const debtRepo = this._getRepo(qr, require("../entities/Debt"));
 
     try {
@@ -185,66 +158,60 @@ class PaymentTransactionService {
         where: { id },
         relations: ["debt"],
       });
-      if (!existing) {
-        throw new Error(`Payment transaction with ID ${id} not found`);
+      if (!existing) throw new Error(`Payment #${id} not found`);
+
+      // Time limit check
+      const createdAt = existing.recordedAt;
+      const hoursSinceCreation = (Date.now() - new Date(createdAt)) / (1000 * 60 * 60);
+      if (hoursSinceCreation > EDIT_TIME_LIMIT_HOURS && !isAdmin) {
+        throw new Error(`Cannot edit payment after ${EDIT_TIME_LIMIT_HOURS} hours`);
       }
+
       const oldData = { ...existing };
       const oldDebtId = existing.debt.id;
-
-      // If debtId is being changed, we need to recalc both old and new debts later
       let newDebtId = null;
+
+      // Update debt if changed (but do NOT recalculate balances here)
       if (paymentData.debtId && paymentData.debtId !== oldDebtId) {
         const newDebt = await debtRepo.findOne({ where: { id: paymentData.debtId } });
-        if (!newDebt) {
-          throw new Error(`Debt with ID ${paymentData.debtId} not found`);
-        }
+        if (!newDebt) throw new Error(`Debt ${paymentData.debtId} not found`);
         existing.debt = newDebt;
         newDebtId = paymentData.debtId;
         delete paymentData.debtId;
       }
 
-      // Apply updates
-      if (paymentData.amount !== undefined) {
-        paymentData.amount = parseFloat(paymentData.amount);
+      // Update payment method if provided
+      if (paymentData.methodId !== undefined) {
+        if (paymentData.methodId === null || paymentData.methodId === "") {
+          existing.methodId = null;
+        } else {
+          const newMethod = await methodRepo.findOne({ where: { id: paymentData.methodId } });
+          if (!newMethod) throw new Error(`Payment method ${paymentData.methodId} not found`);
+          existing.methodId = paymentData.methodId;
+        }
+        delete paymentData.methodId;
       }
-      if (paymentData.paymentDate) {
-        paymentData.paymentDate = new Date(paymentData.paymentDate);
-      }
+
+      // Update other fields
+      if (paymentData.amount !== undefined) paymentData.amount = parseFloat(paymentData.amount);
+      if (paymentData.paymentDate) paymentData.paymentDate = new Date(paymentData.paymentDate);
       Object.assign(existing, paymentData);
       existing.updatedAt = new Date();
 
-      // If amount changed, we need to validate against the debt's remaining (including this payment's old amount)
-      if (paymentData.amount !== undefined && paymentData.amount !== oldData.amount) {
-        const targetDebt = existing.debt;
-        // Temporarily revert paidAmount to old state (without this payment)
-        const oldTotalPaid = targetDebt.paidAmount;
-        const oldRemaining = targetDebt.totalAmount - (oldTotalPaid - oldData.amount);
-        if (paymentData.amount > oldRemaining) {
-          throw new Error(`New payment amount (${paymentData.amount}) exceeds remaining balance (${oldRemaining}) after considering other payments`);
-        }
-      }
+      // Note: No validation against remaining balance because side effects are handled elsewhere.
+      // The state transition service will handle consistency when needed (e.g., on confirm/void/refund).
 
       const saved = await updateDb(paymentRepo, existing);
-
-      // Recalculate affected debts
-      await this._recalculateDebtAmounts(oldDebtId, qr);
-      if (newDebtId && newDebtId !== oldDebtId) {
-        await this._recalculateDebtAmounts(newDebtId, qr);
-      } else if (paymentData.amount !== undefined || paymentData.debtId !== undefined) {
-        // Amount changed but same debt
-        await this._recalculateDebtAmounts(oldDebtId, qr);
-      }
-
       await auditLogger.logUpdate("PaymentTransaction", id, oldData, saved, user);
       return saved;
     } catch (error) {
-      console.error("Failed to update payment:", error.message);
+      console.error("Update payment failed:", error.message);
       throw error;
     }
   }
 
   /**
-   * Soft delete a payment transaction
+   * Soft delete a payment transaction (no side effects)
    * @param {number} id
    * @param {string} user
    * @param {import("typeorm").QueryRunner | null} qr
@@ -259,26 +226,16 @@ class PaymentTransactionService {
         where: { id },
         relations: ["debt"],
       });
-      if (!payment) {
-        throw new Error(`Payment transaction with ID ${id} not found`);
-      }
-      if (payment.deletedAt) {
-        throw new Error(`Payment #${id} is already deleted`);
-      }
+      if (!payment) throw new Error(`Payment #${id} not found`);
+      if (payment.deletedAt) throw new Error(`Payment #${id} is already deleted`);
 
       const oldData = { ...payment };
-      const debtId = payment.debt.id;
-
       payment.deletedAt = new Date();
       payment.updatedAt = new Date();
 
       const saved = await updateDb(paymentRepo, payment);
-
-      // Recalculate debt totals (payment removed)
-      await this._recalculateDebtAmounts(debtId, qr);
-
       await auditLogger.logDelete("PaymentTransaction", id, oldData, user);
-      console.log(`Payment transaction soft deleted: #${id}`);
+      console.log(`Payment #${id} soft deleted`);
       return saved;
     } catch (error) {
       console.error("Failed to delete payment:", error.message);
@@ -287,7 +244,7 @@ class PaymentTransactionService {
   }
 
   /**
-   * Restore a soft-deleted payment transaction
+   * Restore a soft-deleted payment transaction (no side effects)
    * @param {number} id
    * @param {string} user
    * @param {import("typeorm").QueryRunner | null} qr
@@ -303,29 +260,16 @@ class PaymentTransactionService {
         withDeleted: true,
         relations: ["debt"],
       });
-      if (!payment) {
-        throw new Error(`Payment transaction with ID ${id} not found`);
-      }
-      if (!payment.deletedAt) {
-        throw new Error(`Payment #${id} is not deleted`);
-      }
+      if (!payment) throw new Error(`Payment #${id} not found`);
+      if (!payment.deletedAt) throw new Error(`Payment #${id} is not deleted`);
 
-      // Validate that restoring this payment does not exceed remaining balance
-      const debt = payment.debt;
-      const currentPaid = debt.paidAmount;
-      const newTotalPaid = currentPaid + payment.amount;
-      if (newTotalPaid > debt.totalAmount) {
-        throw new Error(`Cannot restore payment of ${payment.amount} - would exceed total debt amount`);
-      }
-
+      // No validation against remaining balance here – state transition service will handle consistency
       payment.deletedAt = null;
       payment.updatedAt = new Date();
 
       const saved = await updateDb(paymentRepo, payment);
-      await this._recalculateDebtAmounts(payment.debt.id, qr);
-
       await auditLogger.logUpdate("PaymentTransaction", id, { deletedAt: true }, { deletedAt: null }, user);
-      console.log(`Payment transaction restored: #${id}`);
+      console.log(`Payment #${id} restored`);
       return saved;
     } catch (error) {
       console.error("Failed to restore payment:", error.message);
@@ -334,7 +278,7 @@ class PaymentTransactionService {
   }
 
   /**
-   * Permanently delete a payment transaction
+   * Permanently delete a payment transaction (no side effects)
    * @param {number} id
    * @param {string} user
    * @param {import("typeorm").QueryRunner | null} qr
@@ -349,19 +293,15 @@ class PaymentTransactionService {
       withDeleted: true,
       relations: ["debt"],
     });
-    if (!payment) {
-      throw new Error(`Payment transaction with ID ${id} not found`);
-    }
-    const debtId = payment.debt.id;
+    if (!payment) throw new Error(`Payment #${id} not found`);
 
     await removeDb(paymentRepo, payment);
-    await this._recalculateDebtAmounts(debtId, qr);
     await auditLogger.logDelete("PaymentTransaction", id, payment, user);
     console.log(`Payment #${id} permanently deleted`);
   }
 
   /**
-   * Find payment by ID (excludes soft-deleted by default)
+   * Find payment by ID
    * @param {number} id
    * @param {boolean} includeDeleted
    */
@@ -372,50 +312,34 @@ class PaymentTransactionService {
       options.where.deletedAt = null;
     }
     const payment = await paymentRepo.findOne(options);
-    if (!payment) {
-      throw new Error(`Payment transaction with ID ${id} not found`);
-    }
+    if (!payment) throw new Error(`Payment #${id} not found`);
     await auditLogger.logView("PaymentTransaction", id, "system");
     return payment;
   }
 
   /**
-   * Find all payment transactions with filters, pagination, sorting
+   * Find all payment transactions with filters, pagination, sorting (read-only)
    * @param {Object} options
    */
   async findAll(options = {}) {
     const { payment: paymentRepo } = await this.getRepositories();
-    const qb = paymentRepo.createQueryBuilder("payment")
+    const qb = paymentRepo
+      .createQueryBuilder("payment")
       .leftJoinAndSelect("payment.debt", "debt")
       .leftJoinAndSelect("debt.borrower", "borrower");
 
-    // Exclude soft-deleted unless requested
     if (!options.includeDeleted) {
       qb.andWhere("payment.deletedAt IS NULL");
     }
 
     // Filters
-    if (options.debtId) {
-      qb.andWhere("debt.id = :debtId", { debtId: options.debtId });
-    }
-    if (options.borrowerId) {
-      qb.andWhere("borrower.id = :borrowerId", { borrowerId: options.borrowerId });
-    }
-    if (options.reference) {
-      qb.andWhere("payment.reference LIKE :reference", { reference: `%${options.reference}%` });
-    }
-    if (options.paymentDateFrom) {
-      qb.andWhere("payment.paymentDate >= :paymentDateFrom", { paymentDateFrom: new Date(options.paymentDateFrom) });
-    }
-    if (options.paymentDateTo) {
-      qb.andWhere("payment.paymentDate <= :paymentDateTo", { paymentDateTo: new Date(options.paymentDateTo) });
-    }
-    if (options.minAmount) {
-      qb.andWhere("payment.amount >= :minAmount", { minAmount: options.minAmount });
-    }
-    if (options.maxAmount) {
-      qb.andWhere("payment.amount <= :maxAmount", { maxAmount: options.maxAmount });
-    }
+    if (options.debtId) qb.andWhere("debt.id = :debtId", { debtId: options.debtId });
+    if (options.borrowerId) qb.andWhere("borrower.id = :borrowerId", { borrowerId: options.borrowerId });
+    if (options.reference) qb.andWhere("payment.reference LIKE :reference", { reference: `%${options.reference}%` });
+    if (options.paymentDateFrom) qb.andWhere("payment.paymentDate >= :paymentDateFrom", { paymentDateFrom: new Date(options.paymentDateFrom) });
+    if (options.paymentDateTo) qb.andWhere("payment.paymentDate <= :paymentDateTo", { paymentDateTo: new Date(options.paymentDateTo) });
+    if (options.minAmount) qb.andWhere("payment.amount >= :minAmount", { minAmount: options.minAmount });
+    if (options.maxAmount) qb.andWhere("payment.amount <= :maxAmount", { maxAmount: options.maxAmount });
     if (options.search) {
       qb.andWhere(
         "(payment.reference LIKE :search OR payment.notes LIKE :search OR debt.name LIKE :search OR borrower.name LIKE :search)",
@@ -440,28 +364,21 @@ class PaymentTransactionService {
   }
 
   /**
-   * Get payment statistics
+   * Get payment statistics (read-only, no side effects)
    */
   async getStatistics() {
     const { payment: paymentRepo } = await this.getRepositories();
-    const qb = paymentRepo.createQueryBuilder("payment")
-      .where("payment.deletedAt IS NULL");
+    const qb = paymentRepo.createQueryBuilder("payment").where("payment.deletedAt IS NULL");
 
     const totalPayments = await qb.getCount();
     const totalAmount = await qb.clone().select("SUM(payment.amount)", "sum").getRawOne();
     const averageAmount = await qb.clone().select("AVG(payment.amount)", "avg").getRawOne();
 
-    // Payments by date range (last 30 days)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const recentPayments = await qb.clone()
-      .andWhere("payment.paymentDate >= :thirtyDaysAgo", { thirtyDaysAgo })
-      .getCount();
+    const recentPayments = await qb.clone().andWhere("payment.paymentDate >= :thirtyDaysAgo", { thirtyDaysAgo }).getCount();
 
-    // Unique debts with payments
-    const uniqueDebts = await qb.clone()
-      .select("COUNT(DISTINCT payment.debtId)", "count")
-      .getRawOne();
+    const uniqueDebts = await qb.clone().select("COUNT(DISTINCT payment.debtId)", "count").getRawOne();
 
     return {
       totalPayments,
@@ -473,10 +390,7 @@ class PaymentTransactionService {
   }
 
   /**
-   * Export payment transactions to CSV or JSON
-   * @param {string} format
-   * @param {Object} filters
-   * @param {string} user
+   * Export payment transactions to CSV or JSON (read-only)
    */
   async exportPayments(format = "json", filters = {}, user = "system") {
     const payments = await this.findAll(filters);
@@ -517,10 +431,7 @@ class PaymentTransactionService {
   }
 
   /**
-   * Bulk create payments
-   * @param {Array<Object>} paymentsArray
-   * @param {string} user
-   * @param {import("typeorm").QueryRunner | null} qr
+   * Bulk create payments (no side effects)
    */
   async bulkCreate(paymentsArray, user = "system", qr = null) {
     const results = { created: [], errors: [] };
@@ -536,10 +447,7 @@ class PaymentTransactionService {
   }
 
   /**
-   * Bulk update payments
-   * @param {Array<{ id: number, updates: Object }>} updatesArray
-   * @param {string} user
-   * @param {import("typeorm").QueryRunner | null} qr
+   * Bulk update payments (no side effects)
    */
   async bulkUpdate(updatesArray, user = "system", qr = null) {
     const results = { updated: [], errors: [] };
@@ -555,10 +463,7 @@ class PaymentTransactionService {
   }
 
   /**
-   * Import payments from CSV file
-   * @param {string} filePath
-   * @param {string} user
-   * @param {import("typeorm").QueryRunner | null} qr
+   * Import payments from CSV file (no side effects)
    */
   async importFromCSV(filePath, user = "system", qr = null) {
     const fs = require("fs").promises;
@@ -579,6 +484,7 @@ class PaymentTransactionService {
           reference: record.reference || null,
           notes: record.notes || null,
           debtId: parseInt(record.debtId, 10),
+          methodId: record.methodId ? parseInt(record.methodId, 10) : null,
         };
         const validation = validatePaymentData(paymentData);
         if (!validation.valid) throw new Error(validation.errors.join(", "));

@@ -5,6 +5,8 @@ const {
   enforceCreditCheck,
   emailEnabled,
   smsEnabled,
+  requireLoanAgreement,
+  loanAgreementTemplate,
 } = require("../utils/system");
 const { NotificationLogService } = require("../services/NotificationLog");
 const notificationService = require("../services/Notification");
@@ -12,7 +14,7 @@ const debtService = require("../services/Debt");
 
 class LoanApplicationStateTransitionService {
   /**
-   * @param {{ getRepository: (arg0: import("typeorm").EntitySchema<{ id: unknown; debtorId: unknown; debtorName: unknown; debtorContact: unknown; debtorEmail: unknown; debtorAddress: unknown; requestedAmount: unknown; purpose: unknown; proposedDueDate: unknown; interestRate: unknown; status: unknown; approvedAt: unknown; rejectedAt: unknown; approvedBy: unknown; rejectionReason: unknown; deletedAt: unknown; createdAt: unknown; updatedAt: unknown; }>) => any; }} dataSource
+   * @param {{ getRepository: (arg0: any) => any; }} dataSource
    */
   constructor(dataSource) {
     this.dataSource = dataSource;
@@ -23,22 +25,13 @@ class LoanApplicationStateTransitionService {
   }
 
   /**
-   * @param {import("typeorm").EntitySchema<{ id: unknown; debtorId: unknown; debtorName: unknown; debtorContact: unknown; debtorEmail: unknown; debtorAddress: unknown; requestedAmount: unknown; purpose: unknown; proposedDueDate: unknown; interestRate: unknown; status: unknown; approvedAt: unknown; rejectedAt: unknown; approvedBy: unknown; rejectionReason: unknown; deletedAt: unknown; createdAt: unknown; updatedAt: unknown; }>} entity
-   * @param {{ manager: { getRepository: (arg0: any) => any; }; } | null} queryRunner
+   * Helper: get repository (transactional)
    */
   _getRepo(entity, queryRunner) {
-    return queryRunner
-      ? queryRunner.manager.getRepository(entity)
-      : this.dataSource.getRepository(entity);
+    if (queryRunner) return queryRunner.manager.getRepository(entity);
+    return this.dataSource.getRepository(entity);
   }
 
-  /**
-   * @param {any} recipient
-   * @param {string} subject
-   * @param {string} message
-   * @param {string | undefined} user
-   * @param {import("typeorm").QueryRunner | null | undefined} queryRunner
-   */
   async _sendEmail(recipient, subject, message, user, queryRunner) {
     const logService = this.notificationLogService;
     const logResult = await logService.createLog(
@@ -58,12 +51,6 @@ class LoanApplicationStateTransitionService {
     return sendResult.status;
   }
 
-  /**
-   * @param {any} phoneNumber
-   * @param {string} message
-   * @param {string} user
-   * @param {null} queryRunner
-   */
   async _sendSms(phoneNumber, message, user, queryRunner) {
     // Placeholder – integrate with actual SMS channel via NotificationLogService
     logger.info(`[SMS] Would send to ${phoneNumber}: ${message}`);
@@ -71,7 +58,7 @@ class LoanApplicationStateTransitionService {
   }
 
   /**
-   * @param {{ id: any; debtorName: any; requestedAmount: any; debtorId: number; }} application
+   * Called when a loan application is submitted (afterInsert)
    */
   async onSubmit(application, user = "system", queryRunner = null) {
     logger.info(
@@ -110,48 +97,42 @@ class LoanApplicationStateTransitionService {
   }
 
   /**
-   * @param {{ id: any; purpose: any; requestedAmount: any; proposedDueDate: any; interestRate: any; debtorId: any; debtorEmail: any; debtorName: any; debtorContact: any; }} application
+   * Called when an application is approved (afterUpdate status → approved)
+   * This is where the active debt is created (side effect).
    */
-  async onApprove(
-    application,
-    createdDebt = null,
-    user = "system",
-    queryRunner = null,
-  ) {
+  async onApprove(application, user = "system", queryRunner = null) {
     logger.info(
       `[LoanApplication] Application #${application.id} approved by ${user}`,
     );
 
-    let debt = createdDebt;
-    if (!debt) {
-      const debtData = {
-        name: `Loan: ${application.purpose}`,
-        totalAmount: application.requestedAmount,
-        paidAmount: 0,
-        dueDate: application.proposedDueDate,
-        status: "active",
-        interestRate: application.interestRate,
-        penaltyRate: null,
-        borrowerId: application.debtorId,
-      };
-      debt = await debtService.create(debtData, user, queryRunner);
-      logger.info(`Created active debt #${debt.id}`);
-    }
+    // 1. Create active debt using debtService (within same transaction if queryRunner provided)
+    const debtData = {
+      name: `Loan: ${application.purpose}`,
+      totalAmount: application.requestedAmount,
+      paidAmount: 0,
+      dueDate: application.proposedDueDate.toISOString().split("T")[0],
+      status: "active",
+      interestRate: application.interestRate, // already set during approval
+      penaltyRate: null,
+      borrowerId: application.debtorId,
+    };
+    const createdDebt = await debtService.create(debtData, user, queryRunner);
+    logger.info(`Created active debt #${createdDebt.id} for application #${application.id}`);
 
-    // In‑app notification to debtor
+    // 2. In‑app notification to debtor
     await notificationService.create(
       {
         userId: 1,
         title: "Loan Approved",
         message: `Your loan application (${application.purpose}) has been approved. An active debt has been created.`,
-        type: "success",
-        metadata: { applicationId: application.id, debtId: debt.id },
+        type: "info",
+        metadata: { applicationId: application.id, debtId: createdDebt.id },
       },
       user,
       queryRunner,
     );
 
-    // Email/SMS if enabled
+    // 3. Email/SMS if enabled
     const canSendEmail = await emailEnabled();
     const canSendSms = await smsEnabled();
     if (application.debtorEmail && canSendEmail) {
@@ -172,48 +153,28 @@ class LoanApplicationStateTransitionService {
       );
     }
 
-    const {
-      requireLoanAgreement,
-      loanAgreementTemplate,
-    } = require("../utils/system");
+    // 4. Generate loan agreement if required
     if (await requireLoanAgreement()) {
       logger.info(
         `Loan agreement should be generated for application #${application.id} using template: ${await loanAgreementTemplate()}`,
       );
-      // TODO: actual PDF generation
+      // TODO: actual PDF generation and storage (could call another service)
     }
 
-    await auditLogger.logUpdate(
-      "LoanApplication",
-      application.id,
-      { status: "pending" },
-      { status: "approved" },
-      user,
-    );
+    // 5. Audit log already recorded by subscriber, but we add an extra log for the created debt
+    await auditLogger.logCreate("Debt", createdDebt.id, createdDebt, user);
   }
 
   /**
-   * @param {{ id: any; rejectionReason: null; rejectedAt: Date; debtorEmail: any; debtorName: any; debtorContact: any; deletedAt: Date; }} application
+   * Called when an application is rejected (afterUpdate status → rejected)
    */
-  async onReject(
-    application,
-    reason = null,
-    user = "system",
-    queryRunner = null,
-  ) {
+  async onReject(application, reason = null, user = "system", queryRunner = null) {
     logger.info(
       `[LoanApplication] Application #${application.id} rejected by ${user} (reason: ${reason || "none"})`,
     );
 
-    const appRepo = this._getRepo(
-      require("../entities/LoanApplication"),
-      queryRunner,
-    );
-    if (application.rejectionReason !== reason) {
-      application.rejectionReason = reason;
-      application.rejectedAt = new Date();
-      await appRepo.save(application);
-    }
+    // The service already updated status, rejectionReason and rejectedAt.
+    // Here we only send notifications and audit.
 
     // In‑app notification to debtor
     let message = `Your loan application has been rejected.`;
@@ -251,40 +212,21 @@ class LoanApplicationStateTransitionService {
       );
     }
 
-    if (!application.deletedAt) {
-      application.deletedAt = new Date();
-      await appRepo.save(application);
-    }
-
-    await auditLogger.logUpdate(
-      "LoanApplication",
-      application.id,
-      { status: "pending" },
-      { status: "rejected", reason },
-      user,
-    );
+    // If application was soft‑deleted as part of rejection, we don't need to delete again.
+    // Audit log is already recorded by subscriber after update.
   }
 
   /**
-   * @param {{ id: any; status: string; rejectedAt: null; rejectionReason: null; deletedAt: null; updatedAt: Date; debtorName: any; }} application
+   * Called when a rejected application is reopened (status back to pending)
    */
   async onReopen(application, user = "system", queryRunner = null) {
     logger.info(
       `[LoanApplication] Application #${application.id} reopened by ${user}`,
     );
 
-    const appRepo = this._getRepo(
-      require("../entities/LoanApplication"),
-      queryRunner,
-    );
-    application.status = "pending";
-    application.rejectedAt = null;
-    application.rejectionReason = null;
-    application.deletedAt = null;
-    application.updatedAt = new Date();
-    await appRepo.save(application);
+    // The service already reset status, rejectionReason, deletedAt.
+    // Here we notify loan officer.
 
-    // In‑app notification to loan officer
     await notificationService.create(
       {
         userId: 1,
@@ -297,13 +239,7 @@ class LoanApplicationStateTransitionService {
       queryRunner,
     );
 
-    await auditLogger.logUpdate(
-      "LoanApplication",
-      application.id,
-      { status: "rejected" },
-      { status: "pending" },
-      user,
-    );
+    // No email to debtor needed at this stage.
   }
 }
 

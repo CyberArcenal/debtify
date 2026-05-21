@@ -8,7 +8,7 @@ function validateNotificationData(data) {
   if (!data.message || typeof data.message !== "string" || data.message.trim() === "") {
     errors.push("Message is required and must be a non-empty string");
   }
-  if (data.type && !["reminder", "overdue", "payment_confirmation"].includes(data.type)) {
+  if (data.type && !["reminder", "error", "info", "reminder", "overdue", "payment_confirmation"].includes(data.type)) {
     errors.push("Type must be one of: reminder, overdue, payment_confirmation");
   }
   if (data.isRead !== undefined && typeof data.isRead !== "boolean") {

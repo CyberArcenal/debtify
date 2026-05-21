@@ -37,6 +37,7 @@ export interface PaymentCreateData {
   paymentDate: string;        // YYYY-MM-DD or ISO string
   reference?: string | null;
   notes?: string | null;
+  methodId: number;
   debtId: number;
 }
 

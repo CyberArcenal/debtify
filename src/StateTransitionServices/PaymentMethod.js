@@ -16,13 +16,32 @@ class PaymentMethodStateTransitionService {
   }
 
   /**
-   * When a new payment method is added
+   * Ensure only one default method exists
+   * @param {number?} excludeId
+   * @param {import("typeorm").QueryRunner | null} qr
+   */
+  async _ensureSingleDefault(excludeId = null, qr = null) {
+    const PaymentMethod = require("../entities/PaymentMethod");
+    const methodRepo = this._getRepo(qr, PaymentMethod);
+    const defaultMethods = await methodRepo.find({ where: { isDefault: true } });
+    for (const method of defaultMethods) {
+      if (method.id !== excludeId) {
+        method.isDefault = false;
+        await methodRepo.save(method);
+      }
+    }
+  }
+
+  /**
+   * When a new payment method is added (afterInsert)
+   * - Creates the stats record
+   * - Enforces single default if this method is default
    */
   async onCreated(method, user = "system", queryRunner = null) {
     logger.info(`[PaymentMethod] Method "${method.name}" (ID: ${method.id}) created by ${user}`);
 
     const statRepo = this._getRepo(require("../entities/PaymentMethodStat"), queryRunner);
-    // 1. Create stats record (initialized to zero)
+    // 1. Create stats record (initialized to zero) – only once
     const stats = statRepo.create({
       method: method,
       transactionCount: 0,
@@ -30,27 +49,29 @@ class PaymentMethodStateTransitionService {
     });
     await statRepo.save(stats);
 
-    // 2. Audit log creation
+    // 2. If this method is default, ensure others are not default
+    if (method.isDefault) {
+      await this._ensureSingleDefault(method.id, queryRunner);
+    }
+
+    // 3. Audit log creation (already logged by service, but we add a transition log)
     await auditLogger.logCreate("PaymentMethod", method.id, method, user);
   }
 
   /**
-   * When a method is updated
+   * When a method is updated (afterUpdate)
+   * - Enforce single default if isDefault changed to true
+   * - Log changes (audit log already done by service, but we add detailed diff)
    */
   async onUpdate(oldMethod, newMethod, user = "system", queryRunner = null) {
     logger.info(`[PaymentMethod] Method "${newMethod.name}" (ID: ${newMethod.id}) updated by ${user}`);
 
-    // Detect if isDefault changed
-    if (oldMethod.isDefault !== newMethod.isDefault && newMethod.isDefault) {
-      // Ensure only one default (the service should have already done this, but we double-check)
-      const methodRepo = this._getRepo(require("../entities/PaymentMethod"), queryRunner);
-      await methodRepo.update({ isDefault: true }, { isDefault: false });
-      newMethod.isDefault = true;
-      await methodRepo.save(newMethod);
-      logger.info(`[PaymentMethod] Enforced single default for method #${newMethod.id}`);
+    // Enforce single default if this method is now default
+    if (newMethod.isDefault && !oldMethod.isDefault) {
+      await this._ensureSingleDefault(newMethod.id, queryRunner);
     }
 
-    // Log changes (audit log)
+    // Log changes (audit log – service already did basic log, this is extra detail)
     const changes = {};
     if (oldMethod.name !== newMethod.name) changes.name = { old: oldMethod.name, new: newMethod.name };
     if (oldMethod.description !== newMethod.description) changes.description = { old: oldMethod.description, new: newMethod.description };
@@ -62,24 +83,32 @@ class PaymentMethodStateTransitionService {
   }
 
   /**
-   * When a method is deleted
+   * When a method is explicitly set as default (optional, called from subscriber if needed)
+   */
+  async onSetDefault(method, user = "system", queryRunner = null) {
+    logger.info(`[PaymentMethod] Method "${method.name}" (ID: ${method.id}) set as default by ${user}`);
+
+    // Unset previous default
+    await this._ensureSingleDefault(method.id, queryRunner);
+    // method.isDefault is already true; just log
+    await auditLogger.logUpdate("PaymentMethod", method.id, { isDefault: false }, { isDefault: true }, user);
+  }
+
+  /**
+   * When a method is deleted (beforeRemove)
+   * - Prevent deletion if it has been used in any payment transaction
    */
   async onDelete(method, user = "system", queryRunner = null) {
-    logger.info(`[PaymentMethod] Method "${method.name}" (ID: ${method.id}) deleted by ${user}`);
+    logger.info(`[PaymentMethod] Method "${method.name}" (ID: ${method.id}) about to be deleted by ${user}`);
 
-    // 1. Prevent deletion if used in any payment transaction
-    const paymentRepo = this._getRepo(require("../entities/PaymentTransaction"), queryRunner);
-    // We need to check if any payment uses this method. However, PaymentTransaction may not have a direct methodId.
-    // In our schema, PaymentMethod is not directly linked to PaymentTransaction. For now, we assume no foreign key constraint.
-    // If there is a relation, adjust accordingly. We'll add a placeholder check.
-    // For safety, we can query the stats table: if transactionCount > 0, prevent deletion.
+    // Check if method has been used
     const statRepo = this._getRepo(require("../entities/PaymentMethodStat"), queryRunner);
     const stats = await statRepo.findOne({ where: { method: { id: method.id } } });
     if (stats && stats.transactionCount > 0) {
       throw new Error(`Cannot delete payment method "${method.name}" because it has been used in ${stats.transactionCount} transaction(s).`);
     }
 
-    // 2. If this method is the default, set another method as default before deletion
+    // If this method is the default, set another method as default before deletion
     if (method.isDefault) {
       const methodRepo = this._getRepo(require("../entities/PaymentMethod"), queryRunner);
       const another = await methodRepo.findOne({ where: { id: method.id }, order: { id: "ASC" } });
@@ -90,29 +119,8 @@ class PaymentMethodStateTransitionService {
       }
     }
 
-    // 3. Stats are deleted automatically by ON DELETE CASCADE (if foreign key defined). If not, delete manually.
-    if (stats) {
-      await statRepo.remove(stats);
-    }
-
-    // 4. Audit log deletion
-    await auditLogger.logDelete("PaymentMethod", method.id, method, user);
-  }
-
-  /**
-   * When a method is set as default (explicit action)
-   */
-  async onSetDefault(method, user = "system", queryRunner = null) {
-    logger.info(`[PaymentMethod] Method "${method.name}" (ID: ${method.id}) set as default by ${user}`);
-
-    const methodRepo = this._getRepo(require("../entities/PaymentMethod"), queryRunner);
-    // Unset previous default
-    await methodRepo.update({ isDefault: true }, { isDefault: false });
-    // Set new default
-    method.isDefault = true;
-    await methodRepo.save(method);
-
-    await auditLogger.logUpdate("PaymentMethod", method.id, { isDefault: false }, { isDefault: true }, user);
+    // Stats will be deleted by cascade if foreign key is set, else deletion will happen in service.
+    // We do not delete stats here because service already does it.
   }
 }
 

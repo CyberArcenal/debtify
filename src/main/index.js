@@ -311,7 +311,7 @@ async function initializeDatabase() {
           });
         }
         dialog.showMessageBoxSync({
-          type: "warning",
+          type: "info",
           title: "Migration Warning",
           message: "Database update had an issue",
           detail: result.message + "\n\nContinuing with current schema.",
@@ -918,7 +918,7 @@ async function startupSequence() {
       log(LogLevel.ERROR, "Database initialization failed:", dbResult.message);
 
       const userChoice = dialog.showMessageBoxSync({
-        type: "warning",
+        type: "info",
         title: "Database Warning",
         message: "Database initialization failed",
         // @ts-ignore

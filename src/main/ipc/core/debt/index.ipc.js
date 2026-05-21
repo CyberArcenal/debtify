@@ -26,6 +26,8 @@ class DebtHandler {
     this.recalculateRemainingAmount = this.importHandler(
       "./recalculate_remaining.ipc",
     );
+    this.correctTotalAmount = this.importHandler("./correct_total_amount.ipc");
+    this.applyForgiveness = this.importHandler("./apply_forgiveness.ipc");
 
     // 🔄 BATCH OPERATIONS
     this.bulkCreateDebts = this.importHandler("./bulk_create.ipc");
@@ -96,6 +98,17 @@ class DebtHandler {
           return await this.handleWithTransaction(this.bulkUpdateDebts, params);
         case "importDebtsCSV":
           return await this.handleWithTransaction(this.importDebtsCSV, params);
+
+        case "correctTotalAmount":
+          return await this.handleWithTransaction(
+            this.correctTotalAmount,
+            params,
+          );
+        case "applyForgiveness":
+          return await this.handleWithTransaction(
+            this.applyForgiveness,
+            params,
+          );
 
         // 📄 EXPORT (read-only)
         case "exportDebts":

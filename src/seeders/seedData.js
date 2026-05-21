@@ -1,5 +1,5 @@
 // src/seeders/seedDebtManagerX.js
-// DebtManagerX Database Seeder
+// DebtManagerX Database Seeder (Full version)
 // Run with: npm run seed:debt -- [options]
 // Or: node src/seeders/seedDebtManagerX.js
 
@@ -9,12 +9,20 @@ const path = require("path");
 // Entity imports
 const { AuditLog } = require("../entities/AuditLog");
 const Borrower = require("../entities/Borrower");
+const CreditCheckLog = require("../entities/CreditCheckLog");
 const Debt = require("../entities/Debt");
+const DebtorGroup = require("../entities/DebtorGroup");
+const DebtorGroupMember = require("../entities/DebtorGroupMember");
+const InterestRateChangeLog = require("../entities/InterestRateChangeLog");
 const LoanAgreement = require("../entities/LoanAgreement");
+const LoanApplication = require("../entities/LoanApplication");
 const Notification = require("../entities/Notification");
 const NotificationLog = require("../entities/NotificationLog");
+const PaymentMethod = require("../entities/PaymentMethod");
+const PaymentMethodStat = require("../entities/PaymentMethodStat");
 const PaymentTransaction = require("../entities/PaymentTransaction");
 const PenaltyTransaction = require("../entities/PenaltyTransaction");
+const Printer = require("../entities/Printer");
 
 // ========== CONFIGURATION ==========
 const DEFAULT_CONFIG = {
@@ -26,6 +34,13 @@ const DEFAULT_CONFIG = {
   notificationCount: 80,
   notificationLogCount: 100,
   auditLogCount: 150,
+  creditCheckCount: 40,
+  groupCount: 8,
+  groupMemberCount: 35,
+  interestRateChangeCount: 25,
+  loanApplicationCount: 30,
+  paymentMethodCount: 6,
+  printerCount: 3,
   clearOnly: false,
   skipBorrowers: false,
   skipDebts: false,
@@ -35,6 +50,13 @@ const DEFAULT_CONFIG = {
   skipNotifications: false,
   skipNotificationLogs: false,
   skipAuditLogs: false,
+  skipCreditChecks: false,
+  skipGroups: false,
+  skipGroupMembers: false,
+  skipInterestRateChanges: false,
+  skipLoanApplications: false,
+  skipPaymentMethods: false,
+  skipPrinters: false,
 };
 
 // ========== RANDOM HELPERS ==========
@@ -79,7 +101,31 @@ const random = {
   
   status: () => random.element(["active", "paid", "overdue", "defaulted"]),
   
-  paymentMethod: () => random.element(["cash", "bank_transfer", "check", "gcash", "paymaya"]),
+  paymentMethodName: () => random.element(["Cash", "Bank Transfer", "Check", "GCash", "PayMaya", "Credit Card"]),
+  paymentMethodIcon: () => random.element(["DollarSign", "Landmark", "Receipt", "Smartphone", "CreditCard", "Wallet"]),
+  
+  printerInterface: () => random.element(["usb", "network", "bluetooth"]),
+  printerConnection: (iface) => {
+    if (iface === "usb") return `USB00${random.int(1, 9)}`;
+    if (iface === "network") return `192.168.${random.int(1, 254)}.${random.int(1, 254)}:9100`;
+    return `AA:BB:CC:${random.int(10, 99)}:${random.int(10, 99)}:${random.int(10, 99)}`;
+  },
+  
+  riskLevel: () => random.element(["Low", "Medium", "High"]),
+  
+  creditScore: () => random.int(300, 850),
+  
+  interestRate: () => random.float(0, 15, 2),
+  
+  groupColor: () => {
+    const colors = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
+    return random.element(colors);
+  },
+  
+  loanPurpose: () => random.element([
+    "Business Expansion", "Emergency Medical", "Education", "Home Renovation",
+    "Debt Consolidation", "Vehicle Purchase", "Wedding Expenses", "Travel"
+  ]),
   
   notificationType: () => random.element(["error", "info", "reminder", "overdue", "payment_confirmation"]),
   
@@ -87,7 +133,10 @@ const random = {
   
   auditAction: () => random.element(["CREATE", "UPDATE", "DELETE", "VIEW", "LOGIN", "LOGOUT", "EXPORT"]),
   
-  auditEntity: () => random.element(["Borrower", "Debt", "PaymentTransaction", "PenaltyTransaction", "LoanAgreement", "Notification", "User"]),
+  auditEntity: () => random.element([
+    "Borrower", "Debt", "PaymentTransaction", "PenaltyTransaction", "LoanAgreement",
+    "Notification", "CreditCheckLog", "DebtorGroup", "LoanApplication", "PaymentMethod", "Printer"
+  ]),
 };
 
 // ========== SEEDER CLASS ==========
@@ -98,11 +147,12 @@ class DebtManagerXSeeder {
     this.queryRunner = null;
     this.borrowers = [];
     this.debts = [];
+    this.groups = [];
+    this.paymentMethods = [];
   }
 
   async init() {
     console.log("⏳ Initializing database connection...");
-    // Use the existing data source configuration from your project
     const { AppDataSource } = require("../main/db/data-source");
     this.dataSource = await AppDataSource.initialize();
     this.queryRunner = this.dataSource.createQueryRunner();
@@ -116,25 +166,42 @@ class DebtManagerXSeeder {
   }
 
   async clearData() {
-    console.log("🧹 Clearing old debt management data...");
+    console.log("🧹 Clearing all debt management data...");
     await this.queryRunner.query("PRAGMA foreign_keys = OFF;");
     try {
-      await this.queryRunner.clearTable("audit_logs");
-      await this.queryRunner.clearTable("notification_logs");
-      await this.queryRunner.clearTable("notifications");
-      await this.queryRunner.clearTable("penalty_transactions");
-      await this.queryRunner.clearTable("payment_transactions");
-      await this.queryRunner.clearTable("loan_agreements");
-      await this.queryRunner.clearTable("debts");
-      await this.queryRunner.clearTable("borrowers");
+      const tables = [
+        "debtor_group_members",
+        "debtor_groups",
+        "credit_check_logs",
+        "loan_applications",
+        "interest_rate_change_logs",
+        "payment_method_stats",
+        "payment_methods",
+        "printers",
+        "audit_logs",
+        "notification_logs",
+        "notifications",
+        "penalty_transactions",
+        "payment_transactions",
+        "loan_agreements",
+        "debts",
+        "borrowers",
+      ];
+      for (const table of tables) {
+        await this.queryRunner.query(`DELETE FROM ${table};`);
+        await this.queryRunner.query(`DELETE FROM sqlite_sequence WHERE name='${table}';`);
+      }
     } catch (error) {
       console.warn("Some tables may not exist yet:", error.message);
     } finally {
       await this.queryRunner.query("PRAGMA foreign_keys = ON;");
     }
-    console.log("✅ All debt management tables cleared");
+    console.log("✅ All tables cleared");
   }
 
+  // ------------------------------------------------------------
+  // SEED METHODS
+  // ------------------------------------------------------------
   async seedBorrowers() {
     console.log(`👥 Seeding ${this.config.borrowerCount} borrowers...`);
     const borrowers = [];
@@ -166,11 +233,9 @@ class DebtManagerXSeeder {
       let paidAmount = random.float(0, totalAmount);
       const remainingAmount = totalAmount - paidAmount;
       
-      // Determine realistic status based on due date and payment
       const dueDate = random.futureDate();
       let status = random.element(statuses);
       
-      // Override status if fully paid
       if (remainingAmount <= 0.01) {
         status = "paid";
         paidAmount = totalAmount;
@@ -202,20 +267,16 @@ class DebtManagerXSeeder {
     const payments = [];
     const repo = this.dataSource.getRepository(PaymentTransaction);
     
-    // Track paid amounts per debt to ensure we don't exceed total
     const debtPaidSoFar = new Map();
     debts.forEach(debt => {
       debtPaidSoFar.set(debt.id, parseFloat(debt.paidAmount) || 0);
     });
     
-    // First, create payments that match existing paid amounts
     for (const debt of debts) {
       let remainingToPay = parseFloat(debt.paidAmount) || 0;
       let paymentCount = random.int(1, Math.min(5, remainingToPay > 0 ? 3 : 1));
       
-      if (remainingToPay === 0) {
-        paymentCount = 0;
-      }
+      if (remainingToPay === 0) paymentCount = 0;
       
       for (let i = 0; i < paymentCount && remainingToPay > 0.01; i++) {
         let amount;
@@ -238,7 +299,6 @@ class DebtManagerXSeeder {
       }
     }
     
-    // Add extra random payments (for debts with remaining balance)
     const extraPaymentsNeeded = this.config.paymentCount - payments.length;
     for (let i = 0; i < extraPaymentsNeeded; i++) {
       const debt = random.element(debts);
@@ -258,7 +318,6 @@ class DebtManagerXSeeder {
         });
         debtPaidSoFar.set(debt.id, currentPaid + amount);
         
-        // Update debt's paidAmount and remainingAmount
         await repo.manager
           .createQueryBuilder()
           .update(Debt)
@@ -446,6 +505,178 @@ class DebtManagerXSeeder {
     return saved;
   }
 
+  // NEW SEED METHODS
+  async seedCreditCheckLogs(borrowers) {
+    console.log(`📊 Seeding ${this.config.creditCheckCount} credit check logs...`);
+    const logs = [];
+    const repo = this.dataSource.getRepository(CreditCheckLog);
+    for (let i = 0; i < this.config.creditCheckCount; i++) {
+      const borrower = random.element(borrowers);
+      const score = random.creditScore();
+      const riskLevel = random.riskLevel();
+      logs.push({
+        debtorId: borrower.id,
+        score: score,
+        riskLevel: riskLevel,
+        remarks: `Credit check performed on ${new Date().toLocaleDateString()}. Score: ${score}`,
+        dateChecked: random.pastDate(),
+      });
+    }
+    const saved = await repo.save(logs);
+    console.log(`✅ ${saved.length} credit check logs saved`);
+    return saved;
+  }
+
+  async seedGroups() {
+    console.log(`👥 Seeding ${this.config.groupCount} debtor groups...`);
+    const groups = [];
+    const repo = this.dataSource.getRepository(DebtorGroup);
+    const groupNames = ["VIP", "High-Risk", "Regular", "New", "Delinquent", "Good Standing", "Review", "Archived"];
+    for (let i = 0; i < this.config.groupCount && i < groupNames.length; i++) {
+      groups.push({
+        name: groupNames[i],
+        description: `Group for ${groupNames[i]} debtors`,
+        color: random.groupColor(),
+      });
+    }
+    const saved = await repo.save(groups);
+    console.log(`✅ ${saved.length} debtor groups saved`);
+    return saved;
+  }
+
+  async seedGroupMembers(groups, borrowers) {
+    console.log(`👥 Seeding ${this.config.groupMemberCount} debtor group members...`);
+    const members = [];
+    const repo = this.dataSource.getRepository(DebtorGroupMember);
+    const usedPairs = new Set();
+    for (let i = 0; i < this.config.groupMemberCount; i++) {
+      const group = random.element(groups);
+      const debtor = random.element(borrowers);
+      const key = `${group.id}-${debtor.id}`;
+      if (usedPairs.has(key)) continue;
+      usedPairs.add(key);
+      members.push({
+        groupId: group.id,
+        debtorId: debtor.id,
+        assignedAt: random.pastDate(),
+      });
+    }
+    const saved = await repo.save(members);
+    console.log(`✅ ${saved.length} group members saved`);
+    return saved;
+  }
+
+  async seedInterestRateChangeLogs(debts) {
+    console.log(`📈 Seeding ${this.config.interestRateChangeCount} interest rate change logs...`);
+    const logs = [];
+    const repo = this.dataSource.getRepository(InterestRateChangeLog);
+    const users = ["admin", "system", "loan_officer"];
+    for (let i = 0; i < this.config.interestRateChangeCount; i++) {
+      const isGlobal = random.boolean(0.4);
+      const settingKey = isGlobal ? "default_interest_rate" : `loan_${random.element(debts).id}`;
+      const oldVal = random.float(0, 20);
+      const newVal = random.float(0, 20);
+      logs.push({
+        setting_key: settingKey,
+        old_value: oldVal,
+        new_value: newVal,
+        changed_by: random.element(users),
+        reason: random.boolean(0.5) ? "Market adjustment" : "Client negotiation",
+        loan_id: isGlobal ? null : random.element(debts).id,
+        changed_at: random.pastDate(),
+      });
+    }
+    const saved = await repo.save(logs);
+    console.log(`✅ ${saved.length} interest rate change logs saved`);
+    return saved;
+  }
+
+  async seedLoanApplications(borrowers) {
+    console.log(`📋 Seeding ${this.config.loanApplicationCount} loan applications...`);
+    const apps = [];
+    const repo = this.dataSource.getRepository(LoanApplication);
+    const statuses = ["pending", "approved", "rejected"];
+    for (let i = 0; i < this.config.loanApplicationCount; i++) {
+      const borrower = random.element(borrowers);
+      const status = random.element(statuses);
+      const requestedAmount = random.float(1000, 200000);
+      const proposedDueDate = random.futureDate();
+      const createdAt = random.pastDate();
+      apps.push({
+        debtorId: borrower.id,
+        debtorName: borrower.name,
+        debtorContact: borrower.contact,
+        debtorEmail: borrower.email,
+        debtorAddress: borrower.address,
+        requestedAmount: requestedAmount,
+        purpose: random.loanPurpose(),
+        proposedDueDate: proposedDueDate,
+        interestRate: random.float(0, 15),
+        status: status,
+        approvedAt: status === "approved" ? random.date(createdAt, new Date()) : null,
+        rejectedAt: status === "rejected" ? random.date(createdAt, new Date()) : null,
+        approvedBy: status === "approved" ? random.element(["admin", "loan_officer"]) : null,
+        rejectionReason: status === "rejected" ? random.element(["Low credit score", "Insufficient income", "Incomplete documents"]) : null,
+        createdAt: createdAt,
+        updatedAt: random.date(createdAt, new Date()),
+      });
+    }
+    const saved = await repo.save(apps);
+    console.log(`✅ ${saved.length} loan applications saved`);
+    return saved;
+  }
+
+  async seedPaymentMethods() {
+    console.log(`💳 Seeding ${this.config.paymentMethodCount} payment methods...`);
+    const methods = [];
+    const repo = this.dataSource.getRepository(PaymentMethod);
+    const methodNames = ["Cash", "Bank Transfer", "Check", "GCash", "PayMaya", "Credit Card"];
+    const icons = ["DollarSign", "Landmark", "Receipt", "Smartphone", "CreditCard", "Wallet"];
+    for (let i = 0; i < this.config.paymentMethodCount && i < methodNames.length; i++) {
+      methods.push({
+        name: methodNames[i],
+        description: `Payment via ${methodNames[i]}`,
+        icon: icons[i],
+        isDefault: i === 0, // first is default
+      });
+    }
+    const saved = await repo.save(methods);
+    // Create associated stats (required by PaymentMethodStat entity)
+    const statRepo = this.dataSource.getRepository(PaymentMethodStat);
+    for (const method of saved) {
+      const stat = statRepo.create({
+        method: method,
+        transactionCount: 0,
+        totalAmount: 0,
+      });
+      await statRepo.save(stat);
+    }
+    console.log(`✅ ${saved.length} payment methods saved with stats`);
+    return saved;
+  }
+
+  async seedPrinters() {
+    console.log(`🖨️ Seeding ${this.config.printerCount} printers...`);
+    const printers = [];
+    const repo = this.dataSource.getRepository(Printer);
+    const interfaces = ["usb", "network", "bluetooth"];
+    for (let i = 0; i < this.config.printerCount; i++) {
+      const iface = random.printerInterface();
+      printers.push({
+        name: `Printer ${i+1}`,
+        description: `Test printer ${i+1}`,
+        interface: iface,
+        connectionString: random.printerConnection(iface),
+        isDefault: i === 0,
+        status: random.element(["online", "offline", "error"]),
+        lastTested: random.boolean(0.5) ? random.pastDate() : null,
+      });
+    }
+    const saved = await repo.save(printers);
+    console.log(`✅ ${saved.length} printers saved`);
+    return saved;
+  }
+
   async run() {
     try {
       await this.init();
@@ -460,42 +691,54 @@ class DebtManagerXSeeder {
 
       await this.clearData();
 
-      // Seed in order (respecting foreign keys)
+      // Borrowers (base)
       if (!this.config.skipBorrowers) {
         this.borrowers = await this.seedBorrowers();
       } else {
         this.borrowers = await this.dataSource.getRepository(Borrower).find();
       }
 
+      // Debts (depends on borrowers)
       if (!this.config.skipDebts && this.borrowers.length) {
         this.debts = await this.seedDebts(this.borrowers);
       } else {
         this.debts = await this.dataSource.getRepository(Debt).find();
       }
 
-      if (!this.config.skipPayments && this.debts.length) {
-        await this.seedPayments(this.debts);
-      }
+      // Payments, penalties, agreements, notifications (depend on debts)
+      if (!this.config.skipPayments && this.debts.length) await this.seedPayments(this.debts);
+      if (!this.config.skipPenalties && this.debts.length) await this.seedPenalties(this.debts);
+      if (!this.config.skipLoanAgreements && this.debts.length) await this.seedLoanAgreements(this.debts);
+      if (!this.config.skipNotifications && this.debts.length) await this.seedNotifications(this.debts);
 
-      if (!this.config.skipPenalties && this.debts.length) {
-        await this.seedPenalties(this.debts);
-      }
+      // NotificationLogs (depends on borrowers)
+      if (!this.config.skipNotificationLogs && this.borrowers.length) await this.seedNotificationLogs(this.borrowers);
 
-      if (!this.config.skipLoanAgreements && this.debts.length) {
-        await this.seedLoanAgreements(this.debts);
-      }
+      // AuditLogs (depends on borrowers + debts)
+      if (!this.config.skipAuditLogs) await this.seedAuditLogs(this.borrowers, this.debts);
 
-      if (!this.config.skipNotifications && this.debts.length) {
-        await this.seedNotifications(this.debts);
+      // NEW ENTITIES
+      if (!this.config.skipCreditChecks && this.borrowers.length) await this.seedCreditCheckLogs(this.borrowers);
+      
+      if (!this.config.skipGroups) {
+        this.groups = await this.seedGroups();
+      } else {
+        this.groups = await this.dataSource.getRepository(DebtorGroup).find();
       }
-
-      if (!this.config.skipNotificationLogs && this.borrowers.length) {
-        await this.seedNotificationLogs(this.borrowers);
+      
+      if (!this.config.skipGroupMembers && this.groups.length && this.borrowers.length) {
+        await this.seedGroupMembers(this.groups, this.borrowers);
       }
-
-      if (!this.config.skipAuditLogs && (this.borrowers.length || this.debts.length)) {
-        await this.seedAuditLogs(this.borrowers, this.debts);
+      
+      if (!this.config.skipInterestRateChanges && this.debts.length) await this.seedInterestRateChangeLogs(this.debts);
+      
+      if (!this.config.skipLoanApplications && this.borrowers.length) await this.seedLoanApplications(this.borrowers);
+      
+      if (!this.config.skipPaymentMethods) {
+        this.paymentMethods = await this.seedPaymentMethods();
       }
+      
+      if (!this.config.skipPrinters) await this.seedPrinters();
 
       await this.queryRunner.commitTransaction();
 
@@ -508,6 +751,13 @@ class DebtManagerXSeeder {
       console.log(`   Notifications: ${this.config.notificationCount}`);
       console.log(`   Notification Logs: ${this.config.notificationLogCount}`);
       console.log(`   Audit Logs: ${this.config.auditLogCount}`);
+      console.log(`   Credit Check Logs: ${this.config.creditCheckCount}`);
+      console.log(`   Debtor Groups: ${this.config.groupCount}`);
+      console.log(`   Group Members: ${this.config.groupMemberCount}`);
+      console.log(`   Interest Rate Change Logs: ${this.config.interestRateChangeCount}`);
+      console.log(`   Loan Applications: ${this.config.loanApplicationCount}`);
+      console.log(`   Payment Methods: ${this.config.paymentMethodCount}`);
+      console.log(`   Printers: ${this.config.printerCount}`);
     } catch (error) {
       console.error("\n❌ Seeding failed – rolling back...", error);
       if (this.queryRunner) await this.queryRunner.rollbackTransaction();
@@ -529,36 +779,64 @@ function parseArgs() {
         config.clearOnly = true;
         break;
       case "--borrowers":
-        config.skipBorrowers = false;
         config.borrowerCount = parseInt(args[++i]) || DEFAULT_CONFIG.borrowerCount;
+        config.skipBorrowers = false;
         break;
       case "--debts":
-        config.skipDebts = false;
         config.debtCount = parseInt(args[++i]) || DEFAULT_CONFIG.debtCount;
+        config.skipDebts = false;
         break;
       case "--payments":
-        config.skipPayments = false;
         config.paymentCount = parseInt(args[++i]) || DEFAULT_CONFIG.paymentCount;
+        config.skipPayments = false;
         break;
       case "--penalties":
-        config.skipPenalties = false;
         config.penaltyCount = parseInt(args[++i]) || DEFAULT_CONFIG.penaltyCount;
+        config.skipPenalties = false;
         break;
       case "--agreements":
-        config.skipLoanAgreements = false;
         config.loanAgreementCount = parseInt(args[++i]) || DEFAULT_CONFIG.loanAgreementCount;
+        config.skipLoanAgreements = false;
         break;
       case "--notifications":
-        config.skipNotifications = false;
         config.notificationCount = parseInt(args[++i]) || DEFAULT_CONFIG.notificationCount;
+        config.skipNotifications = false;
         break;
       case "--logs":
-        config.skipNotificationLogs = false;
         config.notificationLogCount = parseInt(args[++i]) || DEFAULT_CONFIG.notificationLogCount;
+        config.skipNotificationLogs = false;
         break;
       case "--audit":
-        config.skipAuditLogs = false;
         config.auditLogCount = parseInt(args[++i]) || DEFAULT_CONFIG.auditLogCount;
+        config.skipAuditLogs = false;
+        break;
+      case "--credit-checks":
+        config.creditCheckCount = parseInt(args[++i]) || DEFAULT_CONFIG.creditCheckCount;
+        config.skipCreditChecks = false;
+        break;
+      case "--groups":
+        config.groupCount = parseInt(args[++i]) || DEFAULT_CONFIG.groupCount;
+        config.skipGroups = false;
+        break;
+      case "--group-members":
+        config.groupMemberCount = parseInt(args[++i]) || DEFAULT_CONFIG.groupMemberCount;
+        config.skipGroupMembers = false;
+        break;
+      case "--interest-changes":
+        config.interestRateChangeCount = parseInt(args[++i]) || DEFAULT_CONFIG.interestRateChangeCount;
+        config.skipInterestRateChanges = false;
+        break;
+      case "--loan-apps":
+        config.loanApplicationCount = parseInt(args[++i]) || DEFAULT_CONFIG.loanApplicationCount;
+        config.skipLoanApplications = false;
+        break;
+      case "--payment-methods":
+        config.paymentMethodCount = parseInt(args[++i]) || DEFAULT_CONFIG.paymentMethodCount;
+        config.skipPaymentMethods = false;
+        break;
+      case "--printers":
+        config.printerCount = parseInt(args[++i]) || DEFAULT_CONFIG.printerCount;
+        config.skipPrinters = false;
         break;
       case "--skip-borrowers":
         config.skipBorrowers = true;
@@ -584,9 +862,30 @@ function parseArgs() {
       case "--skip-audit":
         config.skipAuditLogs = true;
         break;
+      case "--skip-credit-checks":
+        config.skipCreditChecks = true;
+        break;
+      case "--skip-groups":
+        config.skipGroups = true;
+        break;
+      case "--skip-group-members":
+        config.skipGroupMembers = true;
+        break;
+      case "--skip-interest-changes":
+        config.skipInterestRateChanges = true;
+        break;
+      case "--skip-loan-apps":
+        config.skipLoanApplications = true;
+        break;
+      case "--skip-payment-methods":
+        config.skipPaymentMethods = true;
+        break;
+      case "--skip-printers":
+        config.skipPrinters = true;
+        break;
       case "--help":
         console.log(`
-DebtManagerX Database Seeder
+DebtManagerX Database Seeder (Full)
 
 Usage: node src/seeders/seedDebtManagerX.js [options]
 
@@ -600,21 +899,24 @@ Options:
   --notifications <n>       Number of notifications (default: 80)
   --logs <n>                Number of notification logs (default: 100)
   --audit <n>               Number of audit logs (default: 150)
+  --credit-checks <n>       Number of credit check logs (default: 40)
+  --groups <n>              Number of debtor groups (default: 8)
+  --group-members <n>       Number of group members (default: 35)
+  --interest-changes <n>    Interest rate change logs (default: 25)
+  --loan-apps <n>           Loan applications (default: 30)
+  --payment-methods <n>     Payment methods (default: 6)
+  --printers <n>            Printers (default: 3)
 
 Skip options:
-  --skip-borrowers          Skip seeding borrowers
-  --skip-debts              Skip seeding debts
-  --skip-payments           Skip seeding payments
-  --skip-penalties          Skip seeding penalties
-  --skip-agreements         Skip seeding loan agreements
-  --skip-notifications      Skip seeding notifications
-  --skip-logs               Skip seeding notification logs
-  --skip-audit              Skip seeding audit logs
+  --skip-borrowers, --skip-debts, --skip-payments, --skip-penalties,
+  --skip-agreements, --skip-notifications, --skip-logs, --skip-audit,
+  --skip-credit-checks, --skip-groups, --skip-group-members,
+  --skip-interest-changes, --skip-loan-apps, --skip-payment-methods,
+  --skip-printers
 
 Examples:
   node src/seeders/seedDebtManagerX.js --borrowers 50 --debts 100
   node src/seeders/seedDebtManagerX.js --clear-only
-  node src/seeders/seedDebtManagerX.js --skip-notifications --logs 50
 `);
         process.exit(0);
     }
@@ -622,7 +924,6 @@ Examples:
   return config;
 }
 
-// Run if called directly
 if (require.main === module) {
   const config = parseArgs();
   const seeder = new DebtManagerXSeeder(config);

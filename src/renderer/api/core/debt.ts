@@ -10,7 +10,7 @@ export interface Debt {
   totalAmount: number;
   paidAmount: number;
   remainingAmount: number;
-  dueDate: string;          // ISO date string
+  dueDate: string; // ISO date string
   status: "active" | "paid" | "overdue" | "defaulted";
   interestRate: number | null;
   penaltyRate: number | null;
@@ -34,7 +34,6 @@ export interface BorrowerFilters {
   page?: number;
 }
 
-
 export interface DebtStatistics {
   totalDebts: number;
   totalActive: number;
@@ -49,7 +48,7 @@ export interface DebtCreateData {
   name: string;
   totalAmount: number;
   paidAmount?: number;
-  dueDate: string;          // YYYY-MM-DD or ISO string
+  dueDate: string; // YYYY-MM-DD or ISO string
   status?: "active" | "paid" | "overdue" | "defaulted";
   interestRate?: number | null;
   penaltyRate?: number | null;
@@ -232,7 +231,7 @@ class DebtsAPI {
     page?: number,
     limit?: number,
     status?: string,
-    borrowerId?: number
+    borrowerId?: number,
   ): Promise<DebtsResponse> {
     if (!window.backendAPI?.debt) {
       throw new Error("Electron API (debt) not available");
@@ -267,7 +266,11 @@ class DebtsAPI {
   /**
    * Update an existing debt
    */
-  async update(id: number, data: DebtUpdateData, user = "system"): Promise<DebtResponse> {
+  async update(
+    id: number,
+    data: DebtUpdateData,
+    user = "system",
+  ): Promise<DebtResponse> {
     if (!window.backendAPI?.debt) {
       throw new Error("Electron API (debt) not available");
     }
@@ -312,7 +315,10 @@ class DebtsAPI {
   /**
    * Permanently delete a debt (hard delete)
    */
-  async permanentlyDelete(id: number, user = "system"): Promise<{ status: boolean; message: string }> {
+  async permanentlyDelete(
+    id: number,
+    user = "system",
+  ): Promise<{ status: boolean; message: string }> {
     if (!window.backendAPI?.debt) {
       throw new Error("Electron API (debt) not available");
     }
@@ -327,7 +333,10 @@ class DebtsAPI {
   /**
    * Recalculate remaining amount for a debt (based on paidAmount)
    */
-  async recalculateRemainingAmount(id: number, user = "system"): Promise<RecalculateRemainingResponse> {
+  async recalculateRemainingAmount(
+    id: number,
+    user = "system",
+  ): Promise<RecalculateRemainingResponse> {
     if (!window.backendAPI?.debt) {
       throw new Error("Electron API (debt) not available");
     }
@@ -336,7 +345,9 @@ class DebtsAPI {
       params: { id, user },
     });
     if (response.status) return response;
-    throw new Error(response.message || "Failed to recalculate remaining amount");
+    throw new Error(
+      response.message || "Failed to recalculate remaining amount",
+    );
   }
 
   // --------------------------------------------------------------------
@@ -346,7 +357,10 @@ class DebtsAPI {
   /**
    * Bulk create multiple debts
    */
-  async bulkCreate(debtsArray: DebtCreateData[], user = "system"): Promise<BulkCreateDebtResponse> {
+  async bulkCreate(
+    debtsArray: DebtCreateData[],
+    user = "system",
+  ): Promise<BulkCreateDebtResponse> {
     if (!window.backendAPI?.debt) {
       throw new Error("Electron API (debt) not available");
     }
@@ -361,7 +375,10 @@ class DebtsAPI {
   /**
    * Bulk update multiple debts
    */
-  async bulkUpdate(updatesArray: Array<{ id: number; updates: DebtUpdateData }>, user = "system"): Promise<BulkUpdateDebtResponse> {
+  async bulkUpdate(
+    updatesArray: Array<{ id: number; updates: DebtUpdateData }>,
+    user = "system",
+  ): Promise<BulkUpdateDebtResponse> {
     if (!window.backendAPI?.debt) {
       throw new Error("Electron API (debt) not available");
     }
@@ -374,9 +391,56 @@ class DebtsAPI {
   }
 
   /**
+   * Correct total amount (without triggering forgiveness flow)
+   * Use this for data entry corrections only, not for actual forgiveness.
+   */
+  async correctTotalAmount(
+    id: number,
+    newTotalAmount: number,
+    user = "system",
+  ): Promise<DebtResponse> {
+    if (!window.backendAPI?.debt) {
+      throw new Error("Electron API (debt) not available");
+    }
+    const response = await window.backendAPI.debt({
+      method: "correctTotalAmount",
+      params: { id, newTotalAmount, user },
+    });
+    if (response.status) return response;
+    throw new Error(response.message || "Failed to correct total amount");
+  }
+
+  /**
+   * Apply debt forgiveness (reduces total amount, triggers notifications)
+   * @param id - Debt ID
+   * @param amountForgiven - Amount to forgive
+   * @param user - User performing the action
+   * @param reason - Optional reason for forgiveness
+   */
+  async applyForgiveness(
+    id: number,
+    amountForgiven: number,
+    user = "system",
+    reason?: string,
+  ): Promise<DebtResponse> {
+    if (!window.backendAPI?.debt) {
+      throw new Error("Electron API (debt) not available");
+    }
+    const response = await window.backendAPI.debt({
+      method: "applyForgiveness",
+      params: { id, amountForgiven, user, reason },
+    });
+    if (response.status) return response;
+    throw new Error(response.message || "Failed to apply forgiveness");
+  }
+
+  /**
    * Import debts from a CSV file
    */
-  async importFromCSV(filePath: string, user = "system"): Promise<ImportDebtCsvResponse> {
+  async importFromCSV(
+    filePath: string,
+    user = "system",
+  ): Promise<ImportDebtCsvResponse> {
     if (!window.backendAPI?.debt) {
       throw new Error("Electron API (debt) not available");
     }
@@ -391,7 +455,11 @@ class DebtsAPI {
   /**
    * Export debts to CSV or JSON
    */
-  async export(format: "csv" | "json" = "json", filters: any = {}, user = "system"): Promise<ExportDebtResponse> {
+  async export(
+    format: "csv" | "json" = "json",
+    filters: any = {},
+    user = "system",
+  ): Promise<ExportDebtResponse> {
     if (!window.backendAPI?.debt) {
       throw new Error("Electron API (debt) not available");
     }
@@ -410,10 +478,17 @@ class DebtsAPI {
   /**
    * Check if a debt exists by name for a given borrower
    */
-  async existsForBorrower(borrowerId: number, debtName: string): Promise<boolean> {
+  async existsForBorrower(
+    borrowerId: number,
+    debtName: string,
+  ): Promise<boolean> {
     try {
-      const response = await this.getAll({ borrowerId, search: debtName, limit: 1 });
-      return response.data.length > 0;   // ✅ changed: .data is array
+      const response = await this.getAll({
+        borrowerId,
+        search: debtName,
+        limit: 1,
+      });
+      return response.data.length > 0; // ✅ changed: .data is array
     } catch (error) {
       console.error("Error checking debt existence:", error);
       return false;
@@ -423,9 +498,16 @@ class DebtsAPI {
   /**
    * Get all debts for a specific borrower
    */
-  async getByBorrowerId(borrowerId: number, includeDeleted = false): Promise<Debt[]> {
-    const response = await this.getAll({ borrowerId, includeDeleted, limit: 1000 });
-    return response.data;   // ✅ changed: .data is array directly
+  async getByBorrowerId(
+    borrowerId: number,
+    includeDeleted = false,
+  ): Promise<Debt[]> {
+    const response = await this.getAll({
+      borrowerId,
+      includeDeleted,
+      limit: 1000,
+    });
+    return response.data; // ✅ changed: .data is array directly
   }
 
   /**
@@ -439,7 +521,7 @@ class DebtsAPI {
    * Validate if the backend API is available
    */
   async isAvailable(): Promise<boolean> {
-    return !!(window.backendAPI?.debt);
+    return !!window.backendAPI?.debt;
   }
 }
 

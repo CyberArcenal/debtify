@@ -205,7 +205,7 @@ class DebtStateTransitionService {
         userId: 1,
         title: "Payment Overdue",
         message: `Debt "${debt.name}" is now overdue. Please settle immediately.`,
-        type: "warning",
+        type: "info",
         metadata: { debtId: debt.id },
       },
       user,

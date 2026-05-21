@@ -112,7 +112,7 @@ class MigrationManager {
           userId: 1, // fixed system user
           title: "Database Backup Successful",
           message: `Backup created at ${backupResult.path}`,
-          type: "success",
+          type: "info",
           metadata: { backupPath: backupResult.path }
         }, "system");
       } else {

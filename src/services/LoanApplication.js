@@ -141,7 +141,7 @@ class LoanApplicationService {
   }
 
   // ----------------------------------------------------------------------
-  // ✏️ WRITE OPERATIONS
+  // ✏️ WRITE OPERATIONS (CRUD only – no side effects)
   // ----------------------------------------------------------------------
 
   /**
@@ -251,7 +251,7 @@ class LoanApplicationService {
   }
 
   /**
-   * Approve an application – creates active debt
+   * Approve an application – updates status only (no debt creation here)
    * @param {number} id
    * @param {string} user
    * @param {import("typeorm").QueryRunner | null} qr
@@ -288,39 +288,22 @@ class LoanApplicationService {
     if (interestRate === null || interestRate === undefined) {
       interestRate = await defaultInterestRate();
     }
+    // Store the final interest rate on the application (so the state transition can use it)
+    app.interestRate = interestRate;
 
-    // --- Credit check enforcement (only if required) ---
+    // --- Credit check enforcement (only if required) – just log, not enforce here ---
     const needCreditCheck = await enforceCreditCheck();
     if (needCreditCheck) {
-      // Optionally call a credit check service to verify the debtor's score.
-      // For now, we'll assume the frontend already performed the check.
-      // You can implement a call to CreditCheckService here.
       console.log(`Credit check required for debtor ${app.debtorId} – ensure it was done.`);
     }
 
-    // --- Loan agreement requirement ---
+    // --- Loan agreement requirement – just log, not enforce here ---
     const needAgreement = await requireLoanAgreement();
     if (needAgreement) {
-      // The frontend should have uploaded an agreement file.
-      // We could check if a related LoanAgreement record exists for this application.
-      // For simplicity, we'll assume the frontend handles it and just log.
       console.log(`Loan agreement required for application ${id} – ensure document exists.`);
     }
 
-    // Create active debt using debtService (within same transaction)
-    const debtData = {
-      name: `Loan: ${app.purpose}`,
-      totalAmount: app.requestedAmount,
-      paidAmount: 0,
-      dueDate: app.proposedDueDate.toISOString().split("T")[0],
-      status: "active",
-      interestRate: interestRate,
-      penaltyRate: null,   // penalty rate will be set from default when debt is created (DebtService handles it)
-      borrowerId: app.debtorId,
-    };
-    const createdDebt = await debtService.create(debtData, user, qr);
-
-    // Update application status
+    // Update application status only – debt creation will be done by state transition service
     app.status = "approved";
     app.approvedAt = new Date();
     app.approvedBy = user;
@@ -328,9 +311,9 @@ class LoanApplicationService {
 
     const saved = await updateDb(appRepo, app);
     await auditLogger.logUpdate("LoanApplication", id, { status: "pending" }, { status: "approved" }, user);
-    console.log(`Application ${id} approved, debt created: ${createdDebt.id}`);
+    console.log(`Application ${id} approved by ${user}`);
 
-    return { application: saved, createdDebt };
+    return { application: saved };
   }
 
   /**

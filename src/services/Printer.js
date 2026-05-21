@@ -7,9 +7,7 @@ const Debt = require("../entities/Debt");
 const PaymentTransaction = require("../entities/PaymentTransaction");
 const {
   companyName,
-  companyLocation,
   receiptFooterMessage,
-  receiptPrinterType,
 } = require("../utils/system");
 const { logger } = require("../utils/logger");
 
@@ -44,6 +42,10 @@ class PrinterService {
     return { printer: this.printerRepository };
   }
 
+  /**
+   * @param {{ manager: { getRepository: (arg0: any) => any; }; } | null} qr
+   * @param {string | Function | import("typeorm").EntitySchema<{ id: unknown; name: unknown; description: unknown; interface: unknown; connectionString: unknown; isDefault: unknown; status: unknown; lastTested: unknown; createdAt: unknown; updatedAt: unknown; }> | import("typeorm").EntitySchema<import("typeorm").ObjectLiteral> | { type: import("typeorm").ObjectLiteral; name: string; }} entityClass
+   */
   _getRepo(qr, entityClass) {
     if (qr) {
       return qr.manager.getRepository(entityClass);
@@ -56,6 +58,9 @@ class PrinterService {
   // CONFIGURATION MANAGEMENT (CRUD, default, test, status)
   // ----------------------------------------------------------------------
 
+  /**
+   * @param {{ name: string | undefined; interface: string | undefined; connectionString: undefined; }} data
+   */
   _validatePrinterData(data, isUpdate = false) {
     const errors = [];
     if (!isUpdate || data.name !== undefined) {
@@ -96,6 +101,9 @@ class PrinterService {
     return printers;
   }
 
+  /**
+   * @param {null | undefined} id
+   */
   async getPrinterById(id) {
     const { printer: repo } = await this.getRepositories();
     const printer = await repo.findOne({ where: { id } });
@@ -104,6 +112,9 @@ class PrinterService {
     return printer;
   }
 
+  /**
+   * @param {{ name: any; description?: null | undefined; interface: any; connectionString: any; isDefault?: false | undefined; }} data
+   */
   async createPrinter(data, user = "system", qr = null) {
     const { saveDb } = require("../utils/dbUtils/dbActions");
     const Printer = require("../entities/Printer");
@@ -133,6 +144,10 @@ class PrinterService {
     return saved;
   }
 
+  /**
+   * @param {any} id
+   * @param {{ name: string | undefined; description: undefined; interface: undefined; connectionString: undefined; isDefault: undefined; }} data
+   */
   async updatePrinter(id, data, user = "system", qr = null) {
     const { updateDb } = require("../utils/dbUtils/dbActions");
     const Printer = require("../entities/Printer");
@@ -155,6 +170,9 @@ class PrinterService {
     return saved;
   }
 
+  /**
+   * @param {null | undefined} id
+   */
   async setDefaultPrinter(id, user = "system", qr = null) {
     const Printer = require("../entities/Printer");
     const printerRepo = this._getRepo(qr, Printer);
@@ -169,6 +187,9 @@ class PrinterService {
     return saved;
   }
 
+  /**
+   * @param {any} id
+   */
   async deletePrinter(id, user = "system", qr = null) {
     const { removeDb } = require("../utils/dbUtils/dbActions");
     const Printer = require("../entities/Printer");
@@ -182,6 +203,9 @@ class PrinterService {
     console.log(`Printer deleted: ${printer.name}`);
   }
 
+  /**
+   * @param {any} id
+   */
   async refreshPrinterStatus(id, user = "system", qr = null) {
     const { updateDb } = require("../utils/dbUtils/dbActions");
     const Printer = require("../entities/Printer");
@@ -231,6 +255,9 @@ class PrinterService {
   // TEST PRINT (raw content) – used for testing connection
   // ----------------------------------------------------------------------
 
+  /**
+   * @param {{ interface: string; connectionString: { split: (arg0: string) => [any, any]; }; name: any; }} printer
+   */
   async _sendRawTestPrint(printer) {
     const testContent = "Debtify Test Print\n";
     const timestamp = new Date().toLocaleString();
@@ -301,6 +328,9 @@ class PrinterService {
     throw new Error(`Unsupported interface: ${printer.interface}`);
   }
 
+  /**
+   * @param {any} id
+   */
   async testPrinter(id, user = "system", qr = null) {
     const { updateDb } = require("../utils/dbUtils/dbActions");
     const Printer = require("../entities/Printer");
@@ -332,6 +362,9 @@ class PrinterService {
   // RECEIPT PRINTING (using driver abstraction)
   // ----------------------------------------------------------------------
 
+  /**
+   * @param {string} type
+   */
   async _loadDriver(type) {
     switch (type.toLowerCase()) {
       case "thermal":
@@ -352,15 +385,18 @@ class PrinterService {
 
   async _getDriver() {
     if (!this.driver) {
-      const type = await receiptPrinterType();
+      const type = "thermal"
       this.driver = await this._loadDriver(type);
     }
     return this.driver;
   }
 
+  /**
+   * @param {{ id: string; saleItems: { product: { name: string; }; quantity: number; lineTotal: number; }[]; totalAmount: number; paymentMethod: string; }} debtId
+   */
   async printReceipt(debtId) {
     const { AppDataSource } = require("../main/db/data-source");
-    const notificationService = require("./NotificationService");
+    const notificationService = require("../services/Notification");
     let driver;
     try {
       driver = await this._getDriver();
@@ -406,21 +442,22 @@ class PrinterService {
     }
   }
 
+  /**
+   * @param {{ id: any; name?: any; totalAmount?: any; paidAmount?: any; remainingAmount?: any; dueDate: any; status: any; interestRate: any; penaltyRate?: any; deletedAt?: any; createdAt?: any; updatedAt?: any; payments?: any; borrower?: any; amount?: any; }} debt
+   */
   async formatReceipt(debt) {
     const storeName = await companyName();
-    const storeLocation = await companyLocation();
     const footer = await receiptFooterMessage();
 
     const paymentsText = (debt.payments || [])
       .map(
-        (p) =>
+        (/** @type {{ paymentDate: { toISOString: () => string; }; amount: any; method: any; }} */ p) =>
           `${p.paymentDate.toISOString().split("T")[0]} - ${p.amount} (${p.method || "cash"})`
       )
       .join("\n");
 
     const receipt = `
       ${storeName}
-      Address: ${storeLocation}
       -------------------------
       DEBT #${debt.id} - ${debt.borrower.name}
       -------------------------

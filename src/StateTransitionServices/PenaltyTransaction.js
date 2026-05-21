@@ -97,7 +97,7 @@ class PenaltyTransactionStateTransitionService {
           userId: 1,
           title: "Penalty Applied",
           message: `A penalty of ${penalty.amount} has been added to your debt "${debt.name}". New balance: ${debt.remainingAmount}.`,
-          type: "warning",
+          type: "info",
           metadata: { penaltyId: penalty.id, debtId: debt.id },
         },
         user,

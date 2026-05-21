@@ -18,62 +18,131 @@ class PaymentTransactionStateTransitionService {
   }
 
   /**
-   * Void a payment (before it's applied)
+   * Apply a payment to its debt (increase paidAmount, decrease remainingAmount)
+   */
+  async applyPayment(payment, user = "system", queryRunner = null) {
+    logger.info(`[Transition] Applying payment #${payment.id} of ${payment.amount} to debt #${payment.debt?.id}`);
+
+    const debtRepo = this._getRepo(Debt, queryRunner);
+    const debt = payment.debt;
+    if (!debt) throw new Error("Payment has no associated debt");
+
+    // Update debt
+    debt.paidAmount = (debt.paidAmount || 0) + payment.amount;
+    debt.remainingAmount = debt.totalAmount - debt.paidAmount;
+    if (debt.remainingAmount < 0) debt.remainingAmount = 0;
+    debt.updatedAt = new Date();
+    await debtRepo.save(debt);
+
+    // Audit log
+    await auditLogger.logUpdate("Debt", debt.id, { paidAmount: debt.paidAmount - payment.amount }, { paidAmount: debt.paidAmount }, user);
+    logger.info(`[Transition] Payment #${payment.id} applied. Debt #${debt.id} now has paidAmount=${debt.paidAmount}, remaining=${debt.remainingAmount}`);
+  }
+
+  /**
+   * Reverse a payment (subtract from debt) – used when payment is deleted or voided
+   */
+  async reversePayment(payment, user = "system", queryRunner = null) {
+    logger.info(`[Transition] Reversing payment #${payment.id} of ${payment.amount} from debt #${payment.debt?.id}`);
+
+    const debtRepo = this._getRepo(Debt, queryRunner);
+    const debt = payment.debt;
+    if (!debt) throw new Error("Payment has no associated debt");
+
+    debt.paidAmount = Math.max(0, (debt.paidAmount || 0) - payment.amount);
+    debt.remainingAmount = debt.totalAmount - debt.paidAmount;
+    if (debt.remainingAmount < 0) debt.remainingAmount = 0;
+    debt.updatedAt = new Date();
+    await debtRepo.save(debt);
+
+    await auditLogger.logUpdate("Debt", debt.id, { paidAmount: debt.paidAmount + payment.amount }, { paidAmount: debt.paidAmount }, user);
+    logger.info(`[Transition] Payment #${payment.id} reversed. Debt #${debt.id} now has paidAmount=${debt.paidAmount}, remaining=${debt.remainingAmount}`);
+  }
+
+  /**
+   * Update payment amount – adjust debt accordingly
+   */
+  async updatePaymentAmount(payment, oldAmount, newAmount, user = "system", queryRunner = null) {
+    if (oldAmount === newAmount) return;
+    const diff = newAmount - oldAmount;
+    logger.info(`[Transition] Updating payment #${payment.id} amount from ${oldAmount} to ${newAmount} (diff=${diff})`);
+
+    const debtRepo = this._getRepo(Debt, queryRunner);
+    const debt = payment.debt;
+    if (!debt) throw new Error("Payment has no associated debt");
+
+    debt.paidAmount = (debt.paidAmount || 0) + diff;
+    debt.remainingAmount = debt.totalAmount - debt.paidAmount;
+    if (debt.remainingAmount < 0) debt.remainingAmount = 0;
+    debt.updatedAt = new Date();
+    await debtRepo.save(debt);
+
+    await auditLogger.logUpdate("Debt", debt.id, { paidAmount: debt.paidAmount - diff }, { paidAmount: debt.paidAmount }, user);
+    logger.info(`[Transition] Payment amount updated. Debt #${debt.id} now has paidAmount=${debt.paidAmount}, remaining=${debt.remainingAmount}`);
+  }
+
+  /**
+   * Transfer payment from one debt to another
+   */
+  async transferPayment(payment, oldDebtId, newDebtId, user = "system", queryRunner = null) {
+    logger.info(`[Transition] Transferring payment #${payment.id} from debt ${oldDebtId} to ${newDebtId}`);
+
+    const debtRepo = this._getRepo(Debt, queryRunner);
+    const oldDebt = await debtRepo.findOne({ where: { id: oldDebtId } });
+    const newDebt = await debtRepo.findOne({ where: { id: newDebtId } });
+    if (!oldDebt || !newDebt) throw new Error("Old or new debt not found");
+
+    // Remove from old debt
+    oldDebt.paidAmount = Math.max(0, oldDebt.paidAmount - payment.amount);
+    oldDebt.remainingAmount = oldDebt.totalAmount - oldDebt.paidAmount;
+    if (oldDebt.remainingAmount < 0) oldDebt.remainingAmount = 0;
+    oldDebt.updatedAt = new Date();
+    await debtRepo.save(oldDebt);
+
+    // Add to new debt
+    newDebt.paidAmount = (newDebt.paidAmount || 0) + payment.amount;
+    newDebt.remainingAmount = newDebt.totalAmount - newDebt.paidAmount;
+    if (newDebt.remainingAmount < 0) newDebt.remainingAmount = 0;
+    newDebt.updatedAt = new Date();
+    await debtRepo.save(newDebt);
+
+    await auditLogger.logUpdate("Debt", oldDebt.id, { paidAmount: oldDebt.paidAmount + payment.amount }, { paidAmount: oldDebt.paidAmount }, user);
+    await auditLogger.logUpdate("Debt", newDebt.id, { paidAmount: newDebt.paidAmount - payment.amount }, { paidAmount: newDebt.paidAmount }, user);
+    logger.info(`[Transition] Payment transferred. Old debt #${oldDebtId} paidAmount=${oldDebt.paidAmount}, new debt #${newDebtId} paidAmount=${newDebt.paidAmount}`);
+  }
+
+  /**
+   * Void a payment (reverse and mark as voided)
    */
   async onVoid(payment, user = "system", queryRunner = null) {
-    logger.info(`[Transition] Voiding payment transaction #${payment.id} by ${user}`);
+    logger.info(`[Transition] Voiding payment #${payment.id} by ${user}`);
+    await this.reversePayment(payment, user, queryRunner);
 
     const paymentRepo = this._getRepo(PaymentTransaction, queryRunner);
-    const debtRepo = this._getRepo(Debt, queryRunner);
-
-    // 1. Reverse the payment: increase debt remainingAmount by voided amount
-    const debt = payment.debt;
-    if (debt) {
-      debt.remainingAmount += payment.amount;
-      debt.paidAmount -= payment.amount;
-      if (debt.remainingAmount < 0) debt.remainingAmount = 0;
-      if (debt.paidAmount < 0) debt.paidAmount = 0;
-      debt.updatedAt = new Date();
-      await debtRepo.save(debt);
-    }
-
-    // 2. Create a reversal transaction (negative amount)
-    const reversal = paymentRepo.create({
-      amount: -payment.amount,
-      paymentDate: new Date(),
-      reference: `Reversal of #${payment.id}`,
-      notes: `Voided by ${user}`,
-      debt: debt,
-    });
-    await paymentRepo.save(reversal);
-
-    // 3. Update payment status to 'voided' (add a 'status' column or a 'voided' boolean)
-    // For now, we assume a 'voided' boolean exists. If not, we can use `deletedAt` as a marker.
-    payment.voided = true; // hypothetical field
+    payment.voided = true;
     payment.updatedAt = new Date();
     await paymentRepo.save(payment);
 
-    // 4. Notify debtor (in‑app)
-    if (debt?.borrower) {
+    // Notify debtor
+    if (payment.debt?.borrower) {
       await notificationService.create(
         {
           userId: 1,
           title: "Payment Voided",
-          message: `Your payment of ${payment.amount} for debt "${debt.name}" has been voided.`,
-          type: "warning",
-          metadata: { paymentId: payment.id, debtId: debt.id },
+          message: `Your payment of ${payment.amount} for debt "${payment.debt.name}" has been voided.`,
+          type: "info",
+          metadata: { paymentId: payment.id, debtId: payment.debt.id },
         },
         user,
         queryRunner
       );
     }
 
-    // 5. Audit log
     await auditLogger.logUpdate("PaymentTransaction", payment.id, { status: "active" }, { status: "voided" }, user);
   }
 
   /**
-   * Refund a payment
+   * Refund a payment (partial or full)
    */
   async onRefund(payment, refundAmount, user = "system", queryRunner = null) {
     logger.info(`[Transition] Refunding ${refundAmount} from payment #${payment.id} by ${user}`);
@@ -81,10 +150,9 @@ class PaymentTransactionStateTransitionService {
     const paymentRepo = this._getRepo(PaymentTransaction, queryRunner);
     const debtRepo = this._getRepo(Debt, queryRunner);
     const debt = payment.debt;
-
     if (!debt) throw new Error("Payment has no associated debt");
 
-    // 1. Create a refund transaction record (negative amount)
+    // Create a refund transaction record (negative amount)
     const refund = paymentRepo.create({
       amount: -refundAmount,
       paymentDate: new Date(),
@@ -94,18 +162,14 @@ class PaymentTransactionStateTransitionService {
     });
     await paymentRepo.save(refund);
 
-    // 2. Update debt remainingAmount (increase)
-    debt.remainingAmount += refundAmount;
-    debt.paidAmount -= refundAmount;
+    // Update debt (subtract refund amount from paidAmount)
+    debt.paidAmount = Math.max(0, debt.paidAmount - refundAmount);
+    debt.remainingAmount = debt.totalAmount - debt.paidAmount;
     if (debt.remainingAmount < 0) debt.remainingAmount = 0;
-    if (debt.paidAmount < 0) debt.paidAmount = 0;
     debt.updatedAt = new Date();
     await debtRepo.save(debt);
 
-    // 3. If original payment was via gateway, process refund externally (placeholder)
-    logger.info(`[PaymentTransaction] External refund for payment #${payment.id} would be processed here.`);
-
-    // 4. Notify debtor (in‑app)
+    // Notify debtor
     await notificationService.create(
       {
         userId: 1,
@@ -118,60 +182,43 @@ class PaymentTransactionStateTransitionService {
       queryRunner
     );
 
-    // 5. Audit log
     await auditLogger.logCreate("PaymentTransaction", refund.id, refund, user);
     await auditLogger.logUpdate("Debt", debt.id, { paidAmount: debt.paidAmount + refundAmount }, { paidAmount: debt.paidAmount }, user);
   }
 
   /**
-   * Confirm payment (e.g., after bank verification)
+   * Confirm payment (if you need a separate confirmation step)
+   * This is similar to applyPayment but also marks confirmed=true.
    */
   async onConfirm(payment, user = "system", queryRunner = null) {
     logger.info(`[Transition] Confirming payment #${payment.id} by ${user}`);
+    await this.applyPayment(payment, user, queryRunner);
 
     const paymentRepo = this._getRepo(PaymentTransaction, queryRunner);
-    const debtRepo = this._getRepo(Debt, queryRunner);
-    const debt = payment.debt;
-
-    if (!debt) throw new Error("Payment has no associated debt");
-
-    // 1. Mark payment as confirmed (add a 'confirmed' boolean or status)
-    payment.confirmed = true; // hypothetical field
+    payment.confirmed = true;
     payment.updatedAt = new Date();
     await paymentRepo.save(payment);
 
-    // 2. Apply the payment to debt if not already applied (the debt should already reflect paidAmount, but ensure)
-    // Typically the debt is updated when payment is created, so we may not need to do anything here.
-    // However, to be safe, we recalc:
-    const totalPaid = await paymentRepo.sum("amount", { debt: { id: debt.id }, confirmed: true });
-    debt.paidAmount = totalPaid;
-    debt.remainingAmount = debt.totalAmount - debt.paidAmount;
-    if (debt.remainingAmount < 0) debt.remainingAmount = 0;
-    debt.updatedAt = new Date();
-    await debtRepo.save(debt);
-
-    // 3. Generate receipt (use PrinterService)
+    // Generate receipt
     try {
       const printerService = require("../services/Printer");
-      await printerService.printReceipt(debt.id);
+      await printerService.printReceipt(payment.debt.id);
     } catch (err) {
-      logger.warn(`Failed to print receipt for debt #${debt.id}:`, err);
+      logger.warn(`Failed to print receipt for debt #${payment.debt.id}:`, err);
     }
 
-    // 4. Trigger thank‑you notification (in‑app)
     await notificationService.create(
       {
         userId: 1,
         title: "Payment Confirmed",
-        message: `Your payment of ${payment.amount} for debt "${debt.name}" has been confirmed. Thank you!`,
-        type: "success",
-        metadata: { paymentId: payment.id, debtId: debt.id },
+        message: `Your payment of ${payment.amount} for debt "${payment.debt.name}" has been confirmed. Thank you!`,
+        type: "payment_confirmation",
+        metadata: { paymentId: payment.id, debtId: payment.debt.id },
       },
       user,
       queryRunner
     );
 
-    // 5. Audit log
     await auditLogger.logUpdate("PaymentTransaction", payment.id, { confirmed: false }, { confirmed: true }, user);
   }
 }

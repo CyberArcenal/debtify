@@ -47,7 +47,7 @@ class CreditCheckStateTransitionService {
             title: "⚠️ Poor Credit Score Alert",
             // @ts-ignore
             message: `Debtor "${debtorName}" has a credit score of ${logEntry.score} (${logEntry.riskLevel}). Please review.`,
-            type: "warning",
+            type: "info",
             // @ts-ignore
             metadata: { debtorId: logEntry.debtorId, score: logEntry.score },
           },

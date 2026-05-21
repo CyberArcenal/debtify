@@ -1,5 +1,5 @@
 // services/NotificationService.js
-
+//@ts-check
 const auditLogger = require("../utils/auditLogger");
 const { validateNotificationData } = require("../utils/notificationUtils");
 

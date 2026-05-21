@@ -20,6 +20,11 @@ const PaymentMethod = new EntitySchema({
       inverseSide: "method",
       cascade: true,
     },
+    transactions: {
+      target: "PaymentTransaction",
+      type: "one-to-many",
+      inverseSide: "paymentMethod",
+    },
   },
 });
 

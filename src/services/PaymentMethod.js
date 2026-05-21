@@ -54,30 +54,10 @@ class PaymentMethodService {
     return { valid: errors.length === 0, errors };
   }
 
-  /**
-   * Ensure only one default method exists
-   * @param {number?} excludeId
-   * @param {import("typeorm").QueryRunner | null} qr
-   */
-  async _ensureSingleDefault(excludeId = null, qr = null) {
-    const PaymentMethod = require("../entities/PaymentMethod");
-    const methodRepo = this._getRepo(qr, PaymentMethod);
-    const defaultMethods = await methodRepo.find({ where: { isDefault: true } });
-    for (const method of defaultMethods) {
-      if (method.id !== excludeId) {
-        method.isDefault = false;
-        await methodRepo.save(method);
-      }
-    }
-  }
-
   // ----------------------------------------------------------------------
   // 📋 READ OPERATIONS
   // ----------------------------------------------------------------------
 
-  /**
-   * Get all payment methods
-   */
   async getAllPaymentMethods() {
     const { method: repo } = await this.getRepositories();
     const methods = await repo.find({
@@ -87,9 +67,6 @@ class PaymentMethodService {
     return methods;
   }
 
-  /**
-   * Get payment method by ID
-   */
   async getPaymentMethodById(id) {
     const { method: repo } = await this.getRepositories();
     const method = await repo.findOne({ where: { id } });
@@ -100,14 +77,11 @@ class PaymentMethodService {
     return method;
   }
 
-  /**
-   * Get usage statistics for a payment method
-   */
   async getPaymentMethodStats(methodId) {
     const { stat: repo } = await this.getRepositories();
     let stats = await repo.findOne({ where: { method: { id: methodId } }, relations: ["method"] });
     if (!stats) {
-      // Initialize if not exists
+      // Initialize if not exists (read-only fallback)
       const PaymentMethodStat = require("../entities/PaymentMethodStat");
       stats = repo.create({ method: { id: methodId }, transactionCount: 0, totalAmount: 0 });
       await repo.save(stats);
@@ -116,21 +90,13 @@ class PaymentMethodService {
   }
 
   // ----------------------------------------------------------------------
-  // ✏️ WRITE OPERATIONS
+  // ✏️ WRITE OPERATIONS (CRUD only – no side effects)
   // ----------------------------------------------------------------------
 
-  /**
-   * Create a new payment method
-   * @param {Object} data
-   * @param {string} user
-   * @param {import("typeorm").QueryRunner | null} qr
-   */
   async createPaymentMethod(data, user = "system", qr = null) {
     const { saveDb } = require("../utils/dbUtils/dbActions");
     const PaymentMethod = require("../entities/PaymentMethod");
-    const PaymentMethodStat = require("../entities/PaymentMethodStat");
     const methodRepo = this._getRepo(qr, PaymentMethod);
-    const statRepo = this._getRepo(qr, PaymentMethodStat);
 
     const validation = this._validateMethodData(data);
     if (!validation.valid) {
@@ -149,28 +115,14 @@ class PaymentMethodService {
     });
 
     const saved = await saveDb(methodRepo, method);
-
-    // Initialize stats for this method
-    const stats = statRepo.create({
-      method: saved,
-      transactionCount: 0,
-      totalAmount: 0,
-    });
-    await saveDb(statRepo, stats);
-
-    // If this method is default, ensure others are not default
-    if (isDefault) {
-      await this._ensureSingleDefault(saved.id, qr);
-    }
+    // No stats creation here – will be done by state transition service
+    // No default enforcement here – will be done by state transition service
 
     await auditLogger.logCreate("PaymentMethod", saved.id, saved, user);
     console.log(`Payment method created: ${saved.name}`);
     return saved;
   }
 
-  /**
-   * Update an existing payment method
-   */
   async updatePaymentMethod(id, data, user = "system", qr = null) {
     const { updateDb } = require("../utils/dbUtils/dbActions");
     const PaymentMethod = require("../entities/PaymentMethod");
@@ -189,19 +141,12 @@ class PaymentMethodService {
     existing.updatedAt = new Date();
 
     const saved = await updateDb(methodRepo, existing);
-
-    // If this method is set as default, ensure others are not default
-    if (saved.isDefault) {
-      await this._ensureSingleDefault(saved.id, qr);
-    }
+    // No default enforcement here – will be done by state transition service
 
     await auditLogger.logUpdate("PaymentMethod", id, oldData, saved, user);
     return saved;
   }
 
-  /**
-   * Set a payment method as default (unset all others)
-   */
   async setDefaultPaymentMethod(id, user = "system", qr = null) {
     const PaymentMethod = require("../entities/PaymentMethod");
     const methodRepo = this._getRepo(qr, PaymentMethod);
@@ -211,7 +156,7 @@ class PaymentMethodService {
       throw new Error(`Payment method with ID ${id} not found`);
     }
 
-    await this._ensureSingleDefault(id, qr);
+    // Only update the flag, do NOT enforce single default here
     method.isDefault = true;
     method.updatedAt = new Date();
     const saved = await methodRepo.save(method);
@@ -219,9 +164,6 @@ class PaymentMethodService {
     return saved;
   }
 
-  /**
-   * Delete a payment method (prevents deletion if it's the default)
-   */
   async deletePaymentMethod(id, user = "system", qr = null) {
     const { removeDb } = require("../utils/dbUtils/dbActions");
     const PaymentMethod = require("../entities/PaymentMethod");
@@ -237,7 +179,7 @@ class PaymentMethodService {
       throw new Error("Cannot delete the default payment method");
     }
 
-    // Delete associated stats first (cascade not set on entity)
+    // Delete associated stats (cascade is not set on entity)
     const stats = await statRepo.findOne({ where: { method: { id } } });
     if (stats) {
       await removeDb(statRepo, stats);
@@ -248,12 +190,7 @@ class PaymentMethodService {
     console.log(`Payment method deleted: ${method.name}`);
   }
 
-  /**
-   * Increment usage statistics when a payment is recorded
-   * @param {number} methodId
-   * @param {number} amount
-   * @param {import("typeorm").QueryRunner | null} qr
-   */
+  // Utility method to increment stats – called from payment creation (not part of CRUD)
   async incrementPaymentMethodStats(methodId, amount, qr = null) {
     const PaymentMethodStat = require("../entities/PaymentMethodStat");
     const statRepo = this._getRepo(qr, PaymentMethodStat);
@@ -269,6 +206,5 @@ class PaymentMethodService {
   }
 }
 
-// Singleton instance
 const paymentMethodService = new PaymentMethodService();
 module.exports = paymentMethodService;

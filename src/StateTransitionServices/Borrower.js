@@ -134,7 +134,7 @@ class BorrowerStateTransitionService {
         userId: 1,
         title: "Borrower Deactivated",
         message: `Borrower "${borrower.name}" (ID: ${borrower.id}) has been deactivated. All active debts have been marked as defaulted.`,
-        type: "warning",
+        type: "info",
         metadata: { borrowerId: borrower.id },
       },
       user,
