@@ -1,5 +1,9 @@
 # Debtify – Debt Management System
 
+<p align="center">
+  <img src="https://github.com/CyberArcenal/debtify/blob/main/screenshots/thumbnail1.png?raw=true" width="45%" />
+</p>
+
 **Debtify** is a cross‑platform desktop application for managing loans, collections, and borrower relationships. Built with Electron, React, TypeScript, and TypeORM (SQLite), it provides a modern UI for tracking debts, payments, penalties, and notifications. The system includes audit logging, customizable payment plans, and multi‑user support.
 
 ![Electron](https://img.shields.io/badge/Electron-40.x-blue)
