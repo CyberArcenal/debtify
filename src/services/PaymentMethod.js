@@ -47,7 +47,11 @@ class PaymentMethodService {
   _validateMethodData(data, isUpdate = false) {
     const errors = [];
     if (!isUpdate || data.name !== undefined) {
-      if (!data.name || typeof data.name !== "string" || data.name.trim() === "") {
+      if (
+        !data.name ||
+        typeof data.name !== "string" ||
+        data.name.trim() === ""
+      ) {
         errors.push("Method name is required");
       }
     }
@@ -79,11 +83,18 @@ class PaymentMethodService {
 
   async getPaymentMethodStats(methodId) {
     const { stat: repo } = await this.getRepositories();
-    let stats = await repo.findOne({ where: { method: { id: methodId } }, relations: ["method"] });
+    let stats = await repo.findOne({
+      where: { method: { id: methodId } },
+      relations: ["method"],
+    });
     if (!stats) {
       // Initialize if not exists (read-only fallback)
       const PaymentMethodStat = require("../entities/PaymentMethodStat");
-      stats = repo.create({ method: { id: methodId }, transactionCount: 0, totalAmount: 0 });
+      stats = repo.create({
+        method: { id: methodId },
+        transactionCount: 0,
+        totalAmount: 0,
+      });
       await repo.save(stats);
     }
     return stats;
@@ -99,11 +110,19 @@ class PaymentMethodService {
     const methodRepo = this._getRepo(qr, PaymentMethod);
 
     const validation = this._validateMethodData(data);
-    if (!validation.valid) {
-      throw new Error(validation.errors.join(", "));
-    }
+    if (!validation.valid) throw new Error(validation.errors.join(", "));
 
-    const { name, description = null, icon = "CreditCard", isDefault = false } = data;
+    const {
+      name,
+      description = null,
+      icon = "CreditCard",
+      isDefault = false,
+    } = data;
+
+    // 🔧 Kung ito ay default, siguraduhing walang ibang default bago i-save
+    if (isDefault) {
+      await this._ensureSingleDefaultExclude(null, qr);
+    }
 
     const method = methodRepo.create({
       name: name.trim(),
@@ -115,9 +134,6 @@ class PaymentMethodService {
     });
 
     const saved = await saveDb(methodRepo, method);
-    // No stats creation here – will be done by state transition service
-    // No default enforcement here – will be done by state transition service
-
     await auditLogger.logCreate("PaymentMethod", saved.id, saved, user);
     console.log(`Payment method created: ${saved.name}`);
     return saved;
@@ -129,10 +145,15 @@ class PaymentMethodService {
     const methodRepo = this._getRepo(qr, PaymentMethod);
 
     const existing = await methodRepo.findOne({ where: { id } });
-    if (!existing) {
-      throw new Error(`Payment method with ID ${id} not found`);
-    }
+    if (!existing) throw new Error(`Payment method with ID ${id} not found`);
     const oldData = { ...existing };
+
+    // 🔧 Kung ang update ay nagtatakda ng isDefault = true, siguraduhing walang ibang default
+    const newIsDefault =
+      data.isDefault !== undefined ? data.isDefault : existing.isDefault;
+    if (newIsDefault && !existing.isDefault) {
+      await this._ensureSingleDefaultExclude(id, qr);
+    }
 
     if (data.name !== undefined) existing.name = data.name.trim();
     if (data.description !== undefined) existing.description = data.description;
@@ -141,26 +162,32 @@ class PaymentMethodService {
     existing.updatedAt = new Date();
 
     const saved = await updateDb(methodRepo, existing);
-    // No default enforcement here – will be done by state transition service
-
     await auditLogger.logUpdate("PaymentMethod", id, oldData, saved, user);
     return saved;
   }
 
   async setDefaultPaymentMethod(id, user = "system", qr = null) {
+    const { updateDb } = require("../utils/dbUtils/dbActions");
     const PaymentMethod = require("../entities/PaymentMethod");
     const methodRepo = this._getRepo(qr, PaymentMethod);
 
     const method = await methodRepo.findOne({ where: { id } });
-    if (!method) {
-      throw new Error(`Payment method with ID ${id} not found`);
-    }
+    if (!method) throw new Error(`Payment method with ID ${id} not found`);
 
-    // Only update the flag, do NOT enforce single default here
+    // 🔧 Alisin muna ang default sa lahat ng iba
+    await this._ensureSingleDefaultExclude(id, qr);
+
+    // Ngayon i-set ang method na ito bilang default
     method.isDefault = true;
     method.updatedAt = new Date();
-    const saved = await methodRepo.save(method);
-    await auditLogger.logUpdate("PaymentMethod", id, { isDefault: false }, { isDefault: true }, user);
+    const saved = await updateDb(methodRepo, method);
+    await auditLogger.logUpdate(
+      "PaymentMethod",
+      id,
+      { isDefault: false },
+      { isDefault: true },
+      user,
+    );
     return saved;
   }
 
@@ -197,12 +224,39 @@ class PaymentMethodService {
 
     let stats = await statRepo.findOne({ where: { method: { id: methodId } } });
     if (!stats) {
-      stats = statRepo.create({ method: { id: methodId }, transactionCount: 0, totalAmount: 0 });
+      stats = statRepo.create({
+        method: { id: methodId },
+        transactionCount: 0,
+        totalAmount: 0,
+      });
     }
     stats.transactionCount += 1;
     stats.totalAmount = parseFloat(stats.totalAmount) + amount;
     await statRepo.save(stats);
-    console.log(`Stats updated for payment method ${methodId}: +1 transaction, +${amount}`);
+    console.log(
+      `Stats updated for payment method ${methodId}: +1 transaction, +${amount}`,
+    );
+  }
+
+  /**
+   * Helper: Siguraduhing walang ibang default method maliban sa optional excludeId
+   * @param {number|null} excludeId
+   * @param {import("typeorm").QueryRunner|null} qr
+   */
+  async _ensureSingleDefaultExclude(excludeId = null, qr = null) {
+    const PaymentMethod = require("../entities/PaymentMethod");
+    const { updateDb } = require("../utils/dbUtils/dbActions");
+    const methodRepo = this._getRepo(qr, PaymentMethod);
+    const defaultMethods = await methodRepo.find({
+      where: { isDefault: true },
+    });
+    for (const method of defaultMethods) {
+      if (method.id !== excludeId) {
+        method.isDefault = false;
+        method.updatedAt = new Date();
+        await updateDb(methodRepo, method);
+      }
+    }
   }
 }
 
