@@ -11,7 +11,7 @@ interface UsePaymentScheduleReturn {
   filters: PaymentScheduleFilters;
   setFilters: React.Dispatch<React.SetStateAction<PaymentScheduleFilters>>;
   refresh: () => void;
-  markAsPaid: (debtId: number, amount: number, paymentDate: string) => Promise<void>;
+  markAsPaid: (debtId: number, amount: number, paymentDate: string, methodId: number) => Promise<void>;
 }
 
 const usePaymentSchedule = (): UsePaymentScheduleReturn => {
@@ -45,7 +45,6 @@ const usePaymentSchedule = (): UsePaymentScheduleReturn => {
     fetchActiveDebts();
   }, [fetchActiveDebts]);
 
-  // Generate scheduled payments from active debts
   const payments = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -57,7 +56,7 @@ const usePaymentSchedule = (): UsePaymentScheduleReturn => {
       .filter(debt => {
         const dueDate = new Date(debt.dueDate);
         dueDate.setHours(0, 0, 0, 0);
-        if (dueDate < today) return false; // ignore overdue? But we want to show overdue as well? Keep all active debts with due date >= today? Actually schedule should show future payments. We'll show only future due dates.
+        if (dueDate < today) return false;
         return dueDate <= cutoffDate;
       })
       .map(debt => ({
@@ -73,7 +72,7 @@ const usePaymentSchedule = (): UsePaymentScheduleReturn => {
       .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
   }, [allDebts, filters.dateRange]);
 
-  const markAsPaid = async (debtId: number, amount: number, paymentDate: string) => {
+  const markAsPaid = async (debtId: number, amount: number, paymentDate: string, methodId: number) => {
     try {
       await paymentsAPI.create({
         amount,
@@ -81,8 +80,8 @@ const usePaymentSchedule = (): UsePaymentScheduleReturn => {
         reference: `Scheduled payment on ${paymentDate}`,
         notes: null,
         debtId,
+        methodId,
       });
-      // Refresh debts list to get updated remaining amounts
       await fetchActiveDebts();
     } catch (err: any) {
       throw new Error(err.message);

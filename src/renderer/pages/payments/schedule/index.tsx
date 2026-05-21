@@ -25,9 +25,9 @@ const PaymentSchedulePage: React.FC = () => {
     setMarkPaidModalOpen(true);
   };
 
-  const handleConfirmMarkPaid = async (amount: number, paymentDate: string) => {
+  const handleConfirmMarkPaid = async (amount: number, paymentDate: string, methodId: number) => {
     if (selectedPayment) {
-      await markAsPaid(selectedPayment.debtId, amount, paymentDate);
+      await markAsPaid(selectedPayment.debtId, amount, paymentDate, methodId);
       refresh();
     }
   };

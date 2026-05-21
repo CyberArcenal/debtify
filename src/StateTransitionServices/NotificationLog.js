@@ -4,22 +4,23 @@ const { logger } = require("../utils/logger");
 const auditLogger = require("../utils/auditLogger");
 const emailSender = require("../channels/email.sender");
 
+
 class NotificationLogStateTransitionService {
-  /**
-   * @param {{ getRepository: (arg0: import("typeorm").EntitySchema<{ id: unknown; recipient_email: unknown; subject: unknown; payload: unknown; status: unknown; error_message: unknown; retry_count: unknown; resend_count: unknown; sent_at: unknown; last_error_at: unknown; created_at: unknown; updated_at: unknown; }>) => any; }} dataSource
-   */
   constructor(dataSource) {
     this.dataSource = dataSource;
     this.logRepo = dataSource.getRepository(NotificationLog);
   }
 
   /**
-   * @param {import("typeorm").EntitySchema<{ id: unknown; recipient_email: unknown; subject: unknown; payload: unknown; status: unknown; error_message: unknown; retry_count: unknown; resend_count: unknown; sent_at: unknown; last_error_at: unknown; created_at: unknown; updated_at: unknown; }>} entity
-   * @param {import("typeorm").QueryRunner} queryRunner
+   * Get repository (transactional if queryRunner provided)
+   * @param {import("typeorm").QueryRunner|null} qr
+   * @returns {import("typeorm").Repository}
    */
-  async _getRepo(entity, queryRunner) {
-    if (queryRunner) return queryRunner.manager.getRepository(entity);
-    return this.dataSource.getRepository(entity);
+  _getRepo(qr) {
+    if (qr) {
+      return qr.manager.getRepository(NotificationLog);
+    }
+    return this.logRepo;
   }
 
   /**
@@ -29,11 +30,12 @@ class NotificationLogStateTransitionService {
    * @param {import("typeorm").QueryRunner} [queryRunner]
    */
   async onCreate(log, user = "system", queryRunner = null) {
+    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
     logger.info(
-      `[Transition] Attempting to send notification log #${log.id} (recipient: ${log.recipient_email})`,
+      `[Transition] Attempting to send notification log #${log.id} (recipient: ${log.recipient_email})`
     );
 
-    const repo = this._getRepo(NotificationLog, queryRunner);
+    const repo = this._getRepo(queryRunner);
     let success = false;
     let errorMsg = null;
 
@@ -44,7 +46,7 @@ class NotificationLogStateTransitionService {
         `<p>${log.payload}</p>`,
         log.payload,
         {},
-        true, // async
+        true // async
       );
       success = result.success;
       if (!success) errorMsg = "Email send failed";
@@ -63,14 +65,10 @@ class NotificationLogStateTransitionService {
       log.last_error_at = new Date();
     }
     log.updated_at = new Date();
-    await repo.save(log);
 
-    await auditLogger.logCreate(
-      "NotificationLog",
-      log.id,
-      { status: log.status },
-      user,
-    );
+    // Use saveDb instead of repo.save
+    const saved = await saveDb(repo, log, { skipSignal: true });
+    await auditLogger.logCreate("NotificationLog", saved.id, { status: saved.status }, user);
   }
 
   /**
@@ -80,11 +78,10 @@ class NotificationLogStateTransitionService {
    * @param {import("typeorm").QueryRunner} [queryRunner]
    */
   async onRetry(log, user = "system", queryRunner = null) {
-    logger.info(
-      `[Transition] Retrying failed notification log #${log.id} by ${user}`,
-    );
+    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
+    logger.info(`[Transition] Retrying failed notification log #${log.id} by ${user}`);
 
-    const repo = this._getRepo(NotificationLog, queryRunner);
+    const repo = this._getRepo(queryRunner);
     const MAX_RETRIES = 3;
 
     log.retry_count = (log.retry_count || 0) + 1;
@@ -100,7 +97,7 @@ class NotificationLogStateTransitionService {
         `<p>${log.payload}</p>`,
         log.payload,
         {},
-        true,
+        true
       );
       success = result.success;
       if (!success) errorMsg = "Email send failed";
@@ -123,13 +120,16 @@ class NotificationLogStateTransitionService {
     }
 
     log.updated_at = new Date();
-    await repo.save(log);
+
+    // Use updateDb instead of repo.save
+    const oldData = { retry_count: log.retry_count - 1 };
+    const saved = await updateDb(repo, log, { skipSignal: true });
     await auditLogger.logUpdate(
       "NotificationLog",
       log.id,
-      { retry_count: log.retry_count - 1 },
+      oldData,
       { retry_count: log.retry_count, status: log.status },
-      user,
+      user
     );
   }
 
@@ -140,22 +140,24 @@ class NotificationLogStateTransitionService {
    * @param {import("typeorm").QueryRunner} [queryRunner]
    */
   async onAcknowledge(log, user = "system", queryRunner = null) {
-    logger.info(
-      `[Transition] Acknowledging successful delivery of log #${log.id} by ${user}`,
-    );
+    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
+    logger.info(`[Transition] Acknowledging successful delivery of log #${log.id} by ${user}`);
 
-    const repo = this._getRepo(NotificationLog, queryRunner);
+    const repo = this._getRepo(queryRunner);
     if (log.status !== "delivered") {
+      const oldStatus = log.status;
       log.status = "delivered";
       log.sent_at = new Date();
       log.updated_at = new Date();
-      await repo.save(log);
+
+      // Use updateDb instead of repo.save
+      const saved = await updateDb(repo, log, { skipSignal: true });
       await auditLogger.logUpdate(
         "NotificationLog",
         log.id,
-        { status: "sent" },
+        { status: oldStatus },
         { status: "delivered" },
-        user,
+        user
       );
     }
   }

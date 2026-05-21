@@ -62,6 +62,7 @@ declare global {
         channel: string,
         callback: (event: any, ...args: any[]) => void
       ) => () => void;
+      off: (channel: string, callback: (...args: any[]) => void) => void;
 
       // ========== WINDOW STATE EVENTS ==========
       onWindowMaximized: (callback: () => void) => void;

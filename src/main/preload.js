@@ -52,6 +52,7 @@ contextBridge.exposeInMainWorld("backendAPI", {
     ipcRenderer.on(event, callback);
     return () => ipcRenderer.removeListener(event, callback);
   },
+  off: (channel, callback) => ipcRenderer.removeListener(channel, callback),
 
   // ========== WINDOW STATE EVENTS ==========
   onWindowMaximized: (callback) =>

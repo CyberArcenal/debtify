@@ -5,6 +5,7 @@
 // ----------------------------------------------------------------------
 
 export interface PaymentTransaction {
+  methodId: import("react/jsx-runtime").JSX.Element;
   id: number;
   amount: number;
   paymentDate: string;        // ISO date string
@@ -46,6 +47,7 @@ export interface PaymentUpdateData {
   paymentDate?: string;
   reference?: string | null;
   notes?: string | null;
+  methodId: number;
   debtId?: number;
 }
 

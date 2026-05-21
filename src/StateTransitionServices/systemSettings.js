@@ -3,6 +3,7 @@ const { SystemSetting } = require("../entities/systemSettings");
 const { logger } = require("../utils/logger");
 const auditLogger = require("../utils/auditLogger");
 
+
 // Simple in-memory cache (could be replaced with a more robust solution)
 const settingsCache = {};
 
@@ -124,6 +125,7 @@ class SystemSettingStateTransitionService {
    * Apply a setting change (invalidate cache, reload services)
    */
   async onApply(setting, oldValue, newValue, user = "system", queryRunner = null) {
+    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
     logger.info(`[Transition] Applying setting change for key "${setting.key}": ${oldValue} → ${newValue} by ${user}`);
 
     // 1. Invalidate cache
@@ -140,6 +142,7 @@ class SystemSettingStateTransitionService {
    * Reset setting to factory default
    */
   async onReset(setting, user = "system", queryRunner = null) {
+    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
     logger.info(`[Transition] Resetting setting "${setting.key}" to default by ${user}`);
 
     // 1. Fetch default value from constants
@@ -153,7 +156,7 @@ class SystemSettingStateTransitionService {
     const oldValue = setting.value;
     setting.value = this._prepareValueForStorage(defaultValue);
     setting.updatedAt = new Date();
-    await repo.save(setting);
+    await updateDb(repo, setting);
 
     // 3. Invalidate cache and reload affected services
     delete settingsCache[setting.key];
@@ -168,6 +171,7 @@ class SystemSettingStateTransitionService {
    * @returns {Promise<{ valid: boolean; errorMessage?: string }>}
    */
   async onValidate(setting, proposedValue) {
+    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
     logger.info(`[Transition] Validating setting "${setting.key}" with value ${proposedValue}`);
 
     // Convert to string for validation

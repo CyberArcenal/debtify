@@ -2,6 +2,7 @@
 const { logger } = require("../utils/logger");
 const auditLogger = require("../utils/auditLogger");
 
+
 class PaymentMethodStateTransitionService {
   constructor(dataSource) {
     this.dataSource = dataSource;
@@ -10,24 +11,34 @@ class PaymentMethodStateTransitionService {
     this.paymentRepo = dataSource.getRepository(require("../entities/PaymentTransaction"));
   }
 
-  _getRepo(entity, queryRunner) {
-    if (queryRunner) return queryRunner.manager.getRepository(entity);
-    return this.dataSource.getRepository(entity);
+  /**
+   * Helper: get repository (transactional if queryRunner provided)
+   * @param {import("typeorm").QueryRunner|null} qr
+   * @param {Function} entityClass
+   * @returns {import("typeorm").Repository}
+   */
+  _getRepo(qr, entityClass) {
+    if (qr) {
+      return qr.manager.getRepository(entityClass);
+    }
+    return this.dataSource.getRepository(entityClass);
   }
 
   /**
    * Ensure only one default method exists
-   * @param {number?} excludeId
-   * @param {import("typeorm").QueryRunner | null} qr
+   * @param {number|null} excludeId
+   * @param {import("typeorm").QueryRunner|null} qr
    */
   async _ensureSingleDefault(excludeId = null, qr = null) {
+    const { saveDb, updateDb, removeDb } = require("../utils/dbUtils/dbActions");
     const PaymentMethod = require("../entities/PaymentMethod");
     const methodRepo = this._getRepo(qr, PaymentMethod);
     const defaultMethods = await methodRepo.find({ where: { isDefault: true } });
     for (const method of defaultMethods) {
       if (method.id !== excludeId) {
         method.isDefault = false;
-        await methodRepo.save(method);
+        method.updatedAt = new Date();
+        await updateDb(methodRepo, method);
       }
     }
   }
@@ -38,16 +49,17 @@ class PaymentMethodStateTransitionService {
    * - Enforces single default if this method is default
    */
   async onCreated(method, user = "system", queryRunner = null) {
+    const { saveDb, updateDb, removeDb } = require("../utils/dbUtils/dbActions");
     logger.info(`[PaymentMethod] Method "${method.name}" (ID: ${method.id}) created by ${user}`);
 
-    const statRepo = this._getRepo(require("../entities/PaymentMethodStat"), queryRunner);
-    // 1. Create stats record (initialized to zero) – only once
+    const statRepo = this._getRepo(queryRunner, require("../entities/PaymentMethodStat"));
+    // 1. Create stats record (initialized to zero)
     const stats = statRepo.create({
       method: method,
       transactionCount: 0,
       totalAmount: 0,
     });
-    await statRepo.save(stats);
+    await saveDb(statRepo, stats);
 
     // 2. If this method is default, ensure others are not default
     if (method.isDefault) {
@@ -64,6 +76,7 @@ class PaymentMethodStateTransitionService {
    * - Log changes (audit log already done by service, but we add detailed diff)
    */
   async onUpdate(oldMethod, newMethod, user = "system", queryRunner = null) {
+    const { saveDb, updateDb, removeDb } = require("../utils/dbUtils/dbActions");
     logger.info(`[PaymentMethod] Method "${newMethod.name}" (ID: ${newMethod.id}) updated by ${user}`);
 
     // Enforce single default if this method is now default
@@ -99,10 +112,11 @@ class PaymentMethodStateTransitionService {
    * - Prevent deletion if it has been used in any payment transaction
    */
   async onDelete(method, user = "system", queryRunner = null) {
+    const { saveDb, updateDb, removeDb } = require("../utils/dbUtils/dbActions");
     logger.info(`[PaymentMethod] Method "${method.name}" (ID: ${method.id}) about to be deleted by ${user}`);
 
     // Check if method has been used
-    const statRepo = this._getRepo(require("../entities/PaymentMethodStat"), queryRunner);
+    const statRepo = this._getRepo(queryRunner, require("../entities/PaymentMethodStat"));
     const stats = await statRepo.findOne({ where: { method: { id: method.id } } });
     if (stats && stats.transactionCount > 0) {
       throw new Error(`Cannot delete payment method "${method.name}" because it has been used in ${stats.transactionCount} transaction(s).`);
@@ -110,11 +124,12 @@ class PaymentMethodStateTransitionService {
 
     // If this method is the default, set another method as default before deletion
     if (method.isDefault) {
-      const methodRepo = this._getRepo(require("../entities/PaymentMethod"), queryRunner);
-      const another = await methodRepo.findOne({ where: { id: method.id }, order: { id: "ASC" } });
-      if (another) {
+      const methodRepo = this._getRepo(queryRunner, require("../entities/PaymentMethod"));
+      const another = await methodRepo.findOne({ where: {}, order: { id: "ASC" } });
+      if (another && another.id !== method.id) {
         another.isDefault = true;
-        await methodRepo.save(another);
+        another.updatedAt = new Date();
+        await updateDb(methodRepo, another);
         logger.info(`[PaymentMethod] Set method #${another.id} as new default.`);
       }
     }

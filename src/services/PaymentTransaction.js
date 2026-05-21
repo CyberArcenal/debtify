@@ -2,7 +2,10 @@
 
 const auditLogger = require("../utils/auditLogger");
 const { validatePaymentData } = require("../utils/paymentUtils");
-const { enableEarlyPaymentDiscount, earlyPaymentDiscountRate } = require("../utils/system");
+const {
+  enableEarlyPaymentDiscount,
+  earlyPaymentDiscountRate,
+} = require("../utils/system");
 
 // Time limit for editing payments (in hours)
 const EDIT_TIME_LIMIT_HOURS = 24;
@@ -73,7 +76,8 @@ class PaymentTransactionService {
         throw new Error(validation.errors.join(", "));
       }
 
-      let { amount, paymentDate, reference, notes, debtId, methodId } = paymentData;
+      let { amount, paymentDate, reference, notes, debtId, methodId } =
+        paymentData;
       let originalAmount = amount;
 
       // Validate debt existence
@@ -84,7 +88,9 @@ class PaymentTransactionService {
 
       // Validate payment method if provided
       if (methodId) {
-        const paymentMethod = await methodRepo.findOne({ where: { id: methodId } });
+        const paymentMethod = await methodRepo.findOne({
+          where: { id: methodId },
+        });
         if (!paymentMethod) {
           throw new Error(`Payment method with ID ${methodId} not found`);
         }
@@ -102,26 +108,37 @@ class PaymentTransactionService {
         // For simplicity, we'll still fetch the latest remaining amount from debt (but we won't modify debt).
         // This is a read-only check.
         const currentRemaining = debt.totalAmount - debt.paidAmount;
-        const isFullPayment = Math.abs(parseFloat(amount) - currentRemaining) < 0.01;
+        const isFullPayment =
+          Math.abs(parseFloat(amount) - currentRemaining) < 0.01;
 
         if (isEarly && isFullPayment) {
           const discountRate = await earlyPaymentDiscountRate();
           if (discountRate > 0) {
-            const discountedAmount = currentRemaining * (1 - discountRate / 100);
+            const discountedAmount =
+              currentRemaining * (1 - discountRate / 100);
             amount = parseFloat(discountedAmount.toFixed(2));
             const discountNote = `[Early payment discount ${discountRate}% applied – original amount ${originalAmount}]`;
             notes = notes ? `${discountNote} ${notes}` : discountNote;
             discountApplied = true;
-            console.log(`Early payment discount applied: original ${originalAmount} → discounted ${amount}`);
+            console.log(
+              `Early payment discount applied: original ${originalAmount} → discounted ${amount}`,
+            );
           }
         }
+      }
+
+      // AUTO-GENERATE REFERENCE IF NULL OR EMPTY
+      let finalReference = reference;
+      if (!reference || reference.trim() === "") {
+        finalReference = await this.generateUniqueReference(paymentRepo);
+        console.log(`Auto-generated reference: ${finalReference}`);
       }
 
       // Create payment record (no debt update here)
       const payment = paymentRepo.create({
         amount: parseFloat(amount),
         paymentDate: new Date(paymentDate),
-        reference: reference || null,
+        reference: finalReference,
         notes: notes || null,
         recordedAt: new Date(),
         methodId: methodId || null,
@@ -162,9 +179,12 @@ class PaymentTransactionService {
 
       // Time limit check
       const createdAt = existing.recordedAt;
-      const hoursSinceCreation = (Date.now() - new Date(createdAt)) / (1000 * 60 * 60);
+      const hoursSinceCreation =
+        (Date.now() - new Date(createdAt)) / (1000 * 60 * 60);
       if (hoursSinceCreation > EDIT_TIME_LIMIT_HOURS && !isAdmin) {
-        throw new Error(`Cannot edit payment after ${EDIT_TIME_LIMIT_HOURS} hours`);
+        throw new Error(
+          `Cannot edit payment after ${EDIT_TIME_LIMIT_HOURS} hours`,
+        );
       }
 
       const oldData = { ...existing };
@@ -173,7 +193,9 @@ class PaymentTransactionService {
 
       // Update debt if changed (but do NOT recalculate balances here)
       if (paymentData.debtId && paymentData.debtId !== oldDebtId) {
-        const newDebt = await debtRepo.findOne({ where: { id: paymentData.debtId } });
+        const newDebt = await debtRepo.findOne({
+          where: { id: paymentData.debtId },
+        });
         if (!newDebt) throw new Error(`Debt ${paymentData.debtId} not found`);
         existing.debt = newDebt;
         newDebtId = paymentData.debtId;
@@ -185,16 +207,21 @@ class PaymentTransactionService {
         if (paymentData.methodId === null || paymentData.methodId === "") {
           existing.methodId = null;
         } else {
-          const newMethod = await methodRepo.findOne({ where: { id: paymentData.methodId } });
-          if (!newMethod) throw new Error(`Payment method ${paymentData.methodId} not found`);
+          const newMethod = await methodRepo.findOne({
+            where: { id: paymentData.methodId },
+          });
+          if (!newMethod)
+            throw new Error(`Payment method ${paymentData.methodId} not found`);
           existing.methodId = paymentData.methodId;
         }
         delete paymentData.methodId;
       }
 
       // Update other fields
-      if (paymentData.amount !== undefined) paymentData.amount = parseFloat(paymentData.amount);
-      if (paymentData.paymentDate) paymentData.paymentDate = new Date(paymentData.paymentDate);
+      if (paymentData.amount !== undefined)
+        paymentData.amount = parseFloat(paymentData.amount);
+      if (paymentData.paymentDate)
+        paymentData.paymentDate = new Date(paymentData.paymentDate);
       Object.assign(existing, paymentData);
       existing.updatedAt = new Date();
 
@@ -202,7 +229,13 @@ class PaymentTransactionService {
       // The state transition service will handle consistency when needed (e.g., on confirm/void/refund).
 
       const saved = await updateDb(paymentRepo, existing);
-      await auditLogger.logUpdate("PaymentTransaction", id, oldData, saved, user);
+      await auditLogger.logUpdate(
+        "PaymentTransaction",
+        id,
+        oldData,
+        saved,
+        user,
+      );
       return saved;
     } catch (error) {
       console.error("Update payment failed:", error.message);
@@ -227,7 +260,8 @@ class PaymentTransactionService {
         relations: ["debt"],
       });
       if (!payment) throw new Error(`Payment #${id} not found`);
-      if (payment.deletedAt) throw new Error(`Payment #${id} is already deleted`);
+      if (payment.deletedAt)
+        throw new Error(`Payment #${id} is already deleted`);
 
       const oldData = { ...payment };
       payment.deletedAt = new Date();
@@ -268,7 +302,13 @@ class PaymentTransactionService {
       payment.updatedAt = new Date();
 
       const saved = await updateDb(paymentRepo, payment);
-      await auditLogger.logUpdate("PaymentTransaction", id, { deletedAt: true }, { deletedAt: null }, user);
+      await auditLogger.logUpdate(
+        "PaymentTransaction",
+        id,
+        { deletedAt: true },
+        { deletedAt: null },
+        user,
+      );
       console.log(`Payment #${id} restored`);
       return saved;
     } catch (error) {
@@ -333,17 +373,36 @@ class PaymentTransactionService {
     }
 
     // Filters
-    if (options.debtId) qb.andWhere("debt.id = :debtId", { debtId: options.debtId });
-    if (options.borrowerId) qb.andWhere("borrower.id = :borrowerId", { borrowerId: options.borrowerId });
-    if (options.reference) qb.andWhere("payment.reference LIKE :reference", { reference: `%${options.reference}%` });
-    if (options.paymentDateFrom) qb.andWhere("payment.paymentDate >= :paymentDateFrom", { paymentDateFrom: new Date(options.paymentDateFrom) });
-    if (options.paymentDateTo) qb.andWhere("payment.paymentDate <= :paymentDateTo", { paymentDateTo: new Date(options.paymentDateTo) });
-    if (options.minAmount) qb.andWhere("payment.amount >= :minAmount", { minAmount: options.minAmount });
-    if (options.maxAmount) qb.andWhere("payment.amount <= :maxAmount", { maxAmount: options.maxAmount });
+    if (options.debtId)
+      qb.andWhere("debt.id = :debtId", { debtId: options.debtId });
+    if (options.borrowerId)
+      qb.andWhere("borrower.id = :borrowerId", {
+        borrowerId: options.borrowerId,
+      });
+    if (options.reference)
+      qb.andWhere("payment.reference LIKE :reference", {
+        reference: `%${options.reference}%`,
+      });
+    if (options.paymentDateFrom)
+      qb.andWhere("payment.paymentDate >= :paymentDateFrom", {
+        paymentDateFrom: new Date(options.paymentDateFrom),
+      });
+    if (options.paymentDateTo)
+      qb.andWhere("payment.paymentDate <= :paymentDateTo", {
+        paymentDateTo: new Date(options.paymentDateTo),
+      });
+    if (options.minAmount)
+      qb.andWhere("payment.amount >= :minAmount", {
+        minAmount: options.minAmount,
+      });
+    if (options.maxAmount)
+      qb.andWhere("payment.amount <= :maxAmount", {
+        maxAmount: options.maxAmount,
+      });
     if (options.search) {
       qb.andWhere(
         "(payment.reference LIKE :search OR payment.notes LIKE :search OR debt.name LIKE :search OR borrower.name LIKE :search)",
-        { search: `%${options.search}%` }
+        { search: `%${options.search}%` },
       );
     }
 
@@ -368,17 +427,31 @@ class PaymentTransactionService {
    */
   async getStatistics() {
     const { payment: paymentRepo } = await this.getRepositories();
-    const qb = paymentRepo.createQueryBuilder("payment").where("payment.deletedAt IS NULL");
+    const qb = paymentRepo
+      .createQueryBuilder("payment")
+      .where("payment.deletedAt IS NULL");
 
     const totalPayments = await qb.getCount();
-    const totalAmount = await qb.clone().select("SUM(payment.amount)", "sum").getRawOne();
-    const averageAmount = await qb.clone().select("AVG(payment.amount)", "avg").getRawOne();
+    const totalAmount = await qb
+      .clone()
+      .select("SUM(payment.amount)", "sum")
+      .getRawOne();
+    const averageAmount = await qb
+      .clone()
+      .select("AVG(payment.amount)", "avg")
+      .getRawOne();
 
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const recentPayments = await qb.clone().andWhere("payment.paymentDate >= :thirtyDaysAgo", { thirtyDaysAgo }).getCount();
+    const recentPayments = await qb
+      .clone()
+      .andWhere("payment.paymentDate >= :thirtyDaysAgo", { thirtyDaysAgo })
+      .getCount();
 
-    const uniqueDebts = await qb.clone().select("COUNT(DISTINCT payment.debtId)", "count").getRawOne();
+    const uniqueDebts = await qb
+      .clone()
+      .select("COUNT(DISTINCT payment.debtId)", "count")
+      .getRawOne();
 
     return {
       totalPayments,
@@ -398,10 +471,17 @@ class PaymentTransactionService {
     let exportData;
     if (format === "csv") {
       const headers = [
-        "ID", "Amount", "Payment Date", "Reference", "Notes",
-        "Recorded At", "Debt ID", "Debt Name", "Borrower Name"
+        "ID",
+        "Amount",
+        "Payment Date",
+        "Reference",
+        "Notes",
+        "Recorded At",
+        "Debt ID",
+        "Debt Name",
+        "Borrower Name",
       ];
-      const rows = payments.map(p => [
+      const rows = payments.map((p) => [
         p.id,
         p.amount,
         new Date(p.paymentDate).toLocaleDateString(),
@@ -414,7 +494,7 @@ class PaymentTransactionService {
       ]);
       exportData = {
         format: "csv",
-        data: [headers, ...rows].map(row => row.join(",")).join("\n"),
+        data: [headers, ...rows].map((row) => row.join(",")).join("\n"),
         filename: `payments_export_${new Date().toISOString().split("T")[0]}.csv`,
       };
     } else {
@@ -495,6 +575,32 @@ class PaymentTransactionService {
       }
     }
     return results;
+  }
+
+  async generateUniqueReference(paymentRepo) {
+    const now = new Date();
+    const datePart = now.toISOString().slice(0, 10).replace(/-/g, "");
+    const randomPart = Math.floor(10000 + Math.random() * 90000);
+    let reference = `PAY-${datePart}-${randomPart}`;
+
+    let existing = await paymentRepo.findOne({
+      where: { reference },
+      withDeleted: true,
+    });
+    let attempts = 0;
+    while (existing && attempts < 5) {
+      const newRandom = Math.floor(10000 + Math.random() * 90000);
+      reference = `PAY-${datePart}-${newRandom}`;
+      existing = await paymentRepo.findOne({
+        where: { reference },
+        withDeleted: true,
+      });
+      attempts++;
+    }
+    if (existing) {
+      reference = `PAY-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    }
+    return reference;
   }
 }
 

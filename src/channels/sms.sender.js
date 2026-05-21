@@ -4,6 +4,7 @@ const twilio = require("twilio");
 const { getTwilioConfig } = require("../utils/system");
 const { logger } = require("../utils/logger");
 const notificationService = require("../services/Notification");
+const { BrowserWindow } = require("electron");
 
 class SmsSender {
   constructor() {
@@ -34,6 +35,16 @@ class SmsSender {
   }
 
   /**
+   * @param {string} channel
+   * @param {any} data
+   */
+  _sendToRenderers(channel, data) {
+    BrowserWindow.getAllWindows().forEach((win) => {
+      if (!win.isDestroyed()) win.webContents.send(channel, data);
+    });
+  }
+
+  /**
    * @param {string} to
    * @param {string} message
    */
@@ -42,6 +53,13 @@ class SmsSender {
       if (!this.client) {
         await this.initialize();
       }
+
+      this._sendToRenderers("sms:status", {
+        to,
+        messagePreview: message.substring(0, 50),
+        status: "sending",
+        timestamp: new Date().toISOString(),
+      });
 
       // @ts-ignore
       const from = this.config.messagingServiceSid || this.config.phoneNumber;
@@ -65,6 +83,13 @@ class SmsSender {
         `SMS successfully sent → To: ${formattedTo}, SID: ${result.sid}, Status: ${result.status}`,
       );
 
+      this._sendToRenderers("sms:status", {
+        to,
+        status: "sent",
+        sid: result.sid,
+        timestamp: new Date().toISOString(),
+      });
+
       return {
         success: true,
         sid: result.sid,
@@ -74,7 +99,13 @@ class SmsSender {
     } catch (error) {
       // @ts-ignore
       logger.error(`❌ Failed to send SMS → To: ${to}`, error);
-
+      this._sendToRenderers("sms:status", {
+        to,
+        status: "failed",
+        // @ts-ignore
+        error: error.message,
+        timestamp: new Date().toISOString(),
+      });
       try {
         await notificationService.create(
           {

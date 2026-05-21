@@ -30,6 +30,7 @@ const MigrationManager = require("../utils/dbUtils/migrationManager");
 const { registerImageProtocol } = require("./protocols/imageProtocol.js");
 const printerService = require("../services/Printer.js");
 const AuditTrailCleanupScheduler = require("../scheduler/auditTrailCleanupScheduler.js");
+const OverdueReminderScheduler = require("../scheduler/overdueReminderScheduler.js");
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -944,8 +945,14 @@ async function startupSequence() {
 
     log(LogLevel.SUCCESS, `✅ ${APP_CONFIG.appName} started successfully!`);
 
-    const auditCleaner = new AuditTrailCleanupScheduler()
-    auditCleaner.start()
+    const auditCleaner = new AuditTrailCleanupScheduler();
+    auditCleaner.start();
+
+    const reminderScheduler = new OverdueReminderScheduler();
+    reminderScheduler.start().catch((err) => {
+      log(LogLevel.ERROR, "Failed to start Overdue Reminder Scheduler", err);
+    });
+    
   } catch (error) {
     log(LogLevel.ERROR, "Startup sequence failed:", error);
 

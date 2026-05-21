@@ -11,6 +11,9 @@ import {
   FileText,
   Moon,
   Sun,
+  XCircle,
+  CheckCircle,
+  Loader2,
 } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -35,6 +38,23 @@ const TopBar: React.FC<TopBarProps> = ({ toggleSidebar }) => {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
+  const [auditCleanupStatus, setAuditCleanupStatus] = useState<{
+    active: boolean;
+    deletedCount?: number;
+    status?: string;
+    message?: string;
+  }>({ active: false });
+  const [emailStatus, setEmailStatus] = useState<{
+    active: boolean;
+    lastStatus?: string;
+    lastTarget?: string;
+  }>({ active: false });
+  const [smsStatus, setSmsStatus] = useState<{
+    active: boolean;
+    lastStatus?: string;
+    lastTarget?: string;
+  }>({ active: false });
+
   const [theme, setTheme] = useState<"light" | "dark">(() => {
     // I-load mula sa localStorage
     const saved = localStorage.getItem("theme");
@@ -44,6 +64,149 @@ const TopBar: React.FC<TopBarProps> = ({ toggleSidebar }) => {
       return "dark";
     return "light";
   });
+
+  useEffect(() => {
+    const cleanupListener = (event: any, data: any) => {
+      console.log("[Audit Cleanup Event]", data);
+      if (data.status === "started") {
+        setAuditCleanupStatus({ active: true, status: "started" });
+        // Auto-hide after 5 seconds if still active? Or wait for completed/failed
+        setTimeout(() => {
+          setAuditCleanupStatus((prev) =>
+            prev.active ? { ...prev, active: false } : prev,
+          );
+        }, 5000);
+      } else if (data.status === "completed") {
+        setAuditCleanupStatus({
+          active: false,
+          status: "completed",
+          deletedCount: data.deletedCount,
+          message: `${data.deletedCount} old audit records deleted`,
+        });
+        // Auto-clear message after 5 seconds
+        setTimeout(() => setAuditCleanupStatus({ active: false }), 5000);
+      } else if (data.status === "failed") {
+        setAuditCleanupStatus({
+          active: false,
+          status: "failed",
+          message: `Cleanup failed: ${data.error}`,
+        });
+        setTimeout(() => setAuditCleanupStatus({ active: false }), 5000);
+      }
+    };
+
+    window.backendAPI.on("audit:cleanup", cleanupListener);
+    return () => {
+      window.backendAPI.off("audit:cleanup", cleanupListener);
+    };
+  }, []);
+
+  useEffect(() => {
+    // Listeners para sa email events
+    const emailListener = (event: any, data: any) => {
+      if (data.status === "sending") {
+        setEmailStatus({
+          active: true,
+          lastStatus: "sending",
+          lastTarget: data.to,
+        });
+      } else if (data.status === "sent") {
+        setEmailStatus({
+          active: false,
+          lastStatus: "sent",
+          lastTarget: data.to,
+        });
+        // Auto‑clear after 3 seconds
+        setTimeout(
+          () =>
+            setEmailStatus((prev) => ({
+              ...prev,
+              lastStatus: undefined,
+              lastTarget: undefined,
+            })),
+          3000,
+        );
+      } else if (data.status === "failed") {
+        setEmailStatus({
+          active: false,
+          lastStatus: "failed",
+          lastTarget: data.to,
+        });
+        setTimeout(
+          () =>
+            setEmailStatus((prev) => ({
+              ...prev,
+              lastStatus: undefined,
+              lastTarget: undefined,
+            })),
+          5000,
+        );
+      }
+    };
+
+    const smsListener = (event: any, data: any) => {
+      if (data.status === "sending") {
+        setSmsStatus({
+          active: true,
+          lastStatus: "sending",
+          lastTarget: data.to,
+        });
+      } else if (data.status === "sent") {
+        setSmsStatus({
+          active: false,
+          lastStatus: "sent",
+          lastTarget: data.to,
+        });
+        setTimeout(
+          () =>
+            setSmsStatus((prev) => ({
+              ...prev,
+              lastStatus: undefined,
+              lastTarget: undefined,
+            })),
+          3000,
+        );
+      } else if (data.status === "failed") {
+        setSmsStatus({
+          active: false,
+          lastStatus: "failed",
+          lastTarget: data.to,
+        });
+        setTimeout(
+          () =>
+            setSmsStatus((prev) => ({
+              ...prev,
+              lastStatus: undefined,
+              lastTarget: undefined,
+            })),
+          5000,
+        );
+      }
+    };
+
+    // I‑register ang listeners
+    window.backendAPI.on("email:status", emailListener);
+    window.backendAPI.on("sms:status", smsListener);
+
+    return () => {
+      // Cleanup (kailangan ng proper removal, pero dahil walang direct unsubscribe, manual na lang)
+      // Sa totoong implementation, mas maganda gumamit ng ipcRenderer.removeListener pero dahil nasa contextBridge tayo,
+      // pwede tayong mag‑implement ng `off` method. Para sa simple, hindi na muna natin i‑a‑auto cleanup.
+    };
+  }, []);
+
+  useEffect(() => {
+    const emailCb = (event: any, data: any) => {};
+    const smsCb = (event: any, data: any) => {};
+
+    window.backendAPI.on("email:status", emailCb);
+    window.backendAPI.on("sms:status", smsCb);
+
+    return () => {
+      window.backendAPI.off("email:status", emailCb);
+      window.backendAPI.off("sms:status", smsCb);
+    };
+  }, []);
 
   useEffect(() => {
     const fetchUnread = async () => {
@@ -339,6 +502,81 @@ const TopBar: React.FC<TopBarProps> = ({ toggleSidebar }) => {
 
       {/* Right Section */}
       <div className="flex items-center gap-3">
+        {/* Audit Cleanup Indicator */}
+        {(auditCleanupStatus.active || auditCleanupStatus.message) && (
+          <div className="relative group">
+            {auditCleanupStatus.active &&
+              auditCleanupStatus.status === "started" && (
+                <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-300 text-xs">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <span>Cleaning audit logs...</span>
+                </div>
+              )}
+            {!auditCleanupStatus.active &&
+              auditCleanupStatus.status === "completed" && (
+                <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-300 text-xs">
+                  <CheckCircle className="w-3 h-3" />
+                  <span>{auditCleanupStatus.message}</span>
+                </div>
+              )}
+            {!auditCleanupStatus.active &&
+              auditCleanupStatus.status === "failed" && (
+                <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-300 text-xs">
+                  <XCircle className="w-3 h-3" />
+                  <span>{auditCleanupStatus.message}</span>
+                </div>
+              )}
+          </div>
+        )}
+        <div className="flex items-center gap-2">
+          {/* Email indicator */}
+          {(emailStatus.active || emailStatus.lastStatus) && (
+            <div className="relative group">
+              {emailStatus.active && (
+                <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 text-xs">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <span>Sending email...</span>
+                </div>
+              )}
+              {!emailStatus.active && emailStatus.lastStatus === "sent" && (
+                <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-300 text-xs">
+                  <CheckCircle className="w-3 h-3" />
+                  <span>Email sent to {emailStatus.lastTarget}</span>
+                </div>
+              )}
+              {!emailStatus.active && emailStatus.lastStatus === "failed" && (
+                <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-300 text-xs">
+                  <XCircle className="w-3 h-3" />
+                  <span>Email failed</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* SMS indicator (parehas na pattern) */}
+          {(smsStatus.active || smsStatus.lastStatus) && (
+            <div className="relative group">
+              {smsStatus.active && (
+                <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 text-xs">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <span>Sending SMS...</span>
+                </div>
+              )}
+              {!smsStatus.active && smsStatus.lastStatus === "sent" && (
+                <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-300 text-xs">
+                  <CheckCircle className="w-3 h-3" />
+                  <span>SMS sent to {smsStatus.lastTarget}</span>
+                </div>
+              )}
+              {!smsStatus.active && smsStatus.lastStatus === "failed" && (
+                <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-300 text-xs">
+                  <XCircle className="w-3 h-3" />
+                  <span>SMS failed</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
         <button
           onClick={toggleTheme}
           className="p-2 rounded-lg hover:bg-[var(--card-hover-bg)] text-[var(--sidebar-text)] transition-colors"

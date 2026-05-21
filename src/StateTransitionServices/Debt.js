@@ -1,4 +1,5 @@
 // src/services/DebtStateTransitionService.js
+
 const Debt = require("../entities/Debt");
 const PenaltyTransaction = require("../entities/PenaltyTransaction");
 const Notification = require("../entities/Notification");
@@ -15,10 +16,8 @@ const {
 const { NotificationLogService } = require("../services/NotificationLog");
 const notificationService = require("../services/Notification");
 
+
 class DebtStateTransitionService {
-  /**
-   * @param {{ getRepository: (arg0: import("typeorm").EntitySchema<{ id: unknown; name: unknown; totalAmount: unknown; paidAmount: unknown; remainingAmount: unknown; dueDate: unknown; status: unknown; interestRate: unknown; penaltyRate: unknown; deletedAt: unknown; createdAt: unknown; updatedAt: unknown; }>) => any; }} dataSource
-   */
   constructor(dataSource) {
     this.dataSource = dataSource;
     this.debtRepo = dataSource.getRepository(Debt);
@@ -26,22 +25,18 @@ class DebtStateTransitionService {
   }
 
   /**
-   * @param {import("typeorm").EntitySchema<{ id: unknown; name: unknown; totalAmount: unknown; paidAmount: unknown; remainingAmount: unknown; dueDate: unknown; status: unknown; interestRate: unknown; penaltyRate: unknown; deletedAt: unknown; createdAt: unknown; updatedAt: unknown; }> | import("typeorm").EntitySchema<{ id: unknown; title: unknown; message: unknown; type: unknown; isRead: unknown; scheduledFor: unknown; deletedAt: unknown; createdAt: unknown; }> | import("typeorm").EntitySchema<{ id: unknown; amount: unknown; penaltyDate: unknown; reason: unknown; deletedAt: unknown; createdAt: unknown; }>} entity
-   * @param {{ manager: { getRepository: (arg0: any) => any; }; } | null} queryRunner
+   * Helper: get repository (transactional if queryRunner provided)
+   * @param {import("typeorm").QueryRunner|null} qr
+   * @param {Function} entityClass
+   * @returns {import("typeorm").Repository}
    */
-  _getRepo(entity, queryRunner) {
-    return queryRunner
-      ? queryRunner.manager.getRepository(entity)
-      : this.dataSource.getRepository(entity);
+  _getRepo(qr, entityClass) {
+    if (qr) {
+      return qr.manager.getRepository(entityClass);
+    }
+    return this.dataSource.getRepository(entityClass);
   }
 
-  /**
-   * @param {any} recipient
-   * @param {string} subject
-   * @param {string} message
-   * @param {string | undefined} user
-   * @param {import("typeorm").QueryRunner | null | undefined} queryRunner
-   */
   async _sendEmail(recipient, subject, message, user, queryRunner) {
     const logService = this.notificationLogService;
     const logResult = await logService.createLog(
@@ -61,36 +56,34 @@ class DebtStateTransitionService {
     return sendResult.status;
   }
 
-  /**
-   * @param {any} phoneNumber
-   * @param {string} message
-   * @param {string} user
-   * @param {null} queryRunner
-   */
   async _sendSms(phoneNumber, message, user, queryRunner) {
-    // Placeholder – integrate with actual SMS channel via NotificationLogService
     logger.info(`[SMS] Would send to ${phoneNumber}: ${message}`);
     return true;
   }
 
-  /**
-   * @param {{ id: any; status: string; updatedAt: Date; borrower: { id: number; email: any; name: any; contact: any; }; name: any; }} debt
-   */
   async onPaid(debt, user = "system", queryRunner = null) {
+    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
     logger.info(`[Transition] Marking debt #${debt.id} as paid by ${user}`);
 
-    const debtRepo = this._getRepo(Debt, queryRunner);
-    const notifRepo = this._getRepo(Notification, queryRunner);
+    const debtRepo = this._getRepo(queryRunner, Debt);
+    const notifRepo = this._getRepo(queryRunner, Notification);
 
+    // Update debt status to paid
     debt.status = "paid";
     debt.updatedAt = new Date();
-    await debtRepo.save(debt);
+    const savedDebt = await updateDb(debtRepo, debt); // no extra args
 
-    await notifRepo.update(
-      { debt: { id: debt.id }, isRead: false },
-      { isRead: true, updatedAt: new Date() },
-    );
+    // Mark all unread notifications for this debt as read
+    const unreadNotifs = await notifRepo.find({
+      where: { debt: { id: debt.id }, isRead: false },
+    });
+    for (const notif of unreadNotifs) {
+      notif.isRead = true;
+      notif.updatedAt = new Date();
+      await updateDb(notifRepo, notif);
+    }
 
+    // Print receipt (optional)
     try {
       const printerService = require("../services/Printer");
       await printerService.printReceipt(debt.id);
@@ -98,6 +91,7 @@ class DebtStateTransitionService {
       logger.warn(`Failed to print receipt for debt #${debt.id}:`, err);
     }
 
+    // Update credit score
     try {
       const creditCheckService = require("../services/CreditCheck");
       await creditCheckService.performCreditCheck(
@@ -112,7 +106,7 @@ class DebtStateTransitionService {
       );
     }
 
-    // In‑app notification
+    // In-app notification
     await notificationService.create(
       {
         userId: 1,
@@ -125,7 +119,7 @@ class DebtStateTransitionService {
       queryRunner,
     );
 
-    // Email/SMS if enabled
+    // Email/SMS
     const canSendEmail = await emailEnabled();
     const canSendSms = await smsEnabled();
     if (debt.borrower?.email && canSendEmail) {
@@ -153,22 +147,22 @@ class DebtStateTransitionService {
       { status: "paid" },
       user,
     );
+
+    return savedDebt;
   }
 
-  /**
-   * @param {{ id: any; status: string; updatedAt: Date; dueDate: string | number | Date; remainingAmount: number; name: any; borrower: { email: any; name: any; contact: any; }; }} debt
-   */
   async onOverdue(debt, user = "system", queryRunner = null) {
+    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
     logger.info(`[Transition] Marking debt #${debt.id} as overdue by ${user}`);
 
-    const debtRepo = this._getRepo(Debt, queryRunner);
-    const penaltyRepo = this._getRepo(PenaltyTransaction, queryRunner);
+    const debtRepo = this._getRepo(queryRunner, Debt);
+    const penaltyRepo = this._getRepo(queryRunner, PenaltyTransaction);
 
     debt.status = "overdue";
     debt.updatedAt = new Date();
-    await debtRepo.save(debt);
+    const savedDebt = await updateDb(debtRepo, debt);
 
-    // Auto‑penalty
+    // Auto-penalty
     const autoPenalty = await enableAutoPenalty();
     if (autoPenalty) {
       const graceDays = await penaltyGraceDays();
@@ -191,15 +185,13 @@ class DebtStateTransitionService {
             reason: `Auto‑penalty for overdue (${daysOverdue} days)`,
             debt,
           });
-          await penaltyRepo.save(penalty);
-          logger.info(
-            `Applied penalty of ${penaltyAmount} to debt #${debt.id}`,
-          );
+          await saveDb(penaltyRepo, penalty);
+          logger.info(`Applied penalty of ${penaltyAmount} to debt #${debt.id}`);
         }
       }
     }
 
-    // In‑app notification
+    // In-app notification
     await notificationService.create(
       {
         userId: 1,
@@ -241,23 +233,21 @@ class DebtStateTransitionService {
       { status: "overdue" },
       user,
     );
+
+    return savedDebt;
   }
 
-  /**
-   * @param {{ id: any; status: string; updatedAt: Date; name: any; borrower: { name: any; email: any; contact: any; }; }} debt
-   */
   async onDefaulted(debt, user = "system", queryRunner = null) {
-    logger.info(
-      `[Transition] Marking debt #${debt.id} as defaulted by ${user}`,
-    );
+    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
+    logger.info(`[Transition] Marking debt #${debt.id} as defaulted by ${user}`);
 
-    const debtRepo = this._getRepo(Debt, queryRunner);
+    const debtRepo = this._getRepo(queryRunner, Debt);
 
     debt.status = "defaulted";
     debt.updatedAt = new Date();
-    await debtRepo.save(debt);
+    const savedDebt = await updateDb(debtRepo, debt);
 
-    // In‑app notification for debtor
+    // In-app notification for debtor
     await notificationService.create(
       {
         userId: 1,
@@ -311,24 +301,26 @@ class DebtStateTransitionService {
       { status: "defaulted" },
       user,
     );
+
+    return savedDebt;
   }
 
-  /**
-   * @param {{ id: any; status: string; updatedAt: Date; totalAmount: number; paidAmount: number; remainingAmount: number; name: any; borrower: { email: any; name: any; contact: any; }; }} debt
-   */
   async onRestoreToActive(debt, user = "system", queryRunner = null) {
+    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
     logger.info(`[Transition] Restoring debt #${debt.id} to active by ${user}`);
 
-    const debtRepo = this._getRepo(Debt, queryRunner);
+    const debtRepo = this._getRepo(queryRunner, Debt);
 
     debt.status = "active";
     debt.updatedAt = new Date();
-    await debtRepo.save(debt);
+    let savedDebt = await updateDb(debtRepo, debt);
 
+    // Recalculate remaining amount if needed
     const remaining = debt.totalAmount - debt.paidAmount;
     if (remaining !== debt.remainingAmount) {
       debt.remainingAmount = remaining;
-      await debtRepo.save(debt);
+      debt.updatedAt = new Date();
+      savedDebt = await updateDb(debtRepo, debt);
     }
 
     await notificationService.create(
@@ -370,12 +362,10 @@ class DebtStateTransitionService {
       { status: "active" },
       user,
     );
+
+    return savedDebt;
   }
 
-  /**
-   * @param {{ id: any; totalAmount: number; remainingAmount: number; paidAmount: number; updatedAt: Date; name: any; borrower: { email: any; name: any; contact: any; }; }} debt
-   * @param {number} amountForgiven
-   */
   async onForgiveness(
     debt,
     amountForgiven,
@@ -383,18 +373,17 @@ class DebtStateTransitionService {
     queryRunner = null,
     reason = null,
   ) {
-    logger.info(
-      `[Transition] Forgiving ${amountForgiven} from debt #${debt.id} by ${user}`,
-    );
+    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
+    logger.info(`[Transition] Forgiving ${amountForgiven} from debt #${debt.id} by ${user}`);
 
-    const debtRepo = this._getRepo(Debt, queryRunner);
+    const debtRepo = this._getRepo(queryRunner, Debt);
 
     debt.totalAmount -= amountForgiven;
     if (debt.totalAmount < 0) debt.totalAmount = 0;
     debt.remainingAmount = debt.totalAmount - debt.paidAmount;
     if (debt.remainingAmount < 0) debt.remainingAmount = 0;
     debt.updatedAt = new Date();
-    await debtRepo.save(debt);
+    const savedDebt = await updateDb(debtRepo, debt);
 
     const note = reason || "Debt forgiveness applied";
     await auditLogger.logUpdate(
@@ -436,6 +425,8 @@ class DebtStateTransitionService {
         queryRunner,
       );
     }
+
+    return savedDebt;
   }
 }
 

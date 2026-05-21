@@ -9,9 +9,17 @@ class NotificationStateTransitionService {
     this.notificationRepo = dataSource.getRepository(Notification);
   }
 
-  _getRepo(entity, queryRunner) {
-    if (queryRunner) return queryRunner.manager.getRepository(entity);
-    return this.dataSource.getRepository(entity);
+  /**
+   * Helper: get repository (transactional if queryRunner provided)
+   * @param {import("typeorm").QueryRunner|null} qr
+   * @param {Function} entityClass
+   * @returns {import("typeorm").Repository}
+   */
+  _getRepo(qr, entityClass) {
+    if (qr) {
+      return qr.manager.getRepository(entityClass);
+    }
+    return this.dataSource.getRepository(entityClass);
   }
 
   /**
@@ -21,12 +29,27 @@ class NotificationStateTransitionService {
    * @param {import("typeorm").QueryRunner} [queryRunner]
    */
   async onRead(notification, user = "system", queryRunner = null) {
+    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
     logger.info(`[Transition] Marking notification #${notification.id} as read by ${user}`);
 
-    const repo = this._getRepo(Notification, queryRunner);
+    const repo = this._getRepo(queryRunner, Notification);
+    const oldIsRead = notification.isRead;
+
     notification.isRead = true;
     notification.updatedAt = new Date();
-    await repo.save(notification);
+
+    // Use updateDb instead of repo.save
+    const saved = await updateDb(repo, notification);
+
+    await auditLogger.logUpdate(
+      "Notification",
+      notification.id,
+      { isRead: oldIsRead },
+      { isRead: true },
+      user
+    );
+
+    return saved;
   }
 
   /**
@@ -36,15 +59,26 @@ class NotificationStateTransitionService {
    * @param {import("typeorm").QueryRunner} [queryRunner]
    */
   async onDismiss(notification, user = "system", queryRunner = null) {
+    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
     logger.info(`[Transition] Dismissing notification #${notification.id} by ${user}`);
 
-    const repo = this._getRepo(Notification, queryRunner);
-    // For simplicity, we mark it as read. Optionally, you could soft‑delete or set a `dismissed` flag.
+    const repo = this._getRepo(queryRunner, Notification);
+    const oldIsRead = notification.isRead;
+
     notification.isRead = true;
     notification.updatedAt = new Date();
-    await repo.save(notification);
 
-    await auditLogger.logUpdate("Notification", notification.id, { isRead: false }, { isRead: true }, user);
+    const saved = await updateDb(repo, notification);
+
+    await auditLogger.logUpdate(
+      "Notification",
+      notification.id,
+      { isRead: oldIsRead },
+      { isRead: true },
+      user
+    );
+
+    return saved;
   }
 }
 

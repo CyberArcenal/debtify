@@ -6,12 +6,26 @@ const NotificationLog = require("../entities/NotificationLog");
 const { logger } = require("../utils/logger");
 const { AppDataSource } = require("../main/db/data-source");
 const notificationService = require("../services/Notification");
+const { BrowserWindow } = require("electron");
 
 class EmailSender {
   constructor() {
     this.queue = new PQueue({ concurrency: 1 });
     this.maxRetries = 3;
     this.retryDelay = 2000;
+  }
+
+  /**
+   * @param {string} channel
+   * @param {{ to: any; subject: any; status: string; attempt: number; timestamp: string; messageId?: string; error?: any; }} data
+   */
+  _sendToRenderers(channel, data) {
+    const windows = BrowserWindow.getAllWindows();
+    windows.forEach((win) => {
+      if (!win.isDestroyed()) {
+        win.webContents.send(channel, data);
+      }
+    });
   }
 
   /**
@@ -41,6 +55,14 @@ class EmailSender {
   async _sendWithRetry(to, subject, html, text, options) {
     let attempt = 0;
     let lastError;
+
+    this._sendToRenderers("email:status", {
+      to,
+      subject,
+      status: "sending",
+      attempt: 1,
+      timestamp: new Date().toISOString(),
+    });
 
     while (attempt < this.maxRetries) {
       attempt++;
@@ -81,11 +103,29 @@ class EmailSender {
         );
 
         logger.info(`✅ Email sent → To: ${to}, Attempt: ${attempt}`);
+        this._sendToRenderers("email:status", {
+          to,
+          subject,
+          status: "sent",
+          attempt,
+          messageId: result.messageId,
+          timestamp: new Date().toISOString(),
+        });
         return result;
       } catch (error) {
         lastError = error;
         // @ts-ignore
         logger.error(`❌ Attempt ${attempt} failed → To: ${to}`, error);
+
+        this._sendToRenderers("email:status", {
+          to,
+          subject,
+          status: "failed",
+          attempt,
+          // @ts-ignore
+          error: error.message,
+          timestamp: new Date().toISOString(),
+        });
 
         // Update log with failure (always update the existing row)
         await this._updateLog(
@@ -246,7 +286,7 @@ class EmailSender {
       }
 
       // @ts-ignore
-      const saved = await saveDb(repo, log);
+      const saved = await saveDb(repo, log, { skipSignal: true });
       logger.debug(
         `📌 NotificationLog ${saved.id} → Status: ${status}, Retry: ${retryCount}`,
       );

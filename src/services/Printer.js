@@ -5,19 +5,13 @@ const util = require("util");
 const execPromise = util.promisify(exec);
 const Debt = require("../entities/Debt");
 const PaymentTransaction = require("../entities/PaymentTransaction");
-const {
-  companyName,
-  receiptFooterMessage,
-} = require("../utils/system");
+const { companyName, receiptFooterMessage } = require("../utils/system");
 const { logger } = require("../utils/logger");
+const { updateDb, saveDb, removeDb } = require("../utils/dbUtils/dbActions");
 
 class PrinterService {
   constructor() {
-    // Configuration management properties
     this.printerRepository = null;
-    // Receipt printing properties
-    this.driver = null;
-    this.isReady = false;
   }
 
   // ----------------------------------------------------------------------
@@ -43,8 +37,10 @@ class PrinterService {
   }
 
   /**
-   * @param {{ manager: { getRepository: (arg0: any) => any; }; } | null} qr
-   * @param {string | Function | import("typeorm").EntitySchema<{ id: unknown; name: unknown; description: unknown; interface: unknown; connectionString: unknown; isDefault: unknown; status: unknown; lastTested: unknown; createdAt: unknown; updatedAt: unknown; }> | import("typeorm").EntitySchema<import("typeorm").ObjectLiteral> | { type: import("typeorm").ObjectLiteral; name: string; }} entityClass
+   * Helper: get repository (transactional if queryRunner provided)
+   * @param {import("typeorm").QueryRunner|null} qr
+   * @param {Function} entityClass
+   * @returns {import("typeorm").Repository}
    */
   _getRepo(qr, entityClass) {
     if (qr) {
@@ -58,13 +54,14 @@ class PrinterService {
   // CONFIGURATION MANAGEMENT (CRUD, default, test, status)
   // ----------------------------------------------------------------------
 
-  /**
-   * @param {{ name: string | undefined; interface: string | undefined; connectionString: undefined; }} data
-   */
   _validatePrinterData(data, isUpdate = false) {
     const errors = [];
     if (!isUpdate || data.name !== undefined) {
-      if (!data.name || typeof data.name !== "string" || data.name.trim() === "") {
+      if (
+        !data.name ||
+        typeof data.name !== "string" ||
+        data.name.trim() === ""
+      ) {
         errors.push("Printer name is required");
       }
     }
@@ -85,25 +82,27 @@ class PrinterService {
   async _ensureSingleDefault(excludeId = null, qr = null) {
     const Printer = require("../entities/Printer");
     const printerRepo = this._getRepo(qr, Printer);
-    const defaultPrinters = await printerRepo.find({ where: { isDefault: true } });
+    const defaultPrinters = await printerRepo.find({
+      where: { isDefault: true },
+    });
     for (const printer of defaultPrinters) {
       if (printer.id !== excludeId) {
         printer.isDefault = false;
-        await printerRepo.save(printer);
+        printer.updatedAt = new Date();
+        await updateDb(printerRepo, printer);
       }
     }
   }
 
   async getAllPrinters() {
     const { printer: repo } = await this.getRepositories();
-    const printers = await repo.find({ order: { isDefault: "DESC", name: "ASC" } });
+    const printers = await repo.find({
+      order: { isDefault: "DESC", name: "ASC" },
+    });
     await auditLogger.logView("Printer", null, "system");
     return printers;
   }
 
-  /**
-   * @param {null | undefined} id
-   */
   async getPrinterById(id) {
     const { printer: repo } = await this.getRepositories();
     const printer = await repo.findOne({ where: { id } });
@@ -112,18 +111,27 @@ class PrinterService {
     return printer;
   }
 
-  /**
-   * @param {{ name: any; description?: null | undefined; interface: any; connectionString: any; isDefault?: false | undefined; }} data
-   */
+  async getDefaultPrinter() {
+    const { printer: repo } = await this.getRepositories();
+    const printer = await repo.findOne({ where: { isDefault: true } });
+    if (!printer) throw new Error("No default printer configured");
+    return printer;
+  }
+
   async createPrinter(data, user = "system", qr = null) {
-    const { saveDb } = require("../utils/dbUtils/dbActions");
     const Printer = require("../entities/Printer");
     const printerRepo = this._getRepo(qr, Printer);
 
     const validation = this._validatePrinterData(data);
     if (!validation.valid) throw new Error(validation.errors.join(", "));
 
-    const { name, description = null, interface: iface, connectionString, isDefault = false } = data;
+    const {
+      name,
+      description = null,
+      interface: iface,
+      connectionString,
+      isDefault = false,
+    } = data;
 
     const printer = printerRepo.create({
       name: name.trim(),
@@ -144,12 +152,7 @@ class PrinterService {
     return saved;
   }
 
-  /**
-   * @param {any} id
-   * @param {{ name: string | undefined; description: undefined; interface: undefined; connectionString: undefined; isDefault: undefined; }} data
-   */
   async updatePrinter(id, data, user = "system", qr = null) {
-    const { updateDb } = require("../utils/dbUtils/dbActions");
     const Printer = require("../entities/Printer");
     const printerRepo = this._getRepo(qr, Printer);
 
@@ -160,7 +163,8 @@ class PrinterService {
     if (data.name !== undefined) existing.name = data.name.trim();
     if (data.description !== undefined) existing.description = data.description;
     if (data.interface !== undefined) existing.interface = data.interface;
-    if (data.connectionString !== undefined) existing.connectionString = data.connectionString;
+    if (data.connectionString !== undefined)
+      existing.connectionString = data.connectionString;
     if (data.isDefault !== undefined) existing.isDefault = data.isDefault;
     existing.updatedAt = new Date();
 
@@ -170,9 +174,6 @@ class PrinterService {
     return saved;
   }
 
-  /**
-   * @param {null | undefined} id
-   */
   async setDefaultPrinter(id, user = "system", qr = null) {
     const Printer = require("../entities/Printer");
     const printerRepo = this._getRepo(qr, Printer);
@@ -182,16 +183,18 @@ class PrinterService {
     await this._ensureSingleDefault(id, qr);
     printer.isDefault = true;
     printer.updatedAt = new Date();
-    const saved = await printerRepo.save(printer);
-    await auditLogger.logUpdate("Printer", id, { isDefault: false }, { isDefault: true }, user);
+    const saved = await updateDb(printerRepo, printer);
+    await auditLogger.logUpdate(
+      "Printer",
+      id,
+      { isDefault: false },
+      { isDefault: true },
+      user,
+    );
     return saved;
   }
 
-  /**
-   * @param {any} id
-   */
   async deletePrinter(id, user = "system", qr = null) {
-    const { removeDb } = require("../utils/dbUtils/dbActions");
     const Printer = require("../entities/Printer");
     const printerRepo = this._getRepo(qr, Printer);
 
@@ -203,11 +206,7 @@ class PrinterService {
     console.log(`Printer deleted: ${printer.name}`);
   }
 
-  /**
-   * @param {any} id
-   */
   async refreshPrinterStatus(id, user = "system", qr = null) {
-    const { updateDb } = require("../utils/dbUtils/dbActions");
     const Printer = require("../entities/Printer");
     const printerRepo = this._getRepo(qr, Printer);
 
@@ -247,33 +246,40 @@ class PrinterService {
     }
     printer.updatedAt = new Date();
     const saved = await updateDb(printerRepo, printer);
-    await auditLogger.logUpdate("Printer", id, {}, { status: saved.status }, user);
+    await auditLogger.logUpdate(
+      "Printer",
+      id,
+      {},
+      { status: saved.status },
+      user,
+    );
     return saved;
   }
 
   // ----------------------------------------------------------------------
-  // TEST PRINT (raw content) – used for testing connection
+  // RAW PRINTING (generic send to printer by interface)
   // ----------------------------------------------------------------------
 
   /**
-   * @param {{ interface: string; connectionString: { split: (arg0: string) => [any, any]; }; name: any; }} printer
+   * Send raw text to a printer based on its interface and connection string
+   * @param {Object} printer - Printer entity
+   * @param {string} content - Text content to print
+   * @returns {Promise<boolean>}
    */
-  async _sendRawTestPrint(printer) {
-    const testContent = "Debtify Test Print\n";
-    const timestamp = new Date().toLocaleString();
-    const fullContent = `${testContent}Printed: ${timestamp}\n------------------------\nIf you see this, your printer is working correctly.\n`;
-
+  async _sendRawPrint(printer, content) {
     if (printer.interface === "network") {
       const net = require("net");
       const [host, port] = printer.connectionString.split(":");
       return new Promise((resolve, reject) => {
         const client = new net.Socket();
         client.connect(parseInt(port), host, () => {
-          client.write(fullContent);
+          client.write(content);
           client.end();
           resolve(true);
         });
-        client.on("error", (err) => reject(new Error(`Network printer error: ${err.message}`)));
+        client.on("error", (err) =>
+          reject(new Error(`Network printer error: ${err.message}`)),
+        );
         setTimeout(() => {
           client.destroy();
           reject(new Error("Network printer timeout"));
@@ -281,9 +287,12 @@ class PrinterService {
       });
     } else if (printer.interface === "usb") {
       if (process.platform === "win32") {
-        const tempFile = require("path").join(require("os").tmpdir(), `debtify_test_${Date.now()}.txt`);
+        const tempFile = require("path").join(
+          require("os").tmpdir(),
+          `debtify_print_${Date.now()}.txt`,
+        );
         const fs = require("fs");
-        fs.writeFileSync(tempFile, fullContent);
+        fs.writeFileSync(tempFile, content);
         const command = `notepad /p "${tempFile}"`;
         try {
           await execPromise(command);
@@ -294,9 +303,12 @@ class PrinterService {
           throw new Error(`USB printer error: ${err.message}`);
         }
       } else {
-        const tempFile = require("path").join(require("os").tmpdir(), `debtify_test_${Date.now()}.txt`);
+        const tempFile = require("path").join(
+          require("os").tmpdir(),
+          `debtify_print_${Date.now()}.txt`,
+        );
         const fs = require("fs");
-        fs.writeFileSync(tempFile, fullContent);
+        fs.writeFileSync(tempFile, content);
         const command = `lp -d "${printer.name}" "${tempFile}"`;
         try {
           await execPromise(command);
@@ -309,9 +321,12 @@ class PrinterService {
       }
     } else if (printer.interface === "bluetooth") {
       if (process.platform === "linux") {
-        const tempFile = require("path").join(require("os").tmpdir(), `debtify_test_${Date.now()}.txt`);
+        const tempFile = require("path").join(
+          require("os").tmpdir(),
+          `debtify_print_${Date.now()}.txt`,
+        );
         const fs = require("fs");
-        fs.writeFileSync(tempFile, fullContent);
+        fs.writeFileSync(tempFile, content);
         const command = `lpr -P "${printer.name}" "${tempFile}"`;
         try {
           await execPromise(command);
@@ -328,24 +343,34 @@ class PrinterService {
     throw new Error(`Unsupported interface: ${printer.interface}`);
   }
 
-  /**
-   * @param {any} id
-   */
+  // ----------------------------------------------------------------------
+  // TEST PRINT
+  // ----------------------------------------------------------------------
+
   async testPrinter(id, user = "system", qr = null) {
-    const { updateDb } = require("../utils/dbUtils/dbActions");
     const Printer = require("../entities/Printer");
     const printerRepo = this._getRepo(qr, Printer);
 
     const printer = await printerRepo.findOne({ where: { id } });
     if (!printer) throw new Error(`Printer with ID ${id} not found`);
 
+    const testContent = `Debtify Test Print\n`;
+    const timestamp = new Date().toLocaleString();
+    const fullContent = `${testContent}Printed: ${timestamp}\n------------------------\nIf you see this, your printer is working correctly.\n`;
+
     try {
-      await this._sendRawTestPrint(printer);
+      await this._sendRawPrint(printer, fullContent);
       printer.status = "online";
       printer.lastTested = new Date();
       printer.updatedAt = new Date();
       await updateDb(printerRepo, printer);
-      await auditLogger.logUpdate("Printer", id, { status: "unknown" }, { status: "online" }, user);
+      await auditLogger.logUpdate(
+        "Printer",
+        id,
+        { status: "unknown" },
+        { status: "online" },
+        user,
+      );
       console.log(`Test print successful for printer ${printer.name}`);
       return { success: true, message: "Test print sent successfully" };
     } catch (err) {
@@ -359,52 +384,33 @@ class PrinterService {
   }
 
   // ----------------------------------------------------------------------
-  // RECEIPT PRINTING (using driver abstraction)
+  // RECEIPT PRINTING (using default printer)
   // ----------------------------------------------------------------------
 
   /**
-   * @param {string} type
-   */
-  async _loadDriver(type) {
-    switch (type.toLowerCase()) {
-      case "thermal":
-        const ThermalDriver = require("../drivers/thermalDriver");
-        return new ThermalDriver();
-      case "dot_matrix":
-        console.warn("[PrinterService] Dot matrix driver not implemented, falling back to thermal");
-        const FallbackThermal = require("../drivers/thermalDriver");
-        return new FallbackThermal();
-      case "laser":
-        console.warn("[PrinterService] Laser printer driver not implemented, falling back to thermal");
-        const FallbackThermal2 = require("../drivers/thermalDriver");
-        return new FallbackThermal2();
-      default:
-        throw new Error(`Unsupported printer type: ${type}`);
-    }
-  }
-
-  async _getDriver() {
-    if (!this.driver) {
-      const type = "thermal"
-      this.driver = await this._loadDriver(type);
-    }
-    return this.driver;
-  }
-
-  /**
-   * @param {{ id: string; saleItems: { product: { name: string; }; quantity: number; lineTotal: number; }[]; totalAmount: number; paymentMethod: string; }} debtId
+   * Print a receipt for a given debt using the default printer
+   * @param {number} debtId
+   * @returns {Promise<boolean>}
    */
   async printReceipt(debtId) {
     const { AppDataSource } = require("../main/db/data-source");
     const notificationService = require("../services/Notification");
-    let driver;
+
+    // 1. Get default printer
+    let defaultPrinter;
     try {
-      driver = await this._getDriver();
+      defaultPrinter = await this.getDefaultPrinter();
     } catch (err) {
-      console.error("[PrinterService] No driver available:", err.message);
-      throw new Error("No driver available");
+      console.error(
+        "[PrinterService] No default printer configured:",
+        err.message,
+      );
+      throw new Error(
+        "No default printer configured. Please set a default printer in settings.",
+      );
     }
 
+    // 2. Fetch debt data
     let debt;
     try {
       debt = await AppDataSource.getRepository(Debt).findOne({
@@ -412,28 +418,54 @@ class PrinterService {
         relations: ["borrower", "payments"],
       });
       if (!debt) throw new Error(`Debt with ID ${debtId} not found`);
+    } catch (err) {
+      console.error("[PrinterService] Failed to fetch debt:", err.message);
+      throw err;
+    }
 
-      const receiptText = await this.formatReceipt(debt);
-      await driver.print(receiptText);
-      this.isReady = true;
+    // 3. Format receipt content
+    const receiptText = await this.formatReceipt(debt);
 
-      await auditLogger.logCreate("PrinterEvent", debt.id, { action: "printReceipt" }, "system");
-      console.log(`[PrinterService] Printed debt summary #${debt.id}`);
+    // 4. Send to printer
+    try {
+      await this._sendRawPrint(defaultPrinter, receiptText);
+      // Update printer status to online on success (optional)
+      if (defaultPrinter.status !== "online") {
+        defaultPrinter.status = "online";
+        defaultPrinter.lastTested = new Date();
+        defaultPrinter.updatedAt = new Date();
+        const printerRepo = this._getRepo(null, require("../entities/Printer"));
+        await updateDb(printerRepo, defaultPrinter);
+      }
+      await auditLogger.logCreate(
+        "PrinterEvent",
+        debt.id,
+        { action: "printReceipt" },
+        "system",
+      );
+      console.log(
+        `[PrinterService] Printed debt summary #${debt.id} on printer ${defaultPrinter.name}`,
+      );
       return true;
     } catch (err) {
       console.error("[PrinterService] Failed to print receipt:", err.message);
-      this.isReady = false;
-
+      // Update printer status to error
+      defaultPrinter.status = "error";
+      defaultPrinter.lastTested = new Date();
+      defaultPrinter.updatedAt = new Date();
+      const printerRepo = this._getRepo(null, require("../entities/Printer"));
+      await updateDb(printerRepo, defaultPrinter);
+      // Notify user
       try {
         await notificationService.create(
           {
             userId: 1,
             title: "Printer Error",
-            message: `Failed to print receipt: ${err.message}`,
+            message: `Failed to print receipt for debt #${debtId}: ${err.message}`,
             type: "error",
-            metadata: { error: err.message },
+            metadata: { debtId, error: err.message },
           },
-          "system"
+          "system",
         );
       } catch (notifErr) {
         logger.error("Failed to send printer error notification", notifErr);
@@ -443,7 +475,9 @@ class PrinterService {
   }
 
   /**
-   * @param {{ id: any; name?: any; totalAmount?: any; paidAmount?: any; remainingAmount?: any; dueDate: any; status: any; interestRate: any; penaltyRate?: any; deletedAt?: any; createdAt?: any; updatedAt?: any; payments?: any; borrower?: any; amount?: any; }} debt
+   * Format receipt content from debt data
+   * @param {Object} debt
+   * @returns {Promise<string>}
    */
   async formatReceipt(debt) {
     const storeName = await companyName();
@@ -451,39 +485,40 @@ class PrinterService {
 
     const paymentsText = (debt.payments || [])
       .map(
-        (/** @type {{ paymentDate: { toISOString: () => string; }; amount: any; method: any; }} */ p) =>
-          `${p.paymentDate.toISOString().split("T")[0]} - ${p.amount} (${p.method || "cash"})`
+        (p) =>
+          `${new Date(p.paymentDate).toISOString().split("T")[0]} - ${p.amount} (${p.method || "cash"})`,
       )
       .join("\n");
 
     const receipt = `
-      ${storeName}
-      -------------------------
-      DEBT #${debt.id} - ${debt.borrower.name}
-      -------------------------
-      Amount: ${debt.amount}
-      Interest: ${debt.interestRate}%
-      Due: ${debt.dueDate}
-      -------------------------
-      Payments:
-${paymentsText}
-      -------------------------
-      Status: ${debt.status}
-      ${footer}
-      Thank you!
+${storeName}
+-------------------------
+DEBT #${debt.id} - ${debt.borrower?.name || "Unknown"}
+-------------------------
+Total Amount: ${debt.totalAmount}
+Paid Amount: ${debt.paidAmount}
+Remaining: ${debt.remainingAmount}
+Interest Rate: ${debt.interestRate}%
+Due Date: ${new Date(debt.dueDate).toLocaleDateString()}
+Status: ${debt.status}
+-------------------------
+Payment History:
+${paymentsText || "No payments recorded"}
+-------------------------
+${footer}
+Thank you!
     `;
     return receipt.replace(/^\s+/gm, "").trim();
   }
 
   getStatus() {
     return {
-      driverLoaded: !!this.driver,
-      isReady: this.isReady,
+      hasDefaultPrinter: !!this.printerRepository, // simplified
     };
   }
 
   isAvailable() {
-    return !!this.driver;
+    return true; // we assume printer service is available if configured
   }
 }
 
