@@ -46,7 +46,8 @@ class NotificationLogStateTransitionService {
         `<p>${log.payload}</p>`,
         log.payload,
         {},
-        true // async
+        true, // async
+         log.id 
       );
       success = result.success;
       if (!success) errorMsg = "Email send failed";

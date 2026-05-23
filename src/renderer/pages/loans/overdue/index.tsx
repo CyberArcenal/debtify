@@ -10,6 +10,7 @@ import ApplyPenaltyModal from "./components/ApplyPenaltyModal";
 import SendReminderModal from "./components/SendReminderModal";
 import { dialogs } from "../../../utils/dialogs";
 import notificationAPI from "../../../api/core/notification";
+import reminderLogAPI from "../../../api/core/reminder_log";
 
 const OverdueLoansPage: React.FC = () => {
   const {
@@ -37,33 +38,52 @@ const OverdueLoansPage: React.FC = () => {
   const [penaltyModalOpen, setPenaltyModalOpen] = useState(false);
   const [reminderModalOpen, setReminderModalOpen] = useState(false);
   const [selectedLoan, setSelectedLoan] = useState<any>(null);
+  const [submitting, setSubmitting] = useState<boolean>(false);
 
   const openPaymentModal = (loan: any) => { setSelectedLoan(loan); setPaymentModalOpen(true); };
   const openPenaltyModal = (loan: any) => { setSelectedLoan(loan); setPenaltyModalOpen(true); };
   const openReminderModal = (loan: any) => { setSelectedLoan(loan); setReminderModalOpen(true); };
 
-  const handleBulkSendReminders = async () => {
-    if (selectedLoans.length === 0) return;
-    const confirmed = await dialogs.confirm({ title: "Bulk Reminders", message: `Send reminders to ${selectedLoans.length} overdue debtors?` });
-    if (!confirmed) return;
-    try {
-      for (const id of selectedLoans) {
-        const loan = loans.find(l => l.id === id);
-        if (loan) {
-          await notificationAPI.create({
-            title: `Overdue Reminder: ${loan.name}`,
-            message: `Dear ${loan.borrower?.name}, your loan "${loan.name}" is overdue. Please make a payment.`,
-            type: "overdue",
-            debtId: loan.id,
+const handleBulkSendReminders = async () => {
+  if (selectedLoans.length === 0) return;
+  const confirmed = await dialogs.confirm({
+    title: "Bulk Reminders",
+    message: `Send email reminders to ${selectedLoans.length} overdue debtors?`
+  });
+  if (!confirmed) return;
+
+  let successCount = 0;
+  let failCount = 0;
+  setSubmitting(true);
+  try {
+    for (const id of selectedLoans) {
+      const loan = loans.find(l => l.id === id);
+      if (loan && loan.borrower?.email) {
+        try {
+          await reminderLogAPI.createReminder({
+            to: loan.borrower.email,
+            subject: `Overdue Reminder: ${loan.name}`,
+            html: `Dear ${loan.borrower.name},<br/><br/>Your loan "${loan.name}" is overdue. Please make a payment immediately.<br/><br/>Thank you.`,
+            text: `Dear ${loan.borrower.name},\n\nYour loan "${loan.name}" is overdue. Please make a payment immediately.\n\nThank you.`,
           });
+          successCount++;
+        } catch (err) {
+          console.error(`Failed to send to ${loan.borrower.email}`, err);
+          failCount++;
         }
+      } else if (loan && !loan.borrower?.email) {
+        console.warn(`Debtor ${loan.borrower?.name} has no email`);
+        failCount++;
       }
-      dialogs.success(`Reminders sent to ${selectedLoans.length} debtors`);
-      reload();
-    } catch (err: any) {
-      dialogs.error(err.message);
     }
-  };
+    dialogs.success(`Reminders sent: ${successCount} succeeded, ${failCount} failed.`);
+    reload();
+  } catch (err: any) {
+    dialogs.error(err.message);
+  } finally {
+    setSubmitting(false);
+  }
+};
 
   const getDisplayRange = () => {
     const start = (currentPage - 1) * pageSize + 1;

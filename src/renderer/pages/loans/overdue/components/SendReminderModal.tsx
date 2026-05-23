@@ -1,15 +1,18 @@
+// src/renderer/pages/loans/overdue/components/SendReminderModal.tsx
 import React, { useState } from "react";
 import Modal from "../../../../components/UI/Modal";
 import Button from "../../../../components/UI/Button";
 import { dialogs } from "../../../../utils/dialogs";
-import notificationAPI from "../../../../api/core/notification";
+import reminderLogAPI from "../../../../api/core/reminder_log";
 import type { OverdueLoan } from "../hooks/useOverdueLoans";
+
 interface SendReminderModalProps {
   isOpen: boolean;
   loan: OverdueLoan | null;
   onClose: () => void;
   onSuccess: () => void;
 }
+
 const SendReminderModal: React.FC<SendReminderModalProps> = ({
   isOpen,
   loan,
@@ -22,7 +25,7 @@ const SendReminderModal: React.FC<SendReminderModalProps> = ({
   React.useEffect(() => {
     if (loan) {
       setMessage(
-        `Dear ${loan.borrower?.name},\n\nYour loan "${loan.name}" is overdue by ${loan.daysOverdue} days. Remaining balance: ${loan.remainingAmount}. Please make a payment as soon as possible to avoid additional penalties.\n\nThank you.`,
+        `Dear ${loan.borrower?.name},\n\nYour loan "${loan.name}" is overdue by ${loan.daysOverdue} days. Remaining balance: ${loan.remainingAmount.toFixed(2)}. Please make a payment as soon as possible to avoid additional penalties.\n\nThank you.`,
       );
     }
   }, [loan]);
@@ -30,32 +33,33 @@ const SendReminderModal: React.FC<SendReminderModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!loan) return;
+
+    const email = loan.borrower?.email;
+    if (!email) {
+      dialogs.error("This debtor has no email address configured.");
+      return;
+    }
+
     setSubmitting(true);
     try {
-      await notificationAPI.create({
-        title: `Overdue Reminder: ${loan.name}`,
-        message,
-        type: "overdue",
-        debtId: loan.id,
-        scheduledFor: null,
+      await reminderLogAPI.createReminder({
+        to: email,
+        subject: `Overdue Reminder: ${loan.name}`,
+        html: message.replace(/\n/g, "<br/>"),
+        text: message,
       });
-      dialogs.success("Reminder sent successfully");
+      dialogs.success("Reminder email sent successfully");
       onSuccess();
       onClose();
     } catch (err: any) {
-      dialogs.error(err.message);
+      dialogs.error(err.message || "Failed to send reminder");
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title="Send Overdue Reminder"
-      size="md"
-    >
+    <Modal isOpen={isOpen} onClose={onClose} title="Send Overdue Reminder" size="md">
       {loan && (
         <form onSubmit={handleSubmit} className="space-y-4">
           <div
@@ -65,22 +69,12 @@ const SendReminderModal: React.FC<SendReminderModalProps> = ({
               borderColor: "var(--border-color)",
             }}
           >
-            <p>
-              <strong>To:</strong> {loan.borrower?.name} (
-              {loan.borrower?.email || loan.borrower?.contact})
-            </p>
-            <p>
-              <strong>Debt:</strong> {loan.name}
-            </p>
-            <p>
-              <strong>Overdue:</strong> {loan.daysOverdue} days
-            </p>
+            <p><strong>To:</strong> {loan.borrower?.name} ({loan.borrower?.email || "No email"})</p>
+            <p><strong>Debt:</strong> {loan.name}</p>
+            <p><strong>Overdue:</strong> {loan.daysOverdue} days</p>
           </div>
           <div>
-            <label
-              className="block text-sm font-medium mb-1"
-              style={{ color: "var(--text-secondary)" }}
-            >
+            <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
               Reminder Message
             </label>
             <textarea
@@ -97,9 +91,7 @@ const SendReminderModal: React.FC<SendReminderModalProps> = ({
             />
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={onClose}>
-              Cancel
-            </Button>
+            <Button variant="secondary" onClick={onClose}>Cancel</Button>
             <Button type="submit" variant="primary" disabled={submitting}>
               {submitting ? "Sending..." : "Send Reminder"}
             </Button>

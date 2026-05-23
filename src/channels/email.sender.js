@@ -34,25 +34,23 @@ class EmailSender {
    * @param {object} options
    * @param {boolean} asyncMode
    */
-  async send(to, subject, html, text, options = {}, asyncMode = true) {
-    if (asyncMode) {
-      this.queue.add(() =>
-        this._sendWithRetry(to, subject, html, text, options),
-      );
-      logger.info(`📥 Queued email → To: ${to}, Subject: "${subject}"`);
-      return { success: true, queued: true };
-    } else {
-      return await this._sendWithRetry(to, subject, html, text, options);
-    }
+async send(to, subject, html, text, options = {}, asyncMode = true, logId = null) {
+  if (asyncMode) {
+    this.queue.add(() => this._sendWithRetry(to, subject, html, text, options, logId));
+    logger.info(`📥 Queued email → To: ${to}, Subject: "${subject}"`);
+    return { success: true, queued: true };
+  } else {
+    return await this._sendWithRetry(to, subject, html, text, options, logId);
   }
+}
 
   /**
    * @private
    */
-  async _sendWithRetry(to, subject, html, text, options) {
+  async _sendWithRetry(to, subject, html, text, options, initialLogId = null) {
     let attempt = 0;
     let lastError;
-    let currentLogId = null;
+    let currentLogId = initialLogId;
 
     this._sendToRenderers("email:status", {
       to,
