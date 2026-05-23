@@ -251,7 +251,7 @@ const DebtorDirectory: React.FC = () => {
         onSuccess={reload}
       />
       <DebtorViewDialog
-        debtor={viewingDebtor}
+        debtorId={viewingDebtor?.id}
         isOpen={viewOpen}
         onClose={() => setViewOpen(false)}
         onEdit={() => {

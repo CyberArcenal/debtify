@@ -850,6 +850,7 @@ function registerIpcHandlers() {
       "./ipc/utils/windows_control.ipc.js",
       "./ipc/core/notification/index.ipc.js",
       "./ipc/utils/updater/index.ipc.js",
+      "./ipc/utils/handshake/index.ipc.js",
 
       // ========== DEBT MANAGEMENT IPC MODULES ==========
       "./ipc/core/audit/index.ipc.js",

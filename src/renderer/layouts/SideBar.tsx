@@ -29,6 +29,7 @@ import {
   FileSignature,
   ChartNoAxesCombined,
   Layers,
+  Upload,
 } from "lucide-react";
 import { formatCurrency } from "../utils/formatters";
 import { useSettings } from "../contexts/SettingsContext";
@@ -165,7 +166,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen }) => {
       category: "system",
       children: [
         { path: "/system/audit", name: "Audit Trail", icon: ListChecks },
-        // { path: "/notification-logs", name: "Notification Logs", icon: Bell },
+        { path: "/sync", name: "Data Sync", icon: Upload },
         { path: "/devices", name: "Device Manager", icon: ComputerIcon },
         { path: "/system/settings", name: "System Settings", icon: Sliders },
       ],

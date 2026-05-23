@@ -1,4 +1,5 @@
 // src/services/LoanApplicationStateTransitionService.js
+//@ts-check
 const { logger } = require("../utils/logger");
 const auditLogger = require("../utils/auditLogger");
 const {
@@ -7,6 +8,7 @@ const {
   smsEnabled,
   requireLoanAgreement,
   loanAgreementTemplate,
+  defaultPenaltyRate,
 } = require("../utils/system");
 const { NotificationLogService } = require("../services/NotificationLog");
 const notificationService = require("../services/Notification");
@@ -106,6 +108,7 @@ class LoanApplicationStateTransitionService {
     );
 
     // 1. Create active debt using debtService (within same transaction if queryRunner provided)
+    const penaltyRate = await defaultPenaltyRate()
     const debtData = {
       name: `Loan: ${application.purpose}`,
       totalAmount: application.requestedAmount,
@@ -113,7 +116,7 @@ class LoanApplicationStateTransitionService {
       dueDate: application.proposedDueDate.toISOString().split("T")[0],
       status: "active",
       interestRate: application.interestRate, // already set during approval
-      penaltyRate: null,
+      penaltyRate: penaltyRate,
       borrowerId: application.debtorId,
     };
     const createdDebt = await debtService.create(debtData, user, queryRunner);

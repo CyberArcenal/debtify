@@ -1,8 +1,10 @@
 // services/DebtService.js
+//@ts-check
 const auditLogger = require("../utils/auditLogger");
 const { validateDebtData } = require("../utils/debtUtils");
 const { defaultInterestRate, defaultPenaltyRate } = require("../utils/system");
 const { paginateQueryBuilder } = require("../utils/dbUtils/pagination");
+const { logger } = require("../utils/logger");
 class DebtService {
   constructor() {
     this.debtRepository = null;
@@ -38,11 +40,23 @@ class DebtService {
    * @param {Function} entityClass
    * @returns {import("typeorm").Repository<any>}
    */
+
   _getRepo(qr, entityClass) {
-    if (qr) {
+    // Log the type for debugging
+    const qrType =
+      qr === null ? "null" : qr === undefined ? "undefined" : typeof qr;
+    const hasManager = qr && typeof qr === "object" && !!qr.manager;
+    console.log(
+      `[DebtService._getRepo] qr type: ${qrType}, has manager: ${hasManager}`,
+    );
+
+    // Only use the transactional manager if qr is a valid QueryRunner object
+    if (hasManager && typeof qr.manager.getRepository === "function") {
       return qr.manager.getRepository(entityClass);
     }
+    // Fallback to global data source
     const { AppDataSource } = require("../main/db/data-source");
+    console.log(`[DebtService._getRepo] Using global repository (fallback)`);
     return AppDataSource.getRepository(entityClass);
   }
 
@@ -93,6 +107,7 @@ class DebtService {
         penaltyRate !== null && penaltyRate !== undefined
           ? parseFloat(penaltyRate)
           : await defaultPenaltyRate();
+      if (isNaN(finalPenaltyRate)) finalPenaltyRate = 0;
 
       const debt = debtRepo.create({
         name,

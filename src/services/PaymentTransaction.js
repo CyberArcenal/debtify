@@ -50,10 +50,21 @@ class PaymentTransactionService {
    * @returns {import("typeorm").Repository<any>}
    */
   _getRepo(qr, entityClass) {
-    if (qr) {
+    // Log the type for debugging
+    const qrType =
+      qr === null ? "null" : qr === undefined ? "undefined" : typeof qr;
+    const hasManager = qr && typeof qr === "object" && !!qr.manager;
+    console.log(
+      `[Global._getRepo] qr type: ${qrType}, has manager: ${hasManager}`,
+    );
+
+    // Only use the transactional manager if qr is a valid QueryRunner object
+    if (hasManager && typeof qr.manager.getRepository === "function") {
       return qr.manager.getRepository(entityClass);
     }
+    // Fallback to global data source
     const { AppDataSource } = require("../main/db/data-source");
+    console.log(`[Global._getRepo] Using global repository (fallback)`);
     return AppDataSource.getRepository(entityClass);
   }
 

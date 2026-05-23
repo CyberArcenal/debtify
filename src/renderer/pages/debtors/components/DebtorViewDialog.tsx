@@ -1,23 +1,81 @@
 // src/renderer/pages/debtors/components/DebtorViewDialog.tsx
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Modal from "../../../components/UI/Modal";
 import Button from "../../../components/UI/Button";
-import { User, Mail, Phone, MapPin, FileText, DollarSign } from "lucide-react";
-import type { DebtorWithTotal } from "../hooks/useDebtors";
+import { User, Mail, Phone, MapPin, FileText, DollarSign, Loader2 } from "lucide-react";
+import borrowersAPI from "../../../api/core/borrower";
+import type { Borrower } from "../../../api/core/borrower";
 import { formatCurrency, formatDate } from "../../../utils/formatters";
 
 interface DebtorViewDialogProps {
-  debtor: DebtorWithTotal | null;
+  debtorId: number | null;
   isOpen: boolean;
+  editable?: boolean;
   onClose: () => void;
   onEdit?: () => void;
 }
 
-const DebtorViewDialog: React.FC<DebtorViewDialogProps> = ({ debtor, isOpen, onClose, onEdit }) => {
-  if (!debtor) return null;
+const DebtorViewDialog: React.FC<DebtorViewDialogProps> = ({ debtorId, editable, isOpen, onClose, onEdit }) => {
+  const [debtor, setDebtor] = useState<Borrower | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Debtor Details" size="lg">
+  useEffect(() => {
+    if (isOpen && debtorId) {
+      const fetchDebtor = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+          const response = await borrowersAPI.getById(debtorId);
+          if (response.status) {
+            setDebtor(response.data);
+          } else {
+            throw new Error(response.message);
+          }
+        } catch (err: any) {
+          setError(err.message || "Failed to load debtor details");
+          setDebtor(null);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchDebtor();
+    } else if (!isOpen) {
+      // reset when modal closes
+      setDebtor(null);
+      setError(null);
+    }
+  }, [debtorId, isOpen]);
+
+  if (!isOpen) return null;
+
+  const renderContent = () => {
+    if (loading) {
+      return (
+        <div className="flex justify-center py-8">
+          <Loader2 className="w-8 h-8 animate-spin text-[var(--primary-color)]" />
+        </div>
+      );
+    }
+
+    if (error) {
+      return (
+        <div className="text-center py-8 text-red-500">
+          <p>{error}</p>
+          <Button variant="secondary" onClick={onClose} className="mt-4">Close</Button>
+        </div>
+      );
+    }
+
+    if (!debtor) {
+      return (
+        <div className="text-center py-8 text-[var(--text-tertiary)]">
+          No debtor data available.
+        </div>
+      );
+    }
+
+    return (
       <div className="space-y-4">
         <div className="flex items-center gap-4 border-b pb-4" style={{ borderColor: "var(--border-color)" }}>
           <div className="w-16 h-16 rounded-full bg-[var(--primary-color)]/20 flex items-center justify-center">
@@ -56,7 +114,8 @@ const DebtorViewDialog: React.FC<DebtorViewDialogProps> = ({ debtor, isOpen, onC
             <div>
               <p className="text-xs text-[var(--text-tertiary)]">Total Outstanding Debt</p>
               <p className="font-bold text-lg" style={{ color: "var(--debt-high)" }}>
-                {formatCurrency(debtor.total_debt || 0)}
+                {/* Total debt not directly available from Borrower API; you can compute it if needed */}
+                N/A
               </p>
             </div>
           </div>
@@ -89,6 +148,12 @@ const DebtorViewDialog: React.FC<DebtorViewDialogProps> = ({ debtor, isOpen, onC
           <Button variant="secondary" onClick={onClose}>Close</Button>
         </div>
       </div>
+    );
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Debtor Details" size="lg">
+      {renderContent()}
     </Modal>
   );
 };

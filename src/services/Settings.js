@@ -26,8 +26,21 @@ class SystemSettingService {
      * @param {string | Function | import("typeorm").EntitySchema<{ id: unknown; key: unknown; value: unknown; setting_type: unknown; description: unknown; is_public: unknown; is_deleted: unknown; created_at: unknown; updated_at: unknown; }> | import("typeorm").EntitySchema<import("typeorm").ObjectLiteral> | { type: import("typeorm").ObjectLiteral; name: string; }} entityClass
      */
   _getRepo(qr, entityClass) {
-    if (qr) return qr.manager.getRepository(entityClass);
+    // Log the type for debugging
+    const qrType =
+      qr === null ? "null" : qr === undefined ? "undefined" : typeof qr;
+    const hasManager = qr && typeof qr === "object" && !!qr.manager;
+    console.log(
+      `[Global._getRepo] qr type: ${qrType}, has manager: ${hasManager}`,
+    );
+
+    // Only use the transactional manager if qr is a valid QueryRunner object
+    if (hasManager && typeof qr.manager.getRepository === "function") {
+      return qr.manager.getRepository(entityClass);
+    }
+    // Fallback to global data source
     const { AppDataSource } = require("../main/db/data-source");
+    console.log(`[Global._getRepo] Using global repository (fallback)`);
     return AppDataSource.getRepository(entityClass);
   }
 

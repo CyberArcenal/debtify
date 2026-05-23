@@ -22,6 +22,7 @@ declare global {
         message: string;
         data: any;
       }>;
+      handshake: (payload: any) => Promise<any>;
 
       // ========== DEBT MANAGEMENT MODULES ==========
       borrower: (payload: any) => Promise<any>;

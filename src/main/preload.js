@@ -14,20 +14,23 @@ contextBridge.exposeInMainWorld("backendAPI", {
   notificationLog: (payload) => ipcRenderer.invoke("notificationLog", payload),
   notification: (payload) => ipcRenderer.invoke("notification", payload),
   updater: (payload) => ipcRenderer.invoke("updater", payload),
-
+  handshake: (payload) => ipcRenderer.invoke("handshake", payload),
   // ========== CORE DEBT MANAGEMENT MODULES ==========
   borrower: (payload) => ipcRenderer.invoke("borrower", payload),
   debt: (payload) => ipcRenderer.invoke("debt", payload),
   loanAgreement: (payload) => ipcRenderer.invoke("loanAgreement", payload),
-  paymentTransaction: (payload) => ipcRenderer.invoke("paymentTransaction", payload),
-  penaltyTransaction: (payload) => ipcRenderer.invoke("penaltyTransaction", payload),
+  paymentTransaction: (payload) =>
+    ipcRenderer.invoke("paymentTransaction", payload),
+  penaltyTransaction: (payload) =>
+    ipcRenderer.invoke("penaltyTransaction", payload),
 
   // ========== NEW DEBT MANAGEMENT MODULES ==========
   group: (payload) => ipcRenderer.invoke("group", payload),
   loanApplication: (payload) => ipcRenderer.invoke("loanApplication", payload),
   paymentMethod: (payload) => ipcRenderer.invoke("paymentMethod", payload),
   creditCheck: (payload) => ipcRenderer.invoke("creditCheck", payload),
-  interestRateChangeLog: (payload) => ipcRenderer.invoke("interestRateChangeLog", payload),
+  interestRateChangeLog: (payload) =>
+    ipcRenderer.invoke("interestRateChangeLog", payload),
 
   // ========== PRINTER MODULE (generic + specific methods) ==========
   // Generic handler for printer configuration (CRUD, test, etc.)

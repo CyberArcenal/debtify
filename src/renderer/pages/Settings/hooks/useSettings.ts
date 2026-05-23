@@ -17,6 +17,7 @@ import { useSettings as useSettingsContext } from "../../../contexts/SettingsCon
 // ========== Default values for each category ==========
 const DEFAULT_GENERAL: GeneralSettings = {
   company_name: "Debtify",
+  sync_mode: "offline_first",
   branch_location: "",
   default_timezone: "Asia/Manila",
   currency: "PHP",
@@ -111,6 +112,8 @@ const DEFAULTS = {
 const ALLOWED_KEYS: Record<keyof typeof DEFAULTS, string[]> = {
   general: [
     "company_name",
+    "sync_mode",
+    "server_url",
     "branch_location",
     "default_timezone",
     "currency",

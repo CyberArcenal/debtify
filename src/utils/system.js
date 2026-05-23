@@ -143,7 +143,7 @@ async function defaultInterestRate() {
 }
 
 async function defaultPenaltyRate() {
-  return getInt("default_penalty_rate", SettingType.COLLECTIONS, 2);
+  return parseFloat(await getInt("default_penalty_rate", SettingType.COLLECTIONS, 2));
 }
 
 async function penaltyCalculationMethod() {
@@ -507,12 +507,95 @@ async function getAuditSecuritySettings() {
 }
 
 
+// ============================================================
+// 🔄 SYNC SETTINGS (hybrid mode)
+// ============================================================
+
+/**
+ * Get current sync mode (offline/online)
+ * @returns {Promise<string>} "offline" | "online"
+ */
+async function syncMode() {
+  return getValue("sync_mode", SettingType.GENERAL, "offline");
+}
+
+/**
+ * Get server URL for online sync
+ * @returns {Promise<string>}
+ */
+async function serverUrl() {
+  return getValue("server_url", SettingType.GENERAL, "");
+}
+
+/**
+ * Save sync mode and server URL (upsert)
+ * @param {string} mode - 'offline' or 'online'
+ * @param {string} [url] - server URL (required when mode === 'online')
+ */
+async function setSyncSettings(mode, url = "") {
+  const { AppDataSource } = require("../main/db/data-source");
+  const repository = AppDataSource.getRepository(SystemSetting);
+  if (!repository) {
+    throw new Error("SystemSetting repository not available");
+  }
+
+  // Save sync_mode
+  const syncModeKey = "sync_mode";
+  let syncModeRecord = await repository.findOne({
+    where: { key: syncModeKey, setting_type: SettingType.GENERAL, is_deleted: false }
+  });
+  if (!syncModeRecord) {
+    syncModeRecord = repository.create({
+      key: syncModeKey,
+      setting_type: SettingType.GENERAL,
+      value: mode,
+      description: "Offline/Online mode for hybrid sync",
+      is_public: true
+    });
+  } else {
+    syncModeRecord.value = mode;
+  }
+  await repository.save(syncModeRecord);
+
+  // Save server_url (if mode === 'online' and url provided; otherwise clear it)
+  const serverUrlKey = "server_url";
+  let serverUrlRecord = await repository.findOne({
+    where: { key: serverUrlKey, setting_type: SettingType.GENERAL, is_deleted: false }
+  });
+  if (mode === "online" && url) {
+    if (!serverUrlRecord) {
+      serverUrlRecord = repository.create({
+        key: serverUrlKey,
+        setting_type: SettingType.GENERAL,
+        value: url,
+        description: "Server URL for online sync",
+        is_public: true
+      });
+    } else {
+      serverUrlRecord.value = url;
+    }
+    await repository.save(serverUrlRecord);
+  } else if (mode === "offline") {
+    // Clear the stored server URL when switching offline
+    if (serverUrlRecord) {
+      serverUrlRecord.value = "";
+      await repository.save(serverUrlRecord);
+    }
+  }
+}
+
+
 
 // ============================================================
 // 📤 EXPORT ALL FUNCTIONS
 // ============================================================
 
 module.exports = {
+  syncMode,
+  serverUrl,
+  setSyncSettings,
+
+
   // Core getters
   getValue,
   getBool,

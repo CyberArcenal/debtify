@@ -22,6 +22,7 @@ import DebtorStatementPage from "../pages/reports/debtor-stmt";
 import ExpectedPaymentsPage from "../pages/reports/expected";
 import DevicesPage from "../pages/devices";
 import NotificationLogPage from "../pages/reminder";
+import SyncPage from "../pages/sync";
 // import DebtDashboard from "../pages/dashboard";
 
 function App() {
@@ -89,6 +90,7 @@ function App() {
         <Route path="reports/debtor-stmt" element={<DebtorStatementPage />} />
         <Route path="reports/expected" element={<ExpectedPaymentsPage />} />
         <Route path="devices" element={<DevicesPage />} />
+        <Route path="/sync" element={<SyncPage />} />
 
         {/* 404 Page */}
         <Route path="*" element={<div>Not found page</div>} />

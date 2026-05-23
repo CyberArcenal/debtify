@@ -68,6 +68,7 @@ const DebtorTable: React.FC<DebtorTableProps> = ({
           {debtors.map((debtor) => (
             <tr
               key={debtor.id}
+              onClick={() => onView(debtor)}
               className="hover:bg-[var(--card-hover-bg)] transition-colors border-b"
               style={{ borderColor: "var(--border-color)" }}
             >

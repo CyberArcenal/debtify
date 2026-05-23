@@ -1,7 +1,7 @@
 // src/main/services/LoanApplication.js
 const { paginateQueryBuilder } = require("../utils/dbUtils/pagination");
 const auditLogger = require("../utils/auditLogger");
-const debtService = require("./Debt");
+const LoanApplication = require("./Debt");
 const {
   maxLoanAmount,
   minLoanAmount,
@@ -43,10 +43,21 @@ class LoanApplicationService {
    * Helper: get repository (transactional if queryRunner provided)
    */
   _getRepo(qr, entityClass) {
-    if (qr) {
+    // Log the type for debugging
+    const qrType =
+      qr === null ? "null" : qr === undefined ? "undefined" : typeof qr;
+    const hasManager = qr && typeof qr === "object" && !!qr.manager;
+    console.log(
+      `[LoanApplication._getRepo] qr type: ${qrType}, has manager: ${hasManager}`,
+    );
+
+    // Only use the transactional manager if qr is a valid QueryRunner object
+    if (hasManager && typeof qr.manager.getRepository === "function") {
       return qr.manager.getRepository(entityClass);
     }
+    // Fallback to global data source
     const { AppDataSource } = require("../main/db/data-source");
+    console.log(`[LoanApplication._getRepo] Using global repository (fallback)`);
     return AppDataSource.getRepository(entityClass);
   }
 
