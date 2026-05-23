@@ -1,15 +1,22 @@
 // src/renderer/pages/debtors/credit-check/components/PreviousChecksLog.tsx
 import React from "react";
-import { History, Clock } from "lucide-react";
+import { History, Clock, Plus } from "lucide-react";
 import { formatDate } from "../../../../utils/formatters";
 import type { CreditCheckLog } from "../../../../api/core/credit_check";
 
 interface PreviousChecksLogProps {
   logs: CreditCheckLog[];
   loading: boolean;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
 }
 
-const PreviousChecksLog: React.FC<PreviousChecksLogProps> = ({ logs, loading }) => {
+const PreviousChecksLog: React.FC<PreviousChecksLogProps> = ({ 
+  logs, 
+  loading, 
+  hasMore = false, 
+  onLoadMore 
+}) => {
   const getRiskBadge = (risk: string) => {
     switch (risk) {
       case "Low": return "bg-green-500/20 text-green-500";
@@ -24,7 +31,7 @@ const PreviousChecksLog: React.FC<PreviousChecksLogProps> = ({ logs, loading }) 
       <h3 className="font-semibold mb-3 flex items-center gap-2" style={{ color: "var(--text-primary)" }}>
         <History className="w-4 h-4" /> Previous Credit Checks
       </h3>
-      {loading ? (
+      {loading && logs.length === 0 ? (
         <div className="text-center py-4" style={{ color: "var(--text-tertiary)" }}>Loading history...</div>
       ) : logs.length === 0 ? (
         <div className="text-center py-4" style={{ color: "var(--text-tertiary)" }}>No previous credit checks found.</div>
@@ -51,6 +58,15 @@ const PreviousChecksLog: React.FC<PreviousChecksLogProps> = ({ logs, loading }) 
               </div>
             </div>
           ))}
+          {hasMore && (
+            <button
+              onClick={onLoadMore}
+              disabled={loading}
+              className="w-full mt-2 py-2 text-sm text-[var(--accent-blue)] hover:bg-[var(--accent-blue-light)] rounded transition-colors flex items-center justify-center gap-1 disabled:opacity-50"
+            >
+              {loading ? "Loading..." : <><Plus className="w-4 h-4" /> Load more</>}
+            </button>
+          )}
         </div>
       )}
     </div>

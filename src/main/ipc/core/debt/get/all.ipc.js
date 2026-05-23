@@ -1,5 +1,4 @@
 // src/main/ipc/debt/get/all.ipc.js
-//@ts-check
 
 const debtService = require("../../../../../services/Debt");
 

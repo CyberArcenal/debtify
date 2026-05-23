@@ -18,6 +18,8 @@ const CreditCheckPage: React.FC = () => {
     downloadReport,
     previousChecks,
     loadingLogs,
+    hasMoreLogs,
+    loadMoreLogs,
   } = useCreditCheck();
 
   return (
@@ -39,7 +41,12 @@ const CreditCheckPage: React.FC = () => {
               activeOnly={true}
             />
           </div>
-          <PreviousChecksLog logs={previousChecks} loading={loadingLogs} />
+          <PreviousChecksLog 
+            logs={previousChecks} 
+            loading={loadingLogs} 
+            hasMore={hasMoreLogs}
+            onLoadMore={loadMoreLogs}
+          />
         </div>
 
         {/* Right column: Credit Score & Report */}

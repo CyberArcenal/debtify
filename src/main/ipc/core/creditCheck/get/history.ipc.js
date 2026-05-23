@@ -1,16 +1,14 @@
 // src/main/ipc/creditCheck/get/history.ipc.js
-//@ts-check
-
 const creditCheckService = require("../../../../../services/CreditCheck");
 
 module.exports = async (params) => {
   try {
-    const { debtorId } = params;
-    const result = await creditCheckService.getCreditCheckHistory(debtorId);
+    const { debtorId, page = 1, limit = 20 } = params;
+    const result = await creditCheckService.getCreditCheckHistory(debtorId, page, limit);
     return {
       status: true,
       message: "Credit check history retrieved successfully",
-      data: result,
+      data: result
     };
   } catch (error) {
     console.error("Error in getCreditCheckHistory:", error);

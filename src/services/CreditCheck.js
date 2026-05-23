@@ -2,6 +2,7 @@
 const auditLogger = require("../utils/auditLogger");
 const { creditBureauApiEnabled, creditBureauApiKey, creditBureauEndpoint, enforceCreditCheck } = require("../utils/system");
 const { paginateQueryBuilder } = require("../utils/dbUtils/pagination");
+
 class CreditCheckService {
   constructor() {
     this.logRepository = null;
@@ -31,6 +32,11 @@ class CreditCheckService {
     };
   }
 
+  /**
+   * Helper: get repository (transactional if queryRunner provided)
+   * @param {import("typeorm").QueryRunner | null} qr
+   * @param {Function} entityClass
+   */
   _getRepo(qr, entityClass) {
     if (qr) {
       return qr.manager.getRepository(entityClass);
@@ -45,32 +51,24 @@ class CreditCheckService {
    * @returns {Object} score, riskLevel, remarks
    */
   _computeScore(debtorDebtStats) {
-    let score = 700; // base score
+    let score = 700;
     const { totalDebt, overdueCount, totalPaid, totalTransactions, averagePaymentDelay } = debtorDebtStats;
 
-    // Reduce score based on total debt amount
     if (totalDebt > 100000) score -= 50;
     else if (totalDebt > 50000) score -= 30;
     else if (totalDebt > 10000) score -= 15;
 
-    // Penalize overdue debts
-    if (overdueCount > 0) {
-      score -= Math.min(100, overdueCount * 20);
-    }
+    if (overdueCount > 0) score -= Math.min(100, overdueCount * 20);
 
-    // Positive factor: payment history (high paid ratio improves score)
     const paidRatio = totalDebt > 0 ? totalPaid / totalDebt : 1;
     if (paidRatio > 0.8) score += 20;
     else if (paidRatio > 0.5) score += 10;
 
-    // Factor for consistent payments (more transactions = better)
     if (totalTransactions > 5) score += 10;
 
-    // Penalize late payments if average delay > 0
     if (averagePaymentDelay > 30) score -= 25;
     else if (averagePaymentDelay > 15) score -= 10;
 
-    // Clamp score between 300 and 850
     score = Math.min(850, Math.max(300, score));
 
     let riskLevel = "Medium";
@@ -85,38 +83,27 @@ class CreditCheckService {
       riskLevel = "High";
       remarks = "High risk. Overdue debts detected.";
     }
-
-    if (overdueCount > 0) {
-      remarks += ` Has ${overdueCount} overdue debt(s).`;
-    }
-
+    if (overdueCount > 0) remarks += ` Has ${overdueCount} overdue debt(s).`;
     return { score, riskLevel, remarks };
   }
 
   /**
    * Call external credit bureau API if enabled
    * @param {number} debtorId
-   * @param {Object} debtorInfo (name, contact, etc.)
+   * @param {Object} debtorInfo
    * @returns {Promise<Object|null>}
    */
   async _callExternalCreditBureau(debtorId, debtorInfo) {
-    if (!(await creditBureauApiEnabled())) {
-      return null;
-    }
+    if (!(await creditBureauApiEnabled())) return null;
     const apiKey = await creditBureauApiKey();
     const endpoint = await creditBureauEndpoint();
     if (!apiKey || !endpoint) {
       console.warn("Credit bureau API enabled but key or endpoint missing.");
       return null;
     }
-
-    // This is a placeholder – implement actual HTTP request using fetch or axios.
-    // For now, we'll simulate an external call.
     console.log(`Calling external credit bureau at ${endpoint} for debtor ${debtorId}`);
-    // const response = await fetch(endpoint, { method: 'POST', headers: { 'Authorization': `Bearer ${apiKey}` }, body: JSON.stringify({ debtorId, name: debtorInfo.name }) });
-    // const data = await response.json();
-    // return { score: data.score, riskLevel: data.riskLevel, remarks: data.remarks };
-    return null; // Not implemented
+    // Placeholder – implement actual HTTP call with fetch/axios
+    return null;
   }
 
   /**
@@ -132,13 +119,7 @@ class CreditCheckService {
       relations: ["payments"],
     });
 
-    let totalDebt = 0;
-    let totalPaid = 0;
-    let overdueCount = 0;
-    let totalTransactions = 0;
-    let totalPaymentDelay = 0;
-    let paymentDelaysCount = 0;
-
+    let totalDebt = 0, totalPaid = 0, overdueCount = 0, totalTransactions = 0, totalPaymentDelay = 0, paymentDelaysCount = 0;
     const now = new Date();
     for (const debt of debts) {
       totalDebt += parseFloat(debt.totalAmount);
@@ -146,9 +127,7 @@ class CreditCheckService {
       totalTransactions += debt.payments ? debt.payments.length : 0;
 
       const dueDate = new Date(debt.dueDate);
-      if (dueDate < now && debt.status !== "paid" && debt.remainingAmount > 0) {
-        overdueCount++;
-      }
+      if (dueDate < now && debt.status !== "paid" && debt.remainingAmount > 0) overdueCount++;
 
       if (debt.payments && debt.payments.length > 0) {
         for (const payment of debt.payments) {
@@ -161,36 +140,57 @@ class CreditCheckService {
         }
       }
     }
-
     const averagePaymentDelay = paymentDelaysCount > 0 ? totalPaymentDelay / paymentDelaysCount : 0;
-
-    return {
-      totalDebt,
-      totalPaid,
-      overdueCount,
-      totalTransactions,
-      averagePaymentDelay,
-    };
+    return { totalDebt, totalPaid, overdueCount, totalTransactions, averagePaymentDelay };
   }
 
   // ----------------------------------------------------------------------
   // 📋 READ OPERATIONS
   // ----------------------------------------------------------------------
 
-  async getCreditCheckHistory(debtorId) {
-    const { log: repo } = await this.getRepositories();
-    const logs = await repo.find({
-      where: { debtorId },
-      order: { dateChecked: "DESC" },
-    });
-    await auditLogger.logView("CreditCheckLog", null, "system");
-    return logs;
+  /**
+   * Get paginated credit check history for a debtor
+   * @param {number} debtorId
+   * @param {number} page
+   * @param {number} limit
+   * @param {import("typeorm").QueryRunner | null} qr
+   */
+  async getCreditCheckHistory(debtorId, page = 1, limit = 20, qr = null) {
+    const CreditCheckLog = require("../entities/CreditCheckLog");
+    const repo = this._getRepo(qr, CreditCheckLog);
+    const qb = repo.createQueryBuilder("log")
+      .where("log.debtorId = :debtorId", { debtorId })
+      .orderBy("log.dateChecked", "DESC");
+    const result = await paginateQueryBuilder(qb, { page, limit });
+    await auditLogger.logView("CreditCheckLog", debtorId, "system");
+    return result;
+  }
+
+  /**
+   * Get a single credit check log by ID
+   * @param {number} id
+   * @param {import("typeorm").QueryRunner | null} qr
+   */
+  async getCreditCheckLogById(id, qr = null) {
+    const CreditCheckLog = require("../entities/CreditCheckLog");
+    const repo = this._getRepo(qr, CreditCheckLog);
+    const log = await repo.findOne({ where: { id } });
+    if (!log) throw new Error(`Credit check log with ID ${id} not found`);
+    await auditLogger.logView("CreditCheckLog", id, "system");
+    return log;
   }
 
   // ----------------------------------------------------------------------
   // ✏️ WRITE OPERATIONS
   // ----------------------------------------------------------------------
 
+  /**
+   * Perform a credit check for a debtor
+   * @param {number} debtorId
+   * @param {string} user
+   * @param {import("typeorm").QueryRunner | null} qr
+   * @param {Object|null} debtorInfo
+   */
   async performCreditCheck(debtorId, user = "system", qr = null, debtorInfo = null) {
     const { saveDb } = require("../utils/dbUtils/dbActions");
     const CreditCheckLog = require("../entities/CreditCheckLog");
@@ -198,14 +198,12 @@ class CreditCheckService {
 
     let score, riskLevel, remarks;
 
-    // 1. Try external credit bureau if enabled
     const externalResult = await this._callExternalCreditBureau(debtorId, debtorInfo);
     if (externalResult) {
       score = externalResult.score;
       riskLevel = externalResult.riskLevel;
       remarks = externalResult.remarks;
     } else {
-      // 2. Fallback to internal scoring
       const stats = await this._getDebtorDebtStats(debtorId, qr);
       const computed = this._computeScore(stats);
       score = computed.score;
@@ -228,16 +226,18 @@ class CreditCheckService {
     return { score, riskLevel, remarks, dateChecked: saved.dateChecked };
   }
 
+  /**
+   * Delete a credit check log entry
+   * @param {number} logId
+   * @param {string} user
+   * @param {import("typeorm").QueryRunner | null} qr
+   */
   async deleteCreditCheckLog(logId, user = "system", qr = null) {
     const { removeDb } = require("../utils/dbUtils/dbActions");
     const CreditCheckLog = require("../entities/CreditCheckLog");
     const logRepo = this._getRepo(qr, CreditCheckLog);
-
     const log = await logRepo.findOne({ where: { id: logId } });
-    if (!log) {
-      throw new Error(`Credit check log with ID ${logId} not found`);
-    }
-
+    if (!log) throw new Error(`Credit check log with ID ${logId} not found`);
     await removeDb(logRepo, log);
     await auditLogger.logDelete("CreditCheckLog", logId, log, user);
     console.log(`Credit check log ${logId} deleted`);
