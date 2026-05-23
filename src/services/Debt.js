@@ -1,5 +1,4 @@
 // services/DebtService.js
-//@ts-check
 const auditLogger = require("../utils/auditLogger");
 const { validateDebtData } = require("../utils/debtUtils");
 const { defaultInterestRate, defaultPenaltyRate } = require("../utils/system");

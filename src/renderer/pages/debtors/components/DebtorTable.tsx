@@ -1,6 +1,16 @@
 // src/renderer/pages/debtors/components/DebtorTable.tsx
 import React from "react";
-import { ChevronUp, ChevronDown, Eye, Edit, Trash2, RefreshCw, User, Mail, Phone } from "lucide-react";
+import {
+  ChevronUp,
+  ChevronDown,
+  Eye,
+  Edit,
+  Trash2,
+  RefreshCw,
+  User,
+  Mail,
+  Phone,
+} from "lucide-react";
 import type { DebtorWithTotal } from "../hooks/useDebtors";
 import { formatCurrency } from "../../../utils/formatters";
 
@@ -31,44 +41,81 @@ const DebtorTable: React.FC<DebtorTableProps> = ({
 }) => {
   const getSortIcon = (key: string) => {
     if (sortConfig.key !== key) return null;
-    return sortConfig.direction === "asc" ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />;
+    return sortConfig.direction === "asc" ? (
+      <ChevronUp className="w-4 h-4" />
+    ) : (
+      <ChevronDown className="w-4 h-4" />
+    );
   };
 
   return (
-    <div className="overflow-x-auto rounded-md border" style={{ borderColor: "var(--border-color)" }}>
+    <div
+      className="overflow-x-auto rounded-md border"
+      style={{ borderColor: "var(--border-color)" }}
+    >
       <table className="min-w-full">
         <thead style={{ backgroundColor: "var(--card-secondary-bg)" }}>
           <tr>
             <th className="w-10 px-2 py-3 text-left">
               <input
                 type="checkbox"
-                checked={debtors.length > 0 && selectedDebtors.length === debtors.length}
+                checked={
+                  debtors.length > 0 &&
+                  selectedDebtors.length === debtors.length
+                }
                 onChange={onToggleSelectAll}
                 className="h-4 w-4 rounded"
                 style={{ accentColor: "var(--primary-color)" }}
               />
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase cursor-pointer" onClick={() => onSort("name")}>
-              <div className="flex items-center gap-1">Name {getSortIcon("name")}</div>
+            <th
+              className="px-4 py-3 text-left text-xs font-medium uppercase cursor-pointer"
+              onClick={(e) =>{e.stopPropagation(); onSort("name")}}
+            >
+              <div className="flex items-center gap-1">
+                Name {getSortIcon("name")}
+              </div>
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase cursor-pointer" onClick={() => onSort("contact")}>
-              <div className="flex items-center gap-1">Contact {getSortIcon("contact")}</div>
+            <th
+              className="px-4 py-3 text-left text-xs font-medium uppercase cursor-pointer"
+              onClick={(e) =>{e.stopPropagation(); onSort("contact")}}
+            >
+              <div className="flex items-center gap-1">
+                Contact {getSortIcon("contact")}
+              </div>
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase cursor-pointer" onClick={() => onSort("email")}>
-              <div className="flex items-center gap-1">Email {getSortIcon("email")}</div>
+            <th
+              className="px-4 py-3 text-left text-xs font-medium uppercase cursor-pointer"
+              onClick={(e) =>{e.stopPropagation(); onSort("email")}}
+            >
+              <div className="flex items-center gap-1">
+                Email {getSortIcon("email")}
+              </div>
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase cursor-pointer" onClick={() => onSort("total_debt")}>
-              <div className="flex items-center gap-1">Total Debt {getSortIcon("total_debt")}</div>
+            <th
+              className="px-4 py-3 text-left text-xs font-medium uppercase cursor-pointer"
+              onClick={(e) =>{e.stopPropagation(); onSort("total_debt")}}
+            >
+              <div className="flex items-center gap-1">
+                Total Debt {getSortIcon("total_debt")}
+              </div>
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase">Status</th>
-            <th className="px-4 py-3 text-right text-xs font-medium uppercase">Actions</th>
+            <th className="px-4 py-3 text-left text-xs font-medium uppercase">
+              Status
+            </th>
+            <th className="px-4 py-3 text-right text-xs font-medium uppercase">
+              Actions
+            </th>
           </tr>
         </thead>
         <tbody>
           {debtors.map((debtor) => (
             <tr
               key={debtor.id}
-              onClick={() => onView(debtor)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onView(debtor);
+              }}
               className="hover:bg-[var(--card-hover-bg)] transition-colors border-b"
               style={{ borderColor: "var(--border-color)" }}
             >
@@ -101,7 +148,10 @@ const DebtorTable: React.FC<DebtorTableProps> = ({
                   <span>{debtor.email || "—"}</span>
                 </div>
               </td>
-              <td className="px-4 py-3 font-semibold" style={{ color: "var(--debt-high)" }}>
+              <td
+                className="px-4 py-3 font-semibold"
+                style={{ color: "var(--debt-high)" }}
+              >
                 {formatCurrency(debtor.total_debt || 0)}
               </td>
               <td className="px-4 py-3">
@@ -118,7 +168,7 @@ const DebtorTable: React.FC<DebtorTableProps> = ({
               <td className="px-4 py-3 text-right">
                 <div className="flex justify-end gap-2">
                   <button
-                    onClick={() => onView(debtor)}
+                    onClick={(e) =>{e.stopPropagation(); onView(debtor)}}
                     className="p-1.5 rounded hover:bg-[var(--card-hover-bg)] transition-colors"
                     title="View Details"
                   >
@@ -127,14 +177,14 @@ const DebtorTable: React.FC<DebtorTableProps> = ({
                   {!debtor.deletedAt ? (
                     <>
                       <button
-                        onClick={() => onEdit(debtor)}
+                        onClick={(e) =>{e.stopPropagation(); onEdit(debtor)}}
                         className="p-1.5 rounded hover:bg-[var(--card-hover-bg)] transition-colors"
                         title="Edit"
                       >
                         <Edit className="w-4 h-4 text-[var(--accent-amber)]" />
                       </button>
                       <button
-                        onClick={() => onDelete(debtor)}
+                        onClick={(e) =>{e.stopPropagation(); onDelete(debtor)}}
                         className="p-1.5 rounded hover:bg-[var(--card-hover-bg)] transition-colors"
                         title="Soft Delete"
                       >
@@ -144,7 +194,7 @@ const DebtorTable: React.FC<DebtorTableProps> = ({
                   ) : (
                     onRestore && (
                       <button
-                        onClick={() => onRestore(debtor)}
+                        onClick={(e) =>{e.stopPropagation(); onRestore(debtor)}}
                         className="p-1.5 rounded hover:bg-[var(--card-hover-bg)] transition-colors"
                         title="Restore"
                       >

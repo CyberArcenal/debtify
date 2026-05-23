@@ -1,8 +1,9 @@
 // src/renderer/pages/loans/active/components/ActiveLoansTable.tsx
 import React from "react";
-import { ChevronUp, ChevronDown, Eye, Edit, CreditCard, Calendar } from "lucide-react";
+import { ChevronUp, ChevronDown } from "lucide-react";
 import type { Debt } from "../../../../api/core/debt";
 import { formatCurrency, formatDate, daysUntil } from "../../../../utils/formatters";
+import ActiveLoanActionsDropdown from "./ActiveLoanActionsDropdown";
 
 interface ActiveLoansTableProps {
   loans: Debt[];
@@ -12,9 +13,9 @@ interface ActiveLoansTableProps {
   onSort: (key: string) => void;
   sortConfig: { key: string; direction: "asc" | "desc" };
   onView: (loan: Debt) => void;
-  onEdit: (loan: Debt) => void;
   onRecordPayment: (loan: Debt) => void;
   onViewSchedule: (loan: Debt) => void;
+  onForgiveness: (loan: Debt) => void;
 }
 
 const ActiveLoansTable: React.FC<ActiveLoansTableProps> = ({
@@ -25,9 +26,9 @@ const ActiveLoansTable: React.FC<ActiveLoansTableProps> = ({
   onSort,
   sortConfig,
   onView,
-  onEdit,
   onRecordPayment,
   onViewSchedule,
+  onForgiveness,
 }) => {
   const getSortIcon = (key: string) => {
     if (sortConfig.key !== key) return null;
@@ -94,20 +95,13 @@ const ActiveLoansTable: React.FC<ActiveLoansTableProps> = ({
                 <td className="px-4 py-3">{formatDate(loan.dueDate)}</td>
                 <td className={`px-4 py-3 ${getDaysLeftClass(daysLeft)}`}>{daysLeft < 0 ? `Overdue by ${-daysLeft} days` : `${daysLeft} days`}</td>
                 <td className="px-4 py-3 text-right">
-                  <div className="flex justify-end gap-2">
-                    <button onClick={() => onView(loan)} className="p-1.5 rounded hover:bg-[var(--card-hover-bg)]" title="View Details">
-                      <Eye className="w-4 h-4 text-[var(--accent-blue)]" />
-                    </button>
-                    <button onClick={() => onEdit(loan)} className="p-1.5 rounded hover:bg-[var(--card-hover-bg)]" title="Edit">
-                      <Edit className="w-4 h-4 text-[var(--accent-amber)]" />
-                    </button>
-                    <button onClick={() => onRecordPayment(loan)} className="p-1.5 rounded hover:bg-[var(--card-hover-bg)]" title="Record Payment">
-                      <CreditCard className="w-4 h-4 text-[var(--success-color)]" />
-                    </button>
-                    <button onClick={() => onViewSchedule(loan)} className="p-1.5 rounded hover:bg-[var(--card-hover-bg)]" title="Payment Schedule">
-                      <Calendar className="w-4 h-4 text-[var(--accent-purple)]" />
-                    </button>
-                  </div>
+                  <ActiveLoanActionsDropdown
+                    loan={loan}
+                    onView={onView}
+                    onRecordPayment={onRecordPayment}
+                    onViewSchedule={onViewSchedule}
+                    onForgiveness={onForgiveness}
+                  />
                 </td>
               </tr>
             );

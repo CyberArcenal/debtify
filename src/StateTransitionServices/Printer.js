@@ -39,7 +39,7 @@ class PrinterStateTransitionService {
       printer.lastTested = new Date();
       logger.error(`Printer test failed: ${err.message}`);
     }
-    await updateDb(repo, printer);
+    await updateDb(repo, printer, { skipSignal: true });
     return printer.status;
   }
 
@@ -51,6 +51,7 @@ class PrinterStateTransitionService {
   }
 
   async onUpdate(oldPrinter, newPrinter, user = "system", queryRunner = null) {
+    const { updateDb, saveDb, removeDb } = require("../utils/dbUtils/dbActions");
     logger.info(`[Printer] Printer "${newPrinter.name}" (ID: ${newPrinter.id}) updated by ${user}`);
     const repo = this._getRepo(queryRunner, require("../entities/Printer"));
 
@@ -65,7 +66,7 @@ class PrinterStateTransitionService {
       for (const p of allPrinters) {
         if (p.id !== newPrinter.id && p.isDefault) {
           p.isDefault = false;
-          await updateDb(repo, p);
+          await updateDb(repo, p, { skipSignal: true });
         }
       }
       // Ensure newPrinter is still default (might have been changed in loop? no)
@@ -74,7 +75,7 @@ class PrinterStateTransitionService {
       logger.info(`[Printer] Enforced single default for printer #${newPrinter.id}`);
     } else {
       // No default change, just save the updated printer
-      await updateDb(repo, newPrinter);
+      // await updateDb(repo, newPrinter);
     }
 
     await auditLogger.logUpdate("Printer", newPrinter.id, oldPrinter, newPrinter, user);

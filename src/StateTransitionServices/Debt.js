@@ -16,7 +16,6 @@ const {
 const { NotificationLogService } = require("../services/NotificationLog");
 const notificationService = require("../services/Notification");
 
-
 class DebtStateTransitionService {
   constructor(dataSource) {
     this.dataSource = dataSource;
@@ -186,7 +185,9 @@ class DebtStateTransitionService {
             debt,
           });
           await saveDb(penaltyRepo, penalty);
-          logger.info(`Applied penalty of ${penaltyAmount} to debt #${debt.id}`);
+          logger.info(
+            `Applied penalty of ${penaltyAmount} to debt #${debt.id}`,
+          );
         }
       }
     }
@@ -239,7 +240,9 @@ class DebtStateTransitionService {
 
   async onDefaulted(debt, user = "system", queryRunner = null) {
     const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
-    logger.info(`[Transition] Marking debt #${debt.id} as defaulted by ${user}`);
+    logger.info(
+      `[Transition] Marking debt #${debt.id} as defaulted by ${user}`,
+    );
 
     const debtRepo = this._getRepo(queryRunner, Debt);
 
@@ -374,16 +377,11 @@ class DebtStateTransitionService {
     reason = null,
   ) {
     const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
-    logger.info(`[Transition] Forgiving ${amountForgiven} from debt #${debt.id} by ${user}`);
+    logger.info(
+      `[Transition] Forgiving ${amountForgiven} from debt #${debt.id} by ${user}`,
+    );
 
-    const debtRepo = this._getRepo(queryRunner, Debt);
-
-    debt.totalAmount -= amountForgiven;
-    if (debt.totalAmount < 0) debt.totalAmount = 0;
-    debt.remainingAmount = debt.totalAmount - debt.paidAmount;
-    if (debt.remainingAmount < 0) debt.remainingAmount = 0;
-    debt.updatedAt = new Date();
-    const savedDebt = await updateDb(debtRepo, debt);
+    // ❌ DO NOT UPDATE THE DEBT HERE – it's already updated by DebtService.applyForgiveness
 
     const note = reason || "Debt forgiveness applied";
     await auditLogger.logUpdate(
@@ -426,7 +424,7 @@ class DebtStateTransitionService {
       );
     }
 
-    return savedDebt;
+    return debt;
   }
 }
 

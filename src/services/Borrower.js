@@ -26,28 +26,31 @@ class BorrowerService {
     return this.borrowerRepository;
   }
 
+  // services/Borrower.js – inside BorrowerService class
+
   /**
    * Helper: get repository (transactional if queryRunner provided)
    * @param {import("typeorm").QueryRunner | null} qr
    * @returns {import("typeorm").Repository<any>}
    */
-  _getRepo(qr, entityClass) {
+  _getRepo(qr) {
+    const Borrower = require("../entities/Borrower");
     // Log the type for debugging
     const qrType =
       qr === null ? "null" : qr === undefined ? "undefined" : typeof qr;
     const hasManager = qr && typeof qr === "object" && !!qr.manager;
     console.log(
-      `[Global._getRepo] qr type: ${qrType}, has manager: ${hasManager}`,
+      `[Borrower._getRepo] qr type: ${qrType}, has manager: ${hasManager}`,
     );
 
     // Only use the transactional manager if qr is a valid QueryRunner object
     if (hasManager && typeof qr.manager.getRepository === "function") {
-      return qr.manager.getRepository(entityClass);
+      return qr.manager.getRepository(Borrower);
     }
     // Fallback to global data source
     const { AppDataSource } = require("../main/db/data-source");
-    console.log(`[Global._getRepo] Using global repository (fallback)`);
-    return AppDataSource.getRepository(entityClass);
+    console.log(`[Borrower._getRepo] Using global repository (fallback)`);
+    return AppDataSource.getRepository(Borrower);
   }
 
   /**
