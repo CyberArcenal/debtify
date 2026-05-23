@@ -16,7 +16,7 @@ const IS_ADMIN = true; // or get from settings / user context
 
 const TransactionsPage: React.FC = () => {
   const {
-    paginatedTransactions,
+    transactions,          // current page data (no longer need paginatedTransactions)
     filters,
     loading,
     error,
@@ -40,22 +40,31 @@ const TransactionsPage: React.FC = () => {
   const [editingTx, setEditingTx] = useState<any>(null);
   const [deletingTx, setDeletingTx] = useState<any>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
-
   const [viewingTx, setViewingTx] = useState<any>(null);
   const [viewOpen, setViewOpen] = useState(false);
 
   const handleExport = async () => {
     setExporting(true);
     try {
-      const response = await paymentsAPI.export("csv", filters);
+      // Build export filters (same as current filters)
+      const exportFilters: any = { ...filters };
+      if (exportFilters.debtorId === "") delete exportFilters.debtorId;
+      if (exportFilters.debtId === "") delete exportFilters.debtId;
+      if (exportFilters.dateFrom) exportFilters.paymentDateFrom = exportFilters.dateFrom;
+      if (exportFilters.dateTo) exportFilters.paymentDateTo = exportFilters.dateTo;
+      if (exportFilters.minAmount > 0) exportFilters.minAmount = exportFilters.minAmount;
+      if (exportFilters.maxAmount > 0) exportFilters.maxAmount = exportFilters.maxAmount;
+      if (exportFilters.search) exportFilters.search = exportFilters.search;
+      delete exportFilters.dateFrom;
+      delete exportFilters.dateTo;
+
+      const response = await paymentsAPI.export("csv", exportFilters);
       if (response.status) {
         const blob = new Blob([response.data.data], { type: "text/csv" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download =
-          response.data.filename ||
-          `transactions_${new Date().toISOString().slice(0, 10)}.csv`;
+        a.download = response.data.filename || `transactions_${new Date().toISOString().slice(0, 10)}.csv`;
         a.click();
         URL.revokeObjectURL(url);
         dialogs.success("Export completed");
@@ -80,148 +89,62 @@ const TransactionsPage: React.FC = () => {
       setDeleteLoading(false);
     }
   };
+
   const handleView = (tx: any) => {
     setViewingTx(tx);
     setViewOpen(true);
   };
+
   const getDisplayRange = () => {
     const start = (currentPage - 1) * pageSize + 1;
-    const end = Math.min(currentPage * pageSize, pagination.count);
+    const end = Math.min(currentPage * pageSize, pagination.totalItems);
     return { start, end };
   };
   const { start, end } = getDisplayRange();
 
   return (
     <div className="p-4" style={{ backgroundColor: "var(--background-color)" }}>
-      <div
-        className="rounded-md shadow-md border p-4"
-        style={{
-          backgroundColor: "var(--card-bg)",
-          borderColor: "var(--border-color)",
-        }}
-      >
+      <div className="rounded-md shadow-md border p-4" style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--border-color)" }}>
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-2">
-            <Receipt
-              className="w-6 h-6"
-              style={{ color: "var(--primary-color)" }}
-            />
-            <h1
-              className="text-xl font-bold"
-              style={{ color: "var(--text-primary)" }}
-            >
-              Transaction Log
-            </h1>
+            <Receipt className="w-6 h-6" style={{ color: "var(--primary-color)" }} />
+            <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>Transaction Log</h1>
           </div>
           <div className="flex gap-2">
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="px-3 py-2 rounded-md flex items-center gap-1 border"
-              style={{
-                borderColor: "var(--border-color)",
-                backgroundColor: "var(--card-secondary-bg)",
-                color: "var(--text-primary)",
-              }}
-            >
+            <button onClick={() => setShowFilters(!showFilters)} className="px-3 py-2 rounded-md flex items-center gap-1 border" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--card-secondary-bg)", color: "var(--text-primary)" }}>
               <Filter className="w-4 h-4" /> Filters
             </button>
-            <button
-              onClick={reload}
-              disabled={loading}
-              className="px-3 py-2 rounded-md flex items-center gap-1 border"
-              style={{
-                borderColor: "var(--border-color)",
-                backgroundColor: "var(--card-secondary-bg)",
-                color: "var(--text-primary)",
-              }}
-            >
-              <RefreshCw
-                className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
-              />{" "}
-              Refresh
+            <button onClick={reload} disabled={loading} className="px-3 py-2 rounded-md flex items-center gap-1 border" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--card-secondary-bg)", color: "var(--text-primary)" }}>
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> Refresh
             </button>
-            <button
-              onClick={handleExport}
-              disabled={exporting || pagination.count === 0}
-              className="px-3 py-2 rounded-md flex items-center gap-1"
-              style={{
-                backgroundColor: "var(--success-color)",
-                color: "white",
-              }}
-            >
+            <button onClick={handleExport} disabled={exporting || pagination.totalItems === 0} className="px-3 py-2 rounded-md flex items-center gap-1" style={{ backgroundColor: "var(--success-color)", color: "white" }}>
               <Download className="w-4 h-4" /> Export CSV
             </button>
           </div>
         </div>
 
-        {showFilters && (
-          <FilterBar
-            filters={filters}
-            onFilterChange={handleFilterChange}
-            onReset={resetFilters}
-          />
-        )}
+        {showFilters && <FilterBar filters={filters} onFilterChange={handleFilterChange} onReset={resetFilters} />}
 
         <div className="mb-3 flex flex-wrap justify-between items-center gap-2">
           <div className="flex items-center gap-2">
-            <label
-              className="text-sm"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              Show:
-            </label>
-            <select
-              value={pageSize}
-              onChange={(e) => setPageSize(Number(e.target.value))}
-              className="px-2 py-1 border rounded text-sm"
-              style={{
-                backgroundColor: "var(--card-bg)",
-                borderColor: "var(--border-color)",
-                color: "var(--text-primary)",
-              }}
-            >
-              {[10, 25, 50, 100].map((s) => (
-                <option key={s}>{s}</option>
-              ))}
+            <label className="text-sm" style={{ color: "var(--text-secondary)" }}>Show:</label>
+            <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} className="px-2 py-1 border rounded text-sm" style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--border-color)", color: "var(--text-primary)" }}>
+              {[10, 25, 50, 100].map((s) => (<option key={s}>{s}</option>))}
             </select>
           </div>
-          <div className="text-sm" style={{ color: "var(--text-primary)" }}>
-            Total Amount:{" "}
-            <span
-              className="font-bold"
-              style={{ color: "var(--success-color)" }}
-            >
-              {formatCurrency(totalAmount)}
-            </span>
-          </div>
+          <div className="text-sm" style={{ color: "var(--text-primary)" }}>Total Amount (current page): <span className="font-bold" style={{ color: "var(--success-color)" }}>{formatCurrency(totalAmount)}</span></div>
           <div className="text-sm" style={{ color: "var(--text-secondary)" }}>
-            {pagination.count > 0
-              ? `Showing ${start} to ${end} of ${pagination.count} entries`
-              : "No entries"}
+            {pagination.totalItems > 0 ? `Showing ${start} to ${end} of ${pagination.totalItems} entries` : "No entries"}
           </div>
         </div>
 
-        {loading && (
-          <div className="flex justify-center py-8">
-            <div
-              className="animate-spin rounded-full h-8 w-8 border-b-2"
-              style={{ borderColor: "var(--primary-color)" }}
-            ></div>
-          </div>
-        )}
-        {error && (
-          <div
-            className="text-center py-4"
-            style={{ color: "var(--danger-color)" }}
-          >
-            Error: {error}
-          </div>
-        )}
+        {loading && <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: "var(--primary-color)" }}></div></div>}
+        {error && <div className="text-center py-4" style={{ color: "var(--danger-color)" }}>Error: {error}</div>}
 
         {!loading && !error && (
           <>
             <TransactionsTable
-              transactions={paginatedTransactions}
+              transactions={transactions}
               onSort={handleSort}
               sortConfig={sortConfig}
               isAdmin={IS_ADMIN}
@@ -229,19 +152,14 @@ const TransactionsPage: React.FC = () => {
               onDelete={(tx) => setDeletingTx(tx)}
               onView={handleView}
             />
-            {pagination.count === 0 && (
-              <div
-                className="text-center py-8"
-                style={{ color: "var(--text-secondary)" }}
-              >
-                No transactions found.
-              </div>
+            {transactions.length === 0 && (
+              <div className="text-center py-8" style={{ color: "var(--text-secondary)" }}>No transactions found.</div>
             )}
-            {pagination.total_pages > 1 && (
+            {pagination.totalPages > 1 && (
               <div className="mt-4">
                 <Pagination
                   currentPage={currentPage}
-                  totalItems={pagination.count}
+                  totalItems={pagination.totalItems}
                   pageSize={pageSize}
                   onPageChange={setCurrentPage}
                   onPageSizeChange={setPageSize}
@@ -254,24 +172,9 @@ const TransactionsPage: React.FC = () => {
         )}
       </div>
 
-      <EditTransactionModal
-        isOpen={!!editingTx}
-        transaction={editingTx}
-        onClose={() => setEditingTx(null)}
-        onSave={updateTransaction}
-      />
-      <DeleteConfirmationModal
-        isOpen={!!deletingTx}
-        transaction={deletingTx}
-        onClose={() => setDeletingTx(null)}
-        onConfirm={handleDeleteConfirm}
-        loading={deleteLoading}
-      />
-      <PaymentViewDialog
-        transaction={viewingTx}
-        isOpen={viewOpen}
-        onClose={() => setViewOpen(false)}
-      />
+      <EditTransactionModal isOpen={!!editingTx} transaction={editingTx} onClose={() => setEditingTx(null)} onSave={updateTransaction} />
+      <DeleteConfirmationModal isOpen={!!deletingTx} transaction={deletingTx} onClose={() => setDeletingTx(null)} onConfirm={handleDeleteConfirm} loading={deleteLoading} />
+      <PaymentViewDialog transaction={viewingTx} isOpen={viewOpen} onClose={() => setViewOpen(false)} />
     </div>
   );
 };

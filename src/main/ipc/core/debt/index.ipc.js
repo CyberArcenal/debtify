@@ -17,6 +17,9 @@ class DebtHandler {
     this.getDebtStatistics = this.importHandler("./get/statistics.ipc");
     this.searchDebts = this.importHandler("./search.ipc");
 
+    this.getAgingSummary = this.importHandler("./get/aging_summary.ipc");
+    this.getDebtsInBucket = this.importHandler("./get/debts_in_bucket.ipc");
+
     // ✏️ WRITE OPERATION HANDLERS
     this.createDebt = this.importHandler("./create.ipc");
     this.updateDebt = this.importHandler("./update.ipc");
@@ -70,6 +73,11 @@ class DebtHandler {
           return await this.getDebtStatistics(params);
         case "searchDebts":
           return await this.searchDebts(params);
+
+        case "getAgingSummary":
+          return await this.getAgingSummary(params);
+        case "getDebtsInBucket":
+          return await this.getDebtsInBucket(params);
 
         // ✏️ WRITE (with transaction)
         case "createDebt":

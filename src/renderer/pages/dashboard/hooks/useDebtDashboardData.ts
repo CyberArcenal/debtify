@@ -94,7 +94,7 @@ export const useDebtDashboardData = () => {
         days60: 0,
         days90plus: 0,
       };
-      debts.forEach((debt) => {
+      debts.data.forEach((debt) => {
         if (debt.status === 'paid') return;
         const dueDate = new Date(debt.dueDate);
         const diffDays = differenceInDays(today, dueDate);
@@ -113,7 +113,7 @@ export const useDebtDashboardData = () => {
 
       // 3. Top debtors (group by borrower)
       const debtorMap = new Map<number, { name: string; outstanding: number; oldestDueDate?: Date }>();
-      debts.forEach((debt) => {
+      debts.data.forEach((debt) => {
         if (debt.status === 'paid') return;
         const borrowerId = debt.borrower?.id;
         if (!borrowerId) return;
@@ -158,10 +158,10 @@ export const useDebtDashboardData = () => {
         limit: 1000,
       });
       // ✅ NEW: periodPayments.data is directly PaymentTransaction[]
-      const collectedThisPeriod = periodPayments.data.reduce((sum, p) => sum + p.amount, 0);
+      const collectedThisPeriod = periodPayments.data.data.reduce((sum, p) => sum + p.amount, 0);
       const expectedThisPeriod = debtsStats.data.totalRemainingBalance; // total remaining of active debts
-      const newDebts = debts.filter((d) => isAfter(new Date(d.createdAt), firstOfMonth)).length;
-      const newDebtors = borrowers.filter((b) => isAfter(new Date(b.createdAt), firstOfMonth)).length;
+      const newDebts = debts.data.filter((d) => isAfter(new Date(d.createdAt), firstOfMonth)).length;
+      const newDebtors = borrowers.data.filter((b) => isAfter(new Date(b.createdAt), firstOfMonth)).length;
 
       // 6. Build final object
       const result: DebtDashboardData = {

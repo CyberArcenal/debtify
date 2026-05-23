@@ -11,12 +11,11 @@ import EditDebtModal from "./components/EditDebtModal";
 
 const ActiveLoansPage: React.FC = () => {
   const {
-    paginatedLoans,
-    loans,
-    filters,
+    loans,                // kasalukuyang page (may filter at sorting na sa server)
     loading,
     error,
     pagination,
+    filters,
     pageSize,
     setPageSize,
     currentPage,
@@ -41,13 +40,12 @@ const ActiveLoansPage: React.FC = () => {
   const openViewModal = (loan: any) => { setSelectedLoan(loan); setViewModalOpen(true); };
   const openEditModal = (loan: any) => { setSelectedLoan(loan); setEditModalOpen(true); };
   const handleSchedule = (loan: any) => {
-    // Navigate to payment schedule page (to be implemented)
     console.log("View schedule for", loan);
   };
 
   const getDisplayRange = () => {
     const start = (currentPage - 1) * pageSize + 1;
-    const end = Math.min(currentPage * pageSize, pagination.count);
+    const end = Math.min(currentPage * pageSize, pagination.totalItems);
     return { start, end };
   };
   const { start, end } = getDisplayRange();
@@ -91,7 +89,7 @@ const ActiveLoansPage: React.FC = () => {
               {[10, 25, 50, 100].map(size => <option key={size} value={size}>{size}</option>)}
             </select>
           </div>
-          <div className="text-sm text-[var(--text-secondary)]">{pagination.count > 0 ? `Showing ${start} to ${end} of ${pagination.count} entries` : "No entries"}</div>
+          <div className="text-sm text-[var(--text-secondary)]">{pagination.totalItems > 0 ? `Showing ${start} to ${end} of ${pagination.totalItems} entries` : "No entries"}</div>
         </div>
 
         {loading && <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--primary-color)]"></div></div>}
@@ -100,7 +98,7 @@ const ActiveLoansPage: React.FC = () => {
         {!loading && !error && (
           <>
             <ActiveLoansTable
-              loans={paginatedLoans}
+              loans={loans}   // direktang array (kasalukuyang page)
               selectedLoans={selectedLoans}
               onToggleSelect={toggleLoanSelection}
               onToggleSelectAll={toggleSelectAll}
@@ -118,8 +116,18 @@ const ActiveLoansPage: React.FC = () => {
                 <p className="text-sm text-[var(--text-tertiary)] mt-1">All debts are either paid or overdue.</p>
               </div>
             )}
-            {loans.length > 0 && pagination.total_pages > 1 && (
-              <div className="mt-4"><Pagination currentPage={currentPage} totalItems={pagination.count} pageSize={pageSize} onPageChange={setCurrentPage} onPageSizeChange={setPageSize} pageSizeOptions={[10,25,50,100]} showPageSize={false} /></div>
+            {loans.length > 0 && pagination.totalPages > 1 && (
+              <div className="mt-4">
+                <Pagination
+                  currentPage={currentPage}
+                  totalItems={pagination.totalItems}
+                  pageSize={pageSize}
+                  onPageChange={setCurrentPage}
+                  onPageSizeChange={setPageSize}
+                  pageSizeOptions={[10,25,50,100]}
+                  showPageSize={false}
+                />
+              </div>
             )}
           </>
         )}

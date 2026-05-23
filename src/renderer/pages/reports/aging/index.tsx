@@ -7,11 +7,11 @@ import AgingChart from "./components/AgingChart";
 import AgingSummaryTable from "./components/AgingSummaryTable";
 import BucketDrillDownModal from "./components/BucketDrillDownModal";
 import ExportButton from "./components/ExportButton";
-import type { AgingBucket } from "./types";
+
 
 const AgingAnalysisPage: React.FC = () => {
   const { loading, error, asOfDate, setAsOfDate, agingSummary, refresh } = useAgingAnalysis();
-  const [selectedBucket, setSelectedBucket] = useState<AgingBucket | null>(null);
+  const [selectedBucket, setSelectedBucket] = useState<{ range: string; totalAmount: number; count: number } | null>(null);
 
   if (loading) return <div className="flex justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: "var(--primary-color)" }}></div></div>;
   if (error) return <div className="text-center p-8" style={{ color: "var(--danger-color)" }}>Error: {error}</div>;
@@ -40,15 +40,19 @@ const AgingAnalysisPage: React.FC = () => {
           <p className="text-sm" style={{ color: "var(--text-primary)" }}>Total Outstanding: <span className="font-bold text-lg" style={{ color: "var(--debt-high)" }}>{totalOutstanding.toLocaleString()} PHP</span></p>
         </div>
 
-        <AgingSummaryTable buckets={buckets} totalOutstanding={totalOutstanding} onBucketClick={setSelectedBucket} />
+        <AgingSummaryTable
+          buckets={buckets}
+          totalOutstanding={totalOutstanding}
+          onBucketClick={(bucket) => setSelectedBucket(bucket)} // bucket has range, totalAmount, count
+        />
       </div>
 
-      <BucketDrillDownModal
-        isOpen={!!selectedBucket}
-        bucketName={selectedBucket?.range || ""}
-        debts={selectedBucket?.debts || []}
-        onClose={() => setSelectedBucket(null)}
-      />
+<BucketDrillDownModal
+  isOpen={!!selectedBucket}
+  bucketRange={selectedBucket?.range || ""}
+  asOfDate={asOfDate}
+  onClose={() => setSelectedBucket(null)}
+/>
     </div>
   );
 };

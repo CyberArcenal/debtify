@@ -1,18 +1,20 @@
 // src/renderer/api/paymenttransaction.ts
 
+import type { PaginatedResult } from "./common";
+
 // ----------------------------------------------------------------------
 // 📦 Types & Interfaces
 // ----------------------------------------------------------------------
 
 export interface PaymentTransaction {
-  methodId: import("react/jsx-runtime").JSX.Element;
   id: number;
   amount: number;
-  paymentDate: string;        // ISO date string
+  paymentDate: string; // ISO date string
   reference: string | null;
   notes: string | null;
-  recordedAt: string;         // ISO date string
+  recordedAt: string; // ISO date string
   deletedAt: string | null;
+  methodId: number | null;
   debt?: {
     id: number;
     name: string;
@@ -35,7 +37,7 @@ export interface PaymentStatistics {
 
 export interface PaymentCreateData {
   amount: number;
-  paymentDate: string;        // YYYY-MM-DD or ISO string
+  paymentDate: string; // YYYY-MM-DD or ISO string
   reference?: string | null;
   notes?: string | null;
   methodId: number;
@@ -47,7 +49,7 @@ export interface PaymentUpdateData {
   paymentDate?: string;
   reference?: string | null;
   notes?: string | null;
-  methodId: number;
+  methodId?: number;
   debtId?: number;
 }
 
@@ -82,11 +84,11 @@ export interface PaymentResponse {
   data: PaymentTransaction;
 }
 
-// ✅ Changed: data is now an array of PaymentTransactions (no pagination metadata)
+// ✅ Changed: now uses PaginatedResult for list endpoints
 export interface PaymentsResponse {
   status: boolean;
   message: string;
-  data: PaymentTransaction[];
+  data: PaginatedResult<PaymentTransaction>;
 }
 
 export interface PaymentStatisticsResponse {
@@ -154,7 +156,7 @@ class PaymentsAPI {
 
   /**
    * Get all payment transactions with optional filters and pagination
-   * @returns PaymentsResponse where data is an array of PaymentTransactions (no pagination metadata)
+   * @returns PaymentsResponse where data.data is PaymentTransaction[] and data.pagination contains metadata
    */
   async getAll(params?: {
     page?: number;
@@ -201,14 +203,22 @@ class PaymentsAPI {
     debtId?: number,
     borrowerId?: number,
     minAmount?: number,
-    maxAmount?: number
+    maxAmount?: number,
   ): Promise<PaymentsResponse> {
     if (!window.backendAPI?.paymentTransaction) {
       throw new Error("Electron API (paymentTransaction) not available");
     }
     const response = await window.backendAPI.paymentTransaction({
       method: "searchPayments",
-      params: { searchTerm, page, limit, debtId, borrowerId, minAmount, maxAmount },
+      params: {
+        searchTerm,
+        page,
+        limit,
+        debtId,
+        borrowerId,
+        minAmount,
+        maxAmount,
+      },
     });
     if (response.status) return response;
     throw new Error(response.message || "Failed to search payments");
@@ -218,7 +228,10 @@ class PaymentsAPI {
   // ✏️ WRITE OPERATIONS
   // --------------------------------------------------------------------
 
-  async create(data: PaymentCreateData, user = "system"): Promise<PaymentResponse> {
+  async create(
+    data: PaymentCreateData,
+    user = "system",
+  ): Promise<PaymentResponse> {
     if (!window.backendAPI?.paymentTransaction) {
       throw new Error("Electron API (paymentTransaction) not available");
     }
@@ -230,7 +243,11 @@ class PaymentsAPI {
     throw new Error(response.message || "Failed to create payment");
   }
 
-  async update(id: number, data: PaymentUpdateData, user = "system"): Promise<PaymentResponse> {
+  async update(
+    id: number,
+    data: PaymentUpdateData,
+    user = "system",
+  ): Promise<PaymentResponse> {
     if (!window.backendAPI?.paymentTransaction) {
       throw new Error("Electron API (paymentTransaction) not available");
     }
@@ -266,7 +283,10 @@ class PaymentsAPI {
     throw new Error(response.message || "Failed to restore payment");
   }
 
-  async permanentlyDelete(id: number, user = "system"): Promise<{ status: boolean; message: string }> {
+  async permanentlyDelete(
+    id: number,
+    user = "system",
+  ): Promise<{ status: boolean; message: string }> {
     if (!window.backendAPI?.paymentTransaction) {
       throw new Error("Electron API (paymentTransaction) not available");
     }
@@ -282,7 +302,10 @@ class PaymentsAPI {
   // 🔄 BATCH OPERATIONS
   // --------------------------------------------------------------------
 
-  async bulkCreate(paymentsArray: PaymentCreateData[], user = "system"): Promise<BulkCreatePaymentResponse> {
+  async bulkCreate(
+    paymentsArray: PaymentCreateData[],
+    user = "system",
+  ): Promise<BulkCreatePaymentResponse> {
     if (!window.backendAPI?.paymentTransaction) {
       throw new Error("Electron API (paymentTransaction) not available");
     }
@@ -294,7 +317,10 @@ class PaymentsAPI {
     throw new Error(response.message || "Failed to bulk create payments");
   }
 
-  async bulkUpdate(updatesArray: Array<{ id: number; updates: PaymentUpdateData }>, user = "system"): Promise<BulkUpdatePaymentResponse> {
+  async bulkUpdate(
+    updatesArray: Array<{ id: number; updates: PaymentUpdateData }>,
+    user = "system",
+  ): Promise<BulkUpdatePaymentResponse> {
     if (!window.backendAPI?.paymentTransaction) {
       throw new Error("Electron API (paymentTransaction) not available");
     }
@@ -306,7 +332,10 @@ class PaymentsAPI {
     throw new Error(response.message || "Failed to bulk update payments");
   }
 
-  async importFromCSV(filePath: string, user = "system"): Promise<ImportPaymentCsvResponse> {
+  async importFromCSV(
+    filePath: string,
+    user = "system",
+  ): Promise<ImportPaymentCsvResponse> {
     if (!window.backendAPI?.paymentTransaction) {
       throw new Error("Electron API (paymentTransaction) not available");
     }
@@ -318,7 +347,11 @@ class PaymentsAPI {
     throw new Error(response.message || "Failed to import payments from CSV");
   }
 
-  async export(format: "csv" | "json" = "json", filters: any = {}, user = "system"): Promise<ExportPaymentResponse> {
+  async export(
+    format: "csv" | "json" = "json",
+    filters: any = {},
+    user = "system",
+  ): Promise<ExportPaymentResponse> {
     if (!window.backendAPI?.paymentTransaction) {
       throw new Error("Electron API (paymentTransaction) not available");
     }
@@ -334,9 +367,12 @@ class PaymentsAPI {
   // 🧰 UTILITY METHODS
   // --------------------------------------------------------------------
 
-  async getByDebtId(debtId: number, includeDeleted = false): Promise<PaymentTransaction[]> {
+  async getByDebtId(
+    debtId: number,
+    includeDeleted = false,
+  ): Promise<PaymentTransaction[]> {
     const response = await this.getAll({ debtId, includeDeleted, limit: 1000 });
-    return response.data;   // ✅ changed: .data is array directly
+    return response.data.data; // ✅ access nested data array
   }
 
   async getTotalPaidForDebt(debtId: number): Promise<number> {
@@ -345,7 +381,29 @@ class PaymentsAPI {
   }
 
   async isAvailable(): Promise<boolean> {
-    return !!(window.backendAPI?.paymentTransaction);
+    return !!window.backendAPI?.paymentTransaction;
+  }
+
+  /**
+   * Get collection report for a date range and target
+   * @param fromDate - YYYY-MM-DD
+   * @param toDate - YYYY-MM-DD
+   * @param target - expected total collection amount
+   */
+  async getCollectionReport(
+    fromDate: string,
+    toDate: string,
+    target: number,
+  ): Promise<{ status: boolean; message: string; data: any }> {
+    if (!window.backendAPI?.paymentTransaction) {
+      throw new Error("Electron API (paymentTransaction) not available");
+    }
+    const response = await window.backendAPI.paymentTransaction({
+      method: "getCollectionReport",
+      params: { fromDate, toDate, target },
+    });
+    if (response.status) return response;
+    throw new Error(response.message || "Failed to generate collection report");
   }
 }
 

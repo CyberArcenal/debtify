@@ -12,7 +12,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { formatDate } from "../../../utils/formatters";
-import type { NotificationLogEntry } from "../../../api/core/notification_log";
+import type { NotificationLogEntry } from "../../../api/core/reminder_log";
 
 interface NotificationTableProps {
   logs: NotificationLogEntry[];

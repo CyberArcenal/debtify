@@ -2,7 +2,7 @@
 const auditLogger = require("../utils/auditLogger");
 const { validateDebtData } = require("../utils/debtUtils");
 const { defaultInterestRate, defaultPenaltyRate } = require("../utils/system");
-
+const { paginateQueryBuilder } = require("../utils/dbUtils/pagination");
 class DebtService {
   constructor() {
     this.debtRepository = null;
@@ -381,14 +381,12 @@ class DebtService {
     qb.orderBy(`debt.${sortBy}`, sortOrder);
 
     // Pagination
-    if (options.page && options.limit) {
-      const offset = (options.page - 1) * options.limit;
-      qb.skip(offset).take(options.limit);
-    }
-
-    const debts = await qb.getMany();
+    const result = await paginateQueryBuilder(qb, {
+      page: options.page,
+      limit: options.limit,
+    });
     await auditLogger.logView("Debt", null, "system");
-    return debts;
+    return result;
   }
 
   async correctTotalAmount(id, newTotalAmount, user, qr) {
@@ -493,7 +491,8 @@ class DebtService {
    * @param {string} user
    */
   async exportDebts(format = "json", filters = {}, user = "system") {
-    const debts = await this.findAll(filters);
+    const results = await this.findAll(filters);
+    const debts = results.data;
 
     let exportData;
     if (format === "csv") {
@@ -625,6 +624,178 @@ class DebtService {
       }
     }
     return results;
+  }
+
+  // services/Debt.js
+
+  /**
+   * Get aging summary for accounts receivable as of a given date.
+   * @param {string} asOfDate - YYYY-MM-DD
+   * @returns {Promise<{ asOfDate: string; totalOutstanding: number; buckets: Array<{ range: string; minDays: number; maxDays: number|null; totalAmount: number; count: number; percentage: number }> }>}
+   */
+  async getAgingSummary(asOfDate) {
+    const { debt: debtRepo } = await this.getRepositories();
+    // Fetch all active debts (status = 'active', not deleted)
+    const qb = debtRepo
+      .createQueryBuilder("debt")
+      .leftJoinAndSelect("debt.borrower", "borrower")
+      .where("debt.status = :status", { status: "active" })
+      .andWhere("debt.deletedAt IS NULL");
+    const debts = await qb.getMany();
+
+    const asOf = new Date(asOfDate);
+    asOf.setHours(0, 0, 0, 0);
+    const today = asOf; // use given date as reference
+
+    const buckets = [
+      {
+        range: "0-30 days",
+        minDays: 0,
+        maxDays: 30,
+        totalAmount: 0,
+        count: 0,
+        percentage: 0,
+        debts: [],
+      },
+      {
+        range: "31-60 days",
+        minDays: 31,
+        maxDays: 60,
+        totalAmount: 0,
+        count: 0,
+        percentage: 0,
+        debts: [],
+      },
+      {
+        range: "61-90 days",
+        minDays: 61,
+        maxDays: 90,
+        totalAmount: 0,
+        count: 0,
+        percentage: 0,
+        debts: [],
+      },
+      {
+        range: "90+ days",
+        minDays: 91,
+        maxDays: null,
+        totalAmount: 0,
+        count: 0,
+        percentage: 0,
+        debts: [],
+      },
+    ];
+
+    for (const debt of debts) {
+      const dueDate = new Date(debt.dueDate);
+      dueDate.setHours(0, 0, 0, 0);
+      let daysPastDue = Math.floor(
+        (today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24),
+      );
+      if (daysPastDue < 0) daysPastDue = 0;
+
+      let bucketIndex = 0;
+      if (daysPastDue <= 30) bucketIndex = 0;
+      else if (daysPastDue <= 60) bucketIndex = 1;
+      else if (daysPastDue <= 90) bucketIndex = 2;
+      else bucketIndex = 3;
+
+      buckets[bucketIndex].totalAmount += debt.remainingAmount;
+      buckets[bucketIndex].count += 1;
+      // Do not store full debts here to keep lightweight; for drill-down we have separate endpoint.
+    }
+
+    const totalOutstanding = buckets.reduce((sum, b) => sum + b.totalAmount, 0);
+    for (const bucket of buckets) {
+      bucket.percentage =
+        totalOutstanding > 0
+          ? (bucket.totalAmount / totalOutstanding) * 100
+          : 0;
+    }
+
+    return { asOfDate, totalOutstanding, buckets };
+  }
+
+  /**
+   * Get paginated debts that fall into a specific aging bucket as of a given date.
+   * @param {string} bucketRange - e.g., "0-30 days", "31-60 days", "61-90 days", "90+ days"
+   * @param {string} asOfDate - YYYY-MM-DD
+   * @param {number} page - page number
+   * @param {number} limit - items per page
+   * @returns {Promise<{ data: Debt[], pagination: {...} }>}
+   */
+  async getDebtsInBucket(bucketRange, asOfDate, page = 1, limit = 10) {
+    const { debt: debtRepo } = await this.getRepositories();
+    const qb = debtRepo
+      .createQueryBuilder("debt")
+      .leftJoinAndSelect("debt.borrower", "borrower")
+      .where("debt.status = :status", { status: "active" })
+      .andWhere("debt.deletedAt IS NULL");
+
+    const asOf = new Date(asOfDate);
+    asOf.setHours(0, 0, 0, 0);
+
+    // Determine min and max days for the bucket
+    let minDays = 0,
+      maxDays = null;
+    if (bucketRange === "0-30 days") {
+      minDays = 0;
+      maxDays = 30;
+    } else if (bucketRange === "31-60 days") {
+      minDays = 31;
+      maxDays = 60;
+    } else if (bucketRange === "61-90 days") {
+      minDays = 61;
+      maxDays = 90;
+    } else if (bucketRange === "90+ days") {
+      minDays = 91;
+      maxDays = null;
+    } else {
+      throw new Error(`Invalid bucket range: ${bucketRange}`);
+    }
+
+    // Because we cannot directly filter by computed days in SQL easily without a raw query, we'll fetch all active debts and filter client-side.
+    // For large datasets, this is inefficient. Better to use a raw SQL expression:
+    // WHERE julianday(?) - julianday(dueDate) BETWEEN ? AND ?
+    // But since we already have paginateQueryBuilder, we'll do a subquery or raw SQL.
+    // Let's use raw SQL for efficiency.
+
+    const queryRunner = debtRepo.manager.connection.createQueryRunner();
+    await queryRunner.connect();
+    try {
+      let whereClause = `debt.status = 'active' AND debt.deletedAt IS NULL`;
+      if (maxDays !== null) {
+        whereClause += ` AND (julianday(:asOfDate) - julianday(debt.dueDate)) BETWEEN :minDays AND :maxDays`;
+      } else {
+        whereClause += ` AND (julianday(:asOfDate) - julianday(debt.dueDate)) >= :minDays`;
+      }
+      const parameters = { asOfDate, minDays, maxDays };
+      const debts = await queryRunner.manager
+        .createQueryBuilder(Debt, "debt")
+        .leftJoinAndSelect("debt.borrower", "borrower")
+        .where(whereClause, parameters)
+        .orderBy("debt.dueDate", "ASC")
+        .skip((page - 1) * limit)
+        .take(limit)
+        .getMany();
+
+      const total = await queryRunner.manager
+        .createQueryBuilder(Debt, "debt")
+        .where(whereClause, parameters)
+        .getCount();
+
+      const pagination = {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      };
+      return { data: debts, pagination };
+    } catch (error) {
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
   }
 }
 

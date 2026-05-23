@@ -5,6 +5,7 @@ import useDebtorGroups from "./hooks/useDebtorGroups";
 import GroupList from "./components/GroupList";
 import GroupMembers from "./components/GroupMembers";
 import GroupFormDialog from "./components/GroupFormDialog";
+import Pagination from "../../../components/Shared/Pagination";
 
 const DebtorGroupsPage: React.FC = () => {
   const {
@@ -14,6 +15,11 @@ const DebtorGroupsPage: React.FC = () => {
     setSelectedGroup,
     groupMembers,
     loadingMembers,
+    membersPagination,
+    membersCurrentPage,
+    setMembersCurrentPage,
+    membersPageSize,
+    setMembersPageSize,
     availableDebtors,
     loadingDebtors,
     createGroupModalOpen,
@@ -54,17 +60,35 @@ const DebtorGroupsPage: React.FC = () => {
         </div>
 
         {/* Right: Group Members */}
-        <div className="md:col-span-2 min-h-0">
+        <div className="md:col-span-2 min-h-0 flex flex-col">
           {selectedGroup ? (
-            <GroupMembers
-              groupName={selectedGroup.name}
-              members={groupMembers}
-              loading={loadingMembers}
-              availableDebtors={availableDebtors}
-              onAssign={assignDebtor}
-              onRemove={removeDebtor}
-              onBulkAssign={bulkAssign}
-            />
+            <>
+              <div className="flex-1 overflow-auto">
+                <GroupMembers
+                  groupName={selectedGroup.name}
+                  members={groupMembers}
+                  loading={loadingMembers}
+                  availableDebtors={availableDebtors}
+                  onAssign={assignDebtor}
+                  onRemove={removeDebtor}
+                  onBulkAssign={bulkAssign}
+                />
+              </div>
+              {/* Pagination for members */}
+              {membersPagination.totalPages > 1 && (
+                <div className="mt-4">
+                  <Pagination
+                    currentPage={membersCurrentPage}
+                    totalItems={membersPagination.totalItems}
+                    pageSize={membersPageSize}
+                    onPageChange={setMembersCurrentPage}
+                    onPageSizeChange={setMembersPageSize}
+                    pageSizeOptions={[10, 20, 50]}
+                    showPageSize={true}
+                  />
+                </div>
+              )}
+            </>
           ) : (
             <div className="rounded-md border h-full flex items-center justify-center" style={{ backgroundColor: "var(--card-secondary-bg)", borderColor: "var(--border-color)" }}>
               <div className="text-center text-[var(--text-tertiary)]">

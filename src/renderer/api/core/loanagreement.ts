@@ -1,5 +1,7 @@
 // src/renderer/api/loanagreement.ts
 
+import type { PaginatedResult } from "./common";
+
 // ----------------------------------------------------------------------
 // 📦 Types & Interfaces
 // ----------------------------------------------------------------------
@@ -88,7 +90,7 @@ export interface LoanAgreementResponse {
 export interface LoanAgreementsResponse {
   status: boolean;
   message: string;
-  data: LoanAgreement[];
+  data: PaginatedResult<LoanAgreement>;
 }
 
 export interface LoanAgreementStatisticsResponse {
@@ -377,7 +379,7 @@ class LoanAgreementsAPI {
    */
   async getByDebtId(debtId: number, includeDeleted = false): Promise<LoanAgreement[]> {
     const response = await this.getAll({ debtId, includeDeleted, limit: 1000 });
-    return response.data;   // ✅ changed: .data is array directly
+    return response.data.data;   // ✅ changed: .data is array directly
   }
 
   /**
@@ -386,7 +388,7 @@ class LoanAgreementsAPI {
   async hasAgreements(debtId: number): Promise<boolean> {
     try {
       const response = await this.getAll({ debtId, limit: 1 });
-      return response.data.length > 0;   // ✅ changed: .data is array
+      return response.data.data.length > 0;   // ✅ changed: .data is array
     } catch (error) {
       console.error("Error checking agreements:", error);
       return false;

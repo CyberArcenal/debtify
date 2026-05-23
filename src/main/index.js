@@ -841,7 +841,8 @@ function registerIpcHandlers() {
   // Import modular IPC handlers
   try {
     const ipcModules = [
-      "./ipc/core/notification_log/index.ipc.js",
+      "./ipc/core/reminder/index.ipc.js",
+      "./ipc/core/notificationLog/index.ipc.js",
       "./ipc/core/dashboard/index.ipc.js",
       "./ipc/utils/activation.ipc.js",
       "./ipc/utils/printer/index.ipc.js",

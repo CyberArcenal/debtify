@@ -1,5 +1,5 @@
 // src/renderer/pages/debtors/index.tsx
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Plus, Users, RefreshCw } from "lucide-react";
 import Button from "../../components/UI/Button";
 import { dialogs } from "../../utils/dialogs";
@@ -15,12 +15,11 @@ import Pagination from "../../components/Shared/Pagination";
 
 const DebtorDirectory: React.FC = () => {
   const {
-    paginatedDebtors,
     debtors,
-    filters,
     loading,
     error,
     pagination,
+    filters,
     selectedDebtors,
     setSelectedDebtors,
     sortConfig,
@@ -41,6 +40,18 @@ const DebtorDirectory: React.FC = () => {
   const [editingDebtor, setEditingDebtor] = useState<any>(null);
   const [viewOpen, setViewOpen] = useState(false);
   const [viewingDebtor, setViewingDebtor] = useState<any>(null);
+
+  // Ref para sa pagination container (para sa auto-scroll)
+  const paginationRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll pababa sa pagination kapag nagbago ang currentPage AT tapos na ang loading
+  useEffect(() => {
+    if (!loading && paginationRef.current) {
+      setTimeout(() => {
+        paginationRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+      }, 200);
+    }
+  }, [currentPage, loading]);
 
   const openAddForm = () => {
     setFormMode("add");
@@ -108,7 +119,7 @@ const DebtorDirectory: React.FC = () => {
 
   const getDisplayRange = () => {
     const start = (currentPage - 1) * pageSize + 1;
-    const end = Math.min(currentPage * pageSize, pagination.count);
+    const end = Math.min(currentPage * pageSize, pagination.totalItems);
     return { start, end };
   };
   const { start, end } = getDisplayRange();
@@ -176,7 +187,7 @@ const DebtorDirectory: React.FC = () => {
           <span className="text-sm text-[var(--text-secondary)]">entries</span>
         </div>
         <div className="text-sm text-[var(--text-secondary)]">
-          {pagination.count > 0 ? `Showing ${start} to ${end} of ${pagination.count} entries` : "No entries"}
+          {pagination.totalItems > 0 ? `Showing ${start} to ${end} of ${pagination.totalItems} entries` : "No entries"}
         </div>
       </div>
 
@@ -190,7 +201,7 @@ const DebtorDirectory: React.FC = () => {
       {!loading && !error && (
         <>
           <DebtorTable
-            debtors={paginatedDebtors}
+            debtors={debtors}
             selectedDebtors={selectedDebtors}
             onToggleSelect={toggleDebtorSelection}
             onToggleSelectAll={toggleSelectAll}
@@ -215,11 +226,11 @@ const DebtorDirectory: React.FC = () => {
             </div>
           )}
 
-          {debtors.length > 0 && pagination.total_pages > 1 && (
-            <div className="mt-4">
+          {debtors.length > 0 && pagination.totalPages > 1 && (
+            <div ref={paginationRef} className="mt-4">
               <Pagination
                 currentPage={currentPage}
-                totalItems={pagination.count}
+                totalItems={pagination.totalItems}
                 pageSize={pageSize}
                 onPageChange={setCurrentPage}
                 onPageSizeChange={setPageSize}

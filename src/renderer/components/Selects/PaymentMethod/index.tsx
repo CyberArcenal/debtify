@@ -26,7 +26,11 @@ const PaymentMethodSelect: React.FC<PaymentMethodSelectProps> = ({
   const [searchTerm, setSearchTerm] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [dropdownStyle, setDropdownStyle] = useState({ top: 0, left: 0, width: 0 });
+  const [dropdownStyle, setDropdownStyle] = useState({
+    top: 0,
+    left: 0,
+    width: 0,
+  });
 
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -36,9 +40,9 @@ const PaymentMethodSelect: React.FC<PaymentMethodSelectProps> = ({
     const loadMethods = async () => {
       setLoading(true);
       try {
-        const response = await paymentMethodsAPI.getAll();
+        const response = await paymentMethodsAPI.getAll(1, 100); // page, limit
         if (response.status && response.data) {
-          const list = Array.isArray(response.data) ? response.data : [];
+          const list = response.data.data || [];
           setMethods(list);
           setFilteredMethods(list);
         }
@@ -57,7 +61,9 @@ const PaymentMethodSelect: React.FC<PaymentMethodSelectProps> = ({
       return;
     }
     const lower = searchTerm.toLowerCase();
-    setFilteredMethods(methods.filter((m) => m.name.toLowerCase().includes(lower)));
+    setFilteredMethods(
+      methods.filter((m) => m.name.toLowerCase().includes(lower)),
+    );
   }, [searchTerm, methods]);
 
   useEffect(() => {
@@ -69,7 +75,11 @@ const PaymentMethodSelect: React.FC<PaymentMethodSelectProps> = ({
   const updateDropdownPosition = () => {
     if (triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect();
-      setDropdownStyle({ top: rect.bottom + window.scrollY, left: rect.left + window.scrollX, width: rect.width });
+      setDropdownStyle({
+        top: rect.bottom + window.scrollY,
+        left: rect.left + window.scrollX,
+        width: rect.width,
+      });
     }
   };
 
@@ -112,7 +122,9 @@ const PaymentMethodSelect: React.FC<PaymentMethodSelectProps> = ({
   };
 
   const selectedMethod = methods.find((m) => m.id === value);
-  const IconComponent = selectedMethod ? (Icons as any)[selectedMethod.icon] || Icons.CreditCard : null;
+  const IconComponent = selectedMethod
+    ? (Icons as any)[selectedMethod.icon] || Icons.CreditCard
+    : null;
 
   return (
     <div className={`relative ${className}`}>
@@ -122,69 +134,156 @@ const PaymentMethodSelect: React.FC<PaymentMethodSelectProps> = ({
         onClick={() => !disabled && setIsOpen(!isOpen)}
         disabled={disabled}
         className="w-full px-4 py-2 rounded-lg text-left flex items-center gap-2 transition-colors duration-200"
-        style={{ backgroundColor: "var(--card-bg)", border: "1px solid var(--border-color)", color: "var(--text-primary)", minHeight: "42px" }}
+        style={{
+          backgroundColor: "var(--card-bg)",
+          border: "1px solid var(--border-color)",
+          color: "var(--text-primary)",
+          minHeight: "42px",
+        }}
       >
-        {selectedMethod && IconComponent ? <IconComponent className="w-4 h-4 flex-shrink-0" style={{ color: "var(--primary-color)" }} /> : <CreditCard className="w-4 h-4 flex-shrink-0" style={{ color: "var(--primary-color)" }} />}
+        {selectedMethod && IconComponent ? (
+          <IconComponent
+            className="w-4 h-4 flex-shrink-0"
+            style={{ color: "var(--primary-color)" }}
+          />
+        ) : (
+          <CreditCard
+            className="w-4 h-4 flex-shrink-0"
+            style={{ color: "var(--primary-color)" }}
+          />
+        )}
         <div className="flex-1 min-w-0 flex items-center gap-2">
           {selectedMethod ? (
             <>
-              <span className="font-medium truncate">{selectedMethod.name}</span>
+              <span className="font-medium truncate">
+                {selectedMethod.name}
+              </span>
               {selectedMethod.description && (
-                <span className="text-xs truncate" style={{ color: "var(--text-secondary)" }}>
+                <span
+                  className="text-xs truncate"
+                  style={{ color: "var(--text-secondary)" }}
+                >
                   ({selectedMethod.description})
                 </span>
               )}
             </>
           ) : (
-            <span className="truncate" style={{ color: "var(--text-secondary)" }}>{placeholder}</span>
+            <span
+              className="truncate"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              {placeholder}
+            </span>
           )}
         </div>
         {selectedMethod && !disabled && (
-          <button onClick={handleClear} className="p-1 rounded-full hover:bg-gray-700 transition-colors flex-shrink-0" style={{ color: "var(--text-secondary)" }} title="Remove selected">
+          <button
+            onClick={handleClear}
+            className="p-1 rounded-full hover:bg-gray-700 transition-colors flex-shrink-0"
+            style={{ color: "var(--text-secondary)" }}
+            title="Remove selected"
+          >
             <X className="w-4 h-4" />
           </button>
         )}
-        <ChevronDown className={`w-4 h-4 transition-transform duration-200 flex-shrink-0 ${isOpen ? "rotate-180" : ""}`} style={{ color: "var(--text-secondary)" }} />
+        <ChevronDown
+          className={`w-4 h-4 transition-transform duration-200 flex-shrink-0 ${isOpen ? "rotate-180" : ""}`}
+          style={{ color: "var(--text-secondary)" }}
+        />
       </button>
 
-      {isOpen && createPortal(
-        <div
-          ref={dropdownRef}
-          className="fixed z-[9999] rounded-lg shadow-lg overflow-hidden"
-          style={{ top: dropdownStyle.top, left: dropdownStyle.left, width: dropdownStyle.width, backgroundColor: "var(--card-bg)", border: "1px solid var(--border-color)", maxHeight: "350px" }}
-        >
-          <div className="p-2 border-b" style={{ borderColor: "var(--border-color)" }}>
-            <div className="relative">
-              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4" style={{ color: "var(--text-secondary)" }} />
-              <input ref={searchInputRef} type="text" placeholder="Search payment methods..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-8 pr-3 py-1.5 rounded text-sm" style={{ backgroundColor: "var(--card-secondary-bg)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
+      {isOpen &&
+        createPortal(
+          <div
+            ref={dropdownRef}
+            className="fixed z-[9999] rounded-lg shadow-lg overflow-hidden"
+            style={{
+              top: dropdownStyle.top,
+              left: dropdownStyle.left,
+              width: dropdownStyle.width,
+              backgroundColor: "var(--card-bg)",
+              border: "1px solid var(--border-color)",
+              maxHeight: "350px",
+            }}
+          >
+            <div
+              className="p-2 border-b"
+              style={{ borderColor: "var(--border-color)" }}
+            >
+              <div className="relative">
+                <Search
+                  className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4"
+                  style={{ color: "var(--text-secondary)" }}
+                />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Search payment methods..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 rounded text-sm"
+                  style={{
+                    backgroundColor: "var(--card-secondary-bg)",
+                    border: "1px solid var(--border-color)",
+                    color: "var(--text-primary)",
+                  }}
+                />
+              </div>
             </div>
-          </div>
-          <div className="overflow-y-auto" style={{ maxHeight: "250px" }}>
-            {loading && methods.length === 0 ? <div className="p-3 text-center text-sm" style={{ color: "var(--text-secondary)" }}>Loading...</div>
-            : filteredMethods.length === 0 ? <div className="p-3 text-center text-sm" style={{ color: "var(--text-secondary)" }}>No payment methods found</div>
-            : filteredMethods.map((method) => {
-                const MethodIcon = (Icons as any)[method.icon] || Icons.CreditCard;
-                return (
-                  <button
-                    key={method.id}
-                    type="button"
-                    onClick={() => handleSelect(method)}
-                    className={`w-full px-3 py-2 text-left flex items-center gap-2 transition-colors text-sm cursor-pointer hover:bg-[var(--card-hover-bg)] ${method.id === value ? "bg-[var(--accent-blue-light)]" : ""}`}
-                    style={{ borderBottom: "1px solid var(--border-color)" }}
-                  >
-                    <MethodIcon className="w-4 h-4 flex-shrink-0" style={{ color: "var(--primary-color)" }} />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium truncate">{method.name}</div>
-                      {method.description && <div className="text-xs truncate text-[var(--text-tertiary)]">{method.description}</div>}
-                    </div>
-                    {method.isDefault && <span className="text-xs bg-yellow-100 text-yellow-800 px-1 py-0.5 rounded">Default</span>}
-                  </button>
-                );
-              })}
-          </div>
-        </div>,
-        document.body
-      )}
+            <div className="overflow-y-auto" style={{ maxHeight: "250px" }}>
+              {loading && methods.length === 0 ? (
+                <div
+                  className="p-3 text-center text-sm"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  Loading...
+                </div>
+              ) : filteredMethods.length === 0 ? (
+                <div
+                  className="p-3 text-center text-sm"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  No payment methods found
+                </div>
+              ) : (
+                filteredMethods.map((method) => {
+                  const MethodIcon =
+                    (Icons as any)[method.icon] || Icons.CreditCard;
+                  return (
+                    <button
+                      key={method.id}
+                      type="button"
+                      onClick={() => handleSelect(method)}
+                      className={`w-full px-3 py-2 text-left flex items-center gap-2 transition-colors text-sm cursor-pointer hover:bg-[var(--card-hover-bg)] ${method.id === value ? "bg-[var(--accent-blue-light)]" : ""}`}
+                      style={{ borderBottom: "1px solid var(--border-color)" }}
+                    >
+                      <MethodIcon
+                        className="w-4 h-4 flex-shrink-0"
+                        style={{ color: "var(--primary-color)" }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">
+                          {method.name}
+                        </div>
+                        {method.description && (
+                          <div className="text-xs truncate text-[var(--text-tertiary)]">
+                            {method.description}
+                          </div>
+                        )}
+                      </div>
+                      {method.isDefault && (
+                        <span className="text-xs bg-yellow-100 text-yellow-800 px-1 py-0.5 rounded">
+                          Default
+                        </span>
+                      )}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 };

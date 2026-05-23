@@ -1,5 +1,7 @@
 // src/renderer/api/debt.ts
 
+import type { PaginatedResult } from "./common";
+
 // ----------------------------------------------------------------------
 // 📦 Types & Interfaces
 // ----------------------------------------------------------------------
@@ -43,7 +45,19 @@ export interface DebtStatistics {
   totalAmountOwed: number;
   totalRemainingBalance: number;
 }
-
+export interface AgingBucket {
+  range: string; // e.g., "0-30 days"
+  minDays: number;
+  maxDays: number | null;
+  totalAmount: number;
+  count: number;
+  percentage: number;
+}
+export interface AgingSummary {
+  asOfDate: string;
+  totalOutstanding: number;
+  buckets: AgingBucket[];
+}
 export interface DebtCreateData {
   name: string;
   totalAmount: number;
@@ -97,11 +111,11 @@ export interface DebtResponse {
   data: Debt;
 }
 
-// ✅ Changed: data is now an array of Debts (no pagination metadata)
+// ✅ Changed: data now contains pagination metadata
 export interface DebtsResponse {
   status: boolean;
   message: string;
-  data: Debt[];
+  data: PaginatedResult<Debt>;
 }
 
 export interface DebtStatisticsResponse {
@@ -180,7 +194,7 @@ class DebtsAPI {
 
   /**
    * Get all debts with optional filters and pagination
-   * @returns DebtsResponse where data is an array of Debts (no pagination metadata)
+   * @returns DebtsResponse where data.data is Debt[] and data.pagination contains metadata
    */
   async getAll(params?: {
     page?: number;
@@ -224,7 +238,7 @@ class DebtsAPI {
 
   /**
    * Search debts by name, borrower name, etc.
-   * @returns DebtsResponse where data is an array of Debts
+   * @returns DebtsResponse with paginated results
    */
   async search(
     searchTerm: string,
@@ -488,7 +502,7 @@ class DebtsAPI {
         search: debtName,
         limit: 1,
       });
-      return response.data.length > 0; // ✅ changed: .data is array
+      return response.data.data.length > 0; // ✅ access nested data array
     } catch (error) {
       console.error("Error checking debt existence:", error);
       return false;
@@ -507,7 +521,49 @@ class DebtsAPI {
       includeDeleted,
       limit: 1000,
     });
-    return response.data; // ✅ changed: .data is array directly
+    return response.data.data; // ✅ access nested data array
+  }
+
+  /**
+   * Get aging summary for accounts receivable
+   * @param asOfDate - Date to calculate aging (YYYY-MM-DD)
+   */
+  async getAgingSummary(
+    asOfDate: string,
+  ): Promise<{ status: boolean; message: string; data: AgingSummary }> {
+    if (!window.backendAPI?.debt) {
+      throw new Error("Electron API (debt) not available");
+    }
+    const response = await window.backendAPI.debt({
+      method: "getAgingSummary",
+      params: { asOfDate },
+    });
+    if (response.status) return response;
+    throw new Error(response.message || "Failed to fetch aging summary");
+  }
+
+  /**
+   * Get debts in a specific aging bucket with pagination
+   * @param bucketRange - e.g., "0-30 days", "31-60 days"
+   * @param asOfDate - Date to calculate aging (YYYY-MM-DD)
+   * @param page - Page number
+   * @param limit - Items per page
+   */
+  async getDebtsInBucket(
+    bucketRange: string,
+    asOfDate: string,
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<DebtsResponse> {
+    if (!window.backendAPI?.debt) {
+      throw new Error("Electron API (debt) not available");
+    }
+    const response = await window.backendAPI.debt({
+      method: "getDebtsInBucket",
+      params: { bucketRange, asOfDate, page, limit },
+    });
+    if (response.status) return response;
+    throw new Error(response.message || "Failed to fetch debts in bucket");
   }
 
   /**

@@ -15,7 +15,7 @@ interface UsePaymentScheduleReturn {
 }
 
 const usePaymentSchedule = (): UsePaymentScheduleReturn => {
-  const [allDebts, setAllDebts] = useState<any[]>([]);
+  const [payments, setPayments] = useState<ScheduledPayment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<PaymentScheduleFilters>({
@@ -23,54 +23,49 @@ const usePaymentSchedule = (): UsePaymentScheduleReturn => {
     viewMode: "list",
   });
 
-  const fetchActiveDebts = useCallback(async () => {
+  const fetchUpcomingPayments = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const cutoffDays = filters.dateRange === "all" ? 365 : parseInt(filters.dateRange);
+      const cutoffDate = new Date(today);
+      cutoffDate.setDate(today.getDate() + cutoffDays);
+
       const response = await debtsAPI.getAll({
         status: "active",
         includeDeleted: false,
-        limit: 10000,
+        dueDateFrom: today.toISOString().split('T')[0],
+        dueDateTo: cutoffDate.toISOString().split('T')[0],
+        limit: 500, // sufficient for upcoming payments
+        sortBy: "dueDate",
+        sortOrder: "ASC",
       });
       if (!response.status) throw new Error(response.message);
-      setAllDebts(response.data);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
 
-  useEffect(() => {
-    fetchActiveDebts();
-  }, [fetchActiveDebts]);
-
-  const payments = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const cutoffDays = filters.dateRange === "all" ? Infinity : parseInt(filters.dateRange);
-    const cutoffDate = new Date(today);
-    cutoffDate.setDate(today.getDate() + cutoffDays);
-
-    return allDebts
-      .filter(debt => {
-        const dueDate = new Date(debt.dueDate);
-        dueDate.setHours(0, 0, 0, 0);
-        if (dueDate < today) return false;
-        return dueDate <= cutoffDate;
-      })
-      .map(debt => ({
+      const debts = response.data.data; // array of debts
+      const scheduled: ScheduledPayment[] = debts.map(debt => ({
         debtId: debt.id,
         debtName: debt.name,
-        borrowerId: debt.borrower?.id,
+        borrowerId: debt.borrower?.id ?? 0, // fallback to 0 if borrower missing (should not happen for active debts)
         borrowerName: debt.borrower?.name || "Unknown",
         dueDate: debt.dueDate,
         amountDue: debt.remainingAmount,
         contact: debt.borrower?.contact || null,
         email: debt.borrower?.email || null,
-      }))
-      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
-  }, [allDebts, filters.dateRange]);
+      }));
+      setPayments(scheduled);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [filters.dateRange]);
+
+  useEffect(() => {
+    fetchUpcomingPayments();
+  }, [fetchUpcomingPayments]);
 
   const markAsPaid = async (debtId: number, amount: number, paymentDate: string, methodId: number) => {
     try {
@@ -82,13 +77,13 @@ const usePaymentSchedule = (): UsePaymentScheduleReturn => {
         debtId,
         methodId,
       });
-      await fetchActiveDebts();
+      await fetchUpcomingPayments();
     } catch (err: any) {
       throw new Error(err.message);
     }
   };
 
-  const refresh = () => fetchActiveDebts();
+  const refresh = () => fetchUpcomingPayments();
 
   return {
     payments,

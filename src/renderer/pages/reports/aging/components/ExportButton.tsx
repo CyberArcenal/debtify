@@ -15,19 +15,10 @@ const ExportButton: React.FC<ExportButtonProps> = ({ summary }) => {
       [`As of: ${summary.asOfDate}`],
       [`Total Outstanding: ${summary.totalOutstanding}`],
       [],
-      ["Bucket", "Count", "Amount", "Percentage"],
+      ["Bucket", "Count", "Amount (PHP)", "Percentage"],
     ];
     summary.buckets.forEach(b => {
       rows.push([b.range, b.count.toString(), b.totalAmount.toString(), `${b.percentage.toFixed(2)}%`]);
-    });
-    rows.push([], ["DETAILS PER BUCKET"]);
-    summary.buckets.forEach(b => {
-      rows.push([`${b.range} - Debts:`]);
-      rows.push(["Debt Name", "Borrower", "Amount", "Due Date"]);
-      b.debts.forEach(d => {
-        rows.push([d.name, d.borrower?.name || "", d.remainingAmount.toString(), d.dueDate]);
-      });
-      rows.push([]);
     });
     const csvContent = rows.map(row => row.join(",")).join("\n");
     const blob = new Blob([csvContent], { type: "text/csv" });
@@ -42,7 +33,7 @@ const ExportButton: React.FC<ExportButtonProps> = ({ summary }) => {
 
   return (
     <button onClick={handleExportCSV} className="px-3 py-2 rounded flex items-center gap-1" style={{ backgroundColor: "var(--primary-color)", color: "white" }}>
-      <Download className="w-4 h-4" /> Export CSV
+      <Download className="w-4 h-4" /> Export Summary
     </button>
   );
 };

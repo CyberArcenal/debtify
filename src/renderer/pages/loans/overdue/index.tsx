@@ -13,12 +13,11 @@ import notificationAPI from "../../../api/core/notification";
 
 const OverdueLoansPage: React.FC = () => {
   const {
-    paginatedLoans,
-    loans,
-    filters,
+    loans,                     // now the current page data (after filtering)
     loading,
     error,
     pagination,
+    filters,
     pageSize,
     setPageSize,
     currentPage,
@@ -68,7 +67,7 @@ const OverdueLoansPage: React.FC = () => {
 
   const getDisplayRange = () => {
     const start = (currentPage - 1) * pageSize + 1;
-    const end = Math.min(currentPage * pageSize, pagination.count);
+    const end = Math.min(currentPage * pageSize, pagination.totalItems);
     return { start, end };
   };
   const { start, end } = getDisplayRange();
@@ -107,7 +106,7 @@ const OverdueLoansPage: React.FC = () => {
 
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-3">
           <div className="flex items-center gap-2"><label className="text-sm" style={{ color: "var(--text-secondary)" }}>Show:</label><select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} className="px-2 py-1 border rounded text-sm" style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--border-color)", color: "var(--text-primary)" }}>{[10,25,50,100].map(s => <option key={s} value={s}>{s}</option>)}</select></div>
-          <div className="text-sm" style={{ color: "var(--text-secondary)" }}>{pagination.count > 0 ? `Showing ${start} to ${end} of ${pagination.count} entries` : "No entries"}</div>
+          <div className="text-sm" style={{ color: "var(--text-secondary)" }}>{pagination.totalItems > 0 ? `Showing ${start} to ${end} of ${pagination.totalItems} entries` : "No entries"}</div>
         </div>
 
         {loading && <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: "var(--primary-color)" }}></div></div>}
@@ -116,7 +115,7 @@ const OverdueLoansPage: React.FC = () => {
         {!loading && !error && (
           <>
             <OverdueLoansTable
-              loans={paginatedLoans}
+              loans={loans}
               selectedLoans={selectedLoans}
               onToggleSelect={toggleLoanSelection}
               onToggleSelectAll={toggleSelectAll}
@@ -133,7 +132,7 @@ const OverdueLoansPage: React.FC = () => {
                 <p className="text-sm" style={{ color: "var(--text-tertiary)" }}>All debts are up to date.</p>
               </div>
             )}
-            {loans.length > 0 && pagination.total_pages > 1 && <div className="mt-4"><Pagination currentPage={currentPage} totalItems={pagination.count} pageSize={pageSize} onPageChange={setCurrentPage} onPageSizeChange={setPageSize} pageSizeOptions={[10,25,50,100]} showPageSize={false} /></div>}
+            {loans.length > 0 && pagination.totalPages > 1 && <div className="mt-4"><Pagination currentPage={currentPage} totalItems={pagination.totalItems} pageSize={pageSize} onPageChange={setCurrentPage} onPageSizeChange={setPageSize} pageSizeOptions={[10,25,50,100]} showPageSize={false} /></div>}
           </>
         )}
       </div>

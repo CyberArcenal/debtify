@@ -1,5 +1,6 @@
 // src/main/services/GroupService.js
 const auditLogger = require("../utils/auditLogger");
+const { paginateQueryBuilder } = require("../utils/dbUtils/pagination");
 
 class GroupService {
   constructor() {
@@ -53,7 +54,11 @@ class GroupService {
    */
   _validateGroupData(data) {
     const errors = [];
-    if (!data.name || typeof data.name !== "string" || data.name.trim() === "") {
+    if (
+      !data.name ||
+      typeof data.name !== "string" ||
+      data.name.trim() === ""
+    ) {
       errors.push("Group name is required");
     }
     return { valid: errors.length === 0, errors };
@@ -64,15 +69,16 @@ class GroupService {
   // ----------------------------------------------------------------------
 
   /**
-   * Get all groups
+   * Get all groups with pagination
+   * @param {number} page
+   * @param {number} limit
    */
-  async getAllGroups() {
+  async getAllGroups(page = 1, limit = 10) {
     const { group: groupRepo } = await this.getRepositories();
-    const groups = await groupRepo.find({
-      order: { name: "ASC" },
-    });
+    const qb = groupRepo.createQueryBuilder("group").orderBy("group.name", "ASC");
+    const result = await paginateQueryBuilder(qb, { page, limit });
     await auditLogger.logView("DebtorGroup", null, "system");
-    return groups;
+    return result;
   }
 
   /**
@@ -81,9 +87,7 @@ class GroupService {
    */
   async getGroupById(id) {
     const { group: groupRepo } = await this.getRepositories();
-    const group = await groupRepo.findOne({
-      where: { id },
-    });
+    const group = await groupRepo.findOne({ where: { id } });
     if (!group) {
       throw new Error(`Group with ID ${id} not found`);
     }
@@ -92,17 +96,23 @@ class GroupService {
   }
 
   /**
-   * Get all members of a group (with debtor details)
+   * Get members of a group with pagination (including debtor details)
    * @param {number} groupId
+   * @param {number} page
+   * @param {number} limit
+   * @returns {Promise<{ data: GroupMemberWithDebtor[], pagination: {...} }>}
    */
-  async getGroupMembers(groupId) {
+  async getGroupMembers(groupId, page = 1, limit = 20) {
     const { member: memberRepo } = await this.getRepositories();
-    const members = await memberRepo.find({
-      where: { group: { id: groupId } },
-      relations: ["debtor"],
-      order: { assignedAt: "DESC" },
-    });
-    return members.map(m => ({
+    const qb = memberRepo
+      .createQueryBuilder("member")
+      .leftJoinAndSelect("member.debtor", "debtor")
+      .where("member.groupId = :groupId", { groupId })
+      .orderBy("member.assignedAt", "DESC");
+
+    const result = await paginateQueryBuilder(qb, { page, limit });
+    // Transform data to match expected interface
+    const transformedData = result.data.map((m) => ({
       groupId: m.groupId,
       debtorId: m.debtorId,
       assignedAt: m.assignedAt,
@@ -114,19 +124,33 @@ class GroupService {
         address: m.debtor.address,
       },
     }));
+    return {
+      data: transformedData,
+      pagination: result.pagination,
+    };
   }
 
   /**
-   * Get groups for a specific debtor
+   * Get groups for a specific debtor with pagination
    * @param {number} debtorId
+   * @param {number} page
+   * @param {number} limit
+   * @returns {Promise<{ data: DebtorGroup[], pagination: {...} }>}
    */
-  async getGroupsForDebtor(debtorId) {
+  async getGroupsForDebtor(debtorId, page = 1, limit = 10) {
     const { member: memberRepo } = await this.getRepositories();
-    const members = await memberRepo.find({
-      where: { debtor: { id: debtorId } },
-      relations: ["group"],
-    });
-    return members.map(m => m.group);
+    const qb = memberRepo
+      .createQueryBuilder("member")
+      .leftJoinAndSelect("member.group", "group")
+      .where("member.debtorId = :debtorId", { debtorId })
+      .orderBy("group.name", "ASC");
+
+    const result = await paginateQueryBuilder(qb, { page, limit });
+    const groups = result.data.map((m) => m.group);
+    return {
+      data: groups,
+      pagination: result.pagination,
+    };
   }
 
   // ----------------------------------------------------------------------
@@ -229,15 +253,12 @@ class GroupService {
     const groupRepo = this._getRepo(qr, require("../entities/DebtorGroup"));
     const borrowerRepo = this._getRepo(qr, require("../entities/Borrower"));
 
-    // Validate group exists
     const group = await groupRepo.findOne({ where: { id: groupId } });
     if (!group) throw new Error(`Group with ID ${groupId} not found`);
 
-    // Validate debtor exists
     const debtor = await borrowerRepo.findOne({ where: { id: debtorId } });
     if (!debtor) throw new Error(`Debtor with ID ${debtorId} not found`);
 
-    // Check if already assigned
     const existing = await memberRepo.findOne({
       where: { group: { id: groupId }, debtor: { id: debtorId } },
     });
@@ -252,7 +273,12 @@ class GroupService {
     });
 
     const saved = await saveDb(memberRepo, member);
-    await auditLogger.logCreate("DebtorGroupMember", saved.id, { groupId, debtorId }, user);
+    await auditLogger.logCreate(
+      "DebtorGroupMember",
+      saved.id,
+      { groupId, debtorId },
+      user,
+    );
     console.log(`Debtor ${debtorId} assigned to group ${groupId}`);
     return saved;
   }
@@ -274,7 +300,13 @@ class GroupService {
         console.warn(`Failed to assign debtor ${debtorId}: ${err.message}`);
       }
     }
-    await auditLogger.logUpdate("DebtorGroup", groupId, { bulkAssign: true }, { assignedCount }, user);
+    await auditLogger.logUpdate(
+      "DebtorGroup",
+      groupId,
+      { bulkAssign: true },
+      { assignedCount },
+      user,
+    );
     return { assignedCount };
   }
 
@@ -299,7 +331,12 @@ class GroupService {
     }
 
     await removeDb(memberRepo, member);
-    await auditLogger.logDelete("DebtorGroupMember", member.id, { groupId, debtorId }, user);
+    await auditLogger.logDelete(
+      "DebtorGroupMember",
+      member.id,
+      { groupId, debtorId },
+      user,
+    );
     console.log(`Debtor ${debtorId} removed from group ${groupId}`);
   }
 
@@ -320,7 +357,13 @@ class GroupService {
     for (const member of members) {
       await removeDb(memberRepo, member);
     }
-    await auditLogger.logUpdate("DebtorGroup", groupId, { clearMembers: true }, { removedCount: members.length }, user);
+    await auditLogger.logUpdate(
+      "DebtorGroup",
+      groupId,
+      { clearMembers: true },
+      { removedCount: members.length },
+      user,
+    );
     console.log(`Cleared ${members.length} members from group ${groupId}`);
   }
 }

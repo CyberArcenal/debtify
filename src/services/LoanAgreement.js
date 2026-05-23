@@ -1,5 +1,5 @@
 // services/LoanAgreementService.js
-
+const { paginateQueryBuilder } = require("../utils/dbUtils/pagination");
 const auditLogger = require("../utils/auditLogger");
 const { validateLoanAgreementData } = require("../utils/loanAgreementUtils");
 const fs = require("fs").promises;
@@ -80,7 +80,10 @@ class LoanAgreementService {
         await fs.access(filePath);
         await fs.unlink(filePath);
       } catch (err) {
-        console.warn(`Could not delete agreement file: ${filePath}`, err.message);
+        console.warn(
+          `Could not delete agreement file: ${filePath}`,
+          err.message,
+        );
       }
     }
   }
@@ -103,7 +106,14 @@ class LoanAgreementService {
         throw new Error(validation.errors.join(", "));
       }
 
-      const { agreementDate, lenderName, termsText, fileBuffer, fileName, debtId } = agreementData;
+      const {
+        agreementDate,
+        lenderName,
+        termsText,
+        fileBuffer,
+        fileName,
+        debtId,
+      } = agreementData;
 
       // Validate debt existence
       const debt = await debtRepo.findOne({ where: { id: debtId } });
@@ -128,7 +138,11 @@ class LoanAgreementService {
       // Handle file upload if provided
       let savedFilePath = null;
       if (fileBuffer && fileName) {
-        savedFilePath = await this._saveAgreementFile(fileBuffer, fileName, saved.id);
+        savedFilePath = await this._saveAgreementFile(
+          fileBuffer,
+          fileName,
+          saved.id,
+        );
         saved.filePath = savedFilePath;
         await saveDb(agreementRepo, saved); // update with file path
       }
@@ -155,7 +169,10 @@ class LoanAgreementService {
     const debtRepo = this._getRepo(qr, require("../entities/Debt"));
 
     try {
-      const existing = await agreementRepo.findOne({ where: { id }, relations: ["debt"] });
+      const existing = await agreementRepo.findOne({
+        where: { id },
+        relations: ["debt"],
+      });
       if (!existing) {
         throw new Error(`Loan agreement with ID ${id} not found`);
       }
@@ -163,7 +180,9 @@ class LoanAgreementService {
 
       // If debtId is being updated, validate new debt
       if (agreementData.debtId && agreementData.debtId !== existing.debt?.id) {
-        const newDebt = await debtRepo.findOne({ where: { id: agreementData.debtId } });
+        const newDebt = await debtRepo.findOne({
+          where: { id: agreementData.debtId },
+        });
         if (!newDebt) {
           throw new Error(`Debt with ID ${agreementData.debtId} not found`);
         }
@@ -177,7 +196,11 @@ class LoanAgreementService {
         if (existing.filePath) {
           await this._deleteAgreementFile(existing.filePath);
         }
-        const newFilePath = await this._saveAgreementFile(agreementData.fileBuffer, agreementData.fileName, existing.id);
+        const newFilePath = await this._saveAgreementFile(
+          agreementData.fileBuffer,
+          agreementData.fileName,
+          existing.id,
+        );
         existing.filePath = newFilePath;
         delete agreementData.fileBuffer;
         delete agreementData.fileName;
@@ -252,7 +275,10 @@ class LoanAgreementService {
     const agreementRepo = this._getRepo(qr, LoanAgreement);
 
     try {
-      const agreement = await agreementRepo.findOne({ where: { id }, withDeleted: true });
+      const agreement = await agreementRepo.findOne({
+        where: { id },
+        withDeleted: true,
+      });
       if (!agreement) {
         throw new Error(`Loan agreement with ID ${id} not found`);
       }
@@ -264,7 +290,13 @@ class LoanAgreementService {
       agreement.updatedAt = new Date();
 
       const saved = await updateDb(agreementRepo, agreement);
-      await auditLogger.logUpdate("LoanAgreement", id, { deletedAt: true }, { deletedAt: null }, user);
+      await auditLogger.logUpdate(
+        "LoanAgreement",
+        id,
+        { deletedAt: true },
+        { deletedAt: null },
+        user,
+      );
       console.log(`Loan agreement restored: #${id}`);
       return saved;
     } catch (error) {
@@ -284,7 +316,10 @@ class LoanAgreementService {
     const LoanAgreement = require("../entities/LoanAgreement");
     const agreementRepo = this._getRepo(qr, LoanAgreement);
 
-    const agreement = await agreementRepo.findOne({ where: { id }, withDeleted: true });
+    const agreement = await agreementRepo.findOne({
+      where: { id },
+      withDeleted: true,
+    });
     if (!agreement) {
       throw new Error(`Loan agreement with ID ${id} not found`);
     }
@@ -324,7 +359,8 @@ class LoanAgreementService {
    */
   async findAll(options = {}) {
     const { agreement: agreementRepo } = await this.getRepositories();
-    const qb = agreementRepo.createQueryBuilder("agreement")
+    const qb = agreementRepo
+      .createQueryBuilder("agreement")
       .leftJoinAndSelect("agreement.debt", "debt")
       .leftJoinAndSelect("debt.borrower", "borrower");
 
@@ -338,21 +374,29 @@ class LoanAgreementService {
       qb.andWhere("debt.id = :debtId", { debtId: options.debtId });
     }
     if (options.borrowerId) {
-      qb.andWhere("borrower.id = :borrowerId", { borrowerId: options.borrowerId });
+      qb.andWhere("borrower.id = :borrowerId", {
+        borrowerId: options.borrowerId,
+      });
     }
     if (options.lenderName) {
-      qb.andWhere("agreement.lenderName LIKE :lenderName", { lenderName: `%${options.lenderName}%` });
+      qb.andWhere("agreement.lenderName LIKE :lenderName", {
+        lenderName: `%${options.lenderName}%`,
+      });
     }
     if (options.agreementDateFrom) {
-      qb.andWhere("agreement.agreementDate >= :agreementDateFrom", { agreementDateFrom: new Date(options.agreementDateFrom) });
+      qb.andWhere("agreement.agreementDate >= :agreementDateFrom", {
+        agreementDateFrom: new Date(options.agreementDateFrom),
+      });
     }
     if (options.agreementDateTo) {
-      qb.andWhere("agreement.agreementDate <= :agreementDateTo", { agreementDateTo: new Date(options.agreementDateTo) });
+      qb.andWhere("agreement.agreementDate <= :agreementDateTo", {
+        agreementDateTo: new Date(options.agreementDateTo),
+      });
     }
     if (options.search) {
       qb.andWhere(
         "(agreement.lenderName LIKE :search OR agreement.termsText LIKE :search OR debtor.name LIKE :search)",
-        { search: `%${options.search}%` }
+        { search: `%${options.search}%` },
       );
     }
 
@@ -361,15 +405,23 @@ class LoanAgreementService {
     const sortOrder = options.sortOrder === "ASC" ? "ASC" : "DESC";
     qb.orderBy(`agreement.${sortBy}`, sortOrder);
 
-    // Pagination
-    if (options.page && options.limit) {
-      const offset = (options.page - 1) * options.limit;
-      qb.skip(offset).take(options.limit);
-    }
+    const result = await paginateQueryBuilder(qb, {
+      page: options.page,
+      limit: options.limit,
+    });
 
-    const agreements = await qb.getMany();
     await auditLogger.logView("LoanAgreement", null, "system");
-    return agreements;
+    return result; // { data: [], pagination: {} }
+
+    // // Pagination
+    // if (options.page && options.limit) {
+    //   const offset = (options.page - 1) * options.limit;
+    //   qb.skip(offset).take(options.limit);
+    // }
+
+    // const agreements = await qb.getMany();
+    // await auditLogger.logView("LoanAgreement", null, "system");
+    // return agreements;
   }
 
   /**
@@ -377,25 +429,30 @@ class LoanAgreementService {
    */
   async getStatistics() {
     const { agreement: agreementRepo } = await this.getRepositories();
-    const qb = agreementRepo.createQueryBuilder("agreement")
+    const qb = agreementRepo
+      .createQueryBuilder("agreement")
       .where("agreement.deletedAt IS NULL");
 
     const totalAgreements = await qb.getCount();
-    const withFiles = await qb.clone()
+    const withFiles = await qb
+      .clone()
       .andWhere("agreement.filePath IS NOT NULL")
       .getCount();
-    const uniqueLenders = await qb.clone()
+    const uniqueLenders = await qb
+      .clone()
       .select("COUNT(DISTINCT agreement.lenderName)", "count")
       .getRawOne();
 
     // Agreements per debt (average)
-    const agreementsPerDebt = await qb.clone()
+    const agreementsPerDebt = await qb
+      .clone()
       .select("COUNT(agreement.id)", "total")
       .addSelect("agreement.debtId")
       .groupBy("agreement.debtId")
       .getRawMany();
     const avgPerDebt = agreementsPerDebt.length
-      ? agreementsPerDebt.reduce((sum, row) => sum + parseInt(row.total), 0) / agreementsPerDebt.length
+      ? agreementsPerDebt.reduce((sum, row) => sum + parseInt(row.total), 0) /
+        agreementsPerDebt.length
       : 0;
 
     return {
@@ -413,15 +470,24 @@ class LoanAgreementService {
    * @param {string} user
    */
   async exportAgreements(format = "json", filters = {}, user = "system") {
-    const agreements = await this.findAll(filters);
+   const result = await this.findAll(filters);
+  const agreements = result.data;
 
     let exportData;
     if (format === "csv") {
       const headers = [
-        "ID", "Agreement Date", "Lender Name", "Terms Text", "File Path",
-        "Debt ID", "Debt Name", "Borrower Name", "Created At", "Updated At"
+        "ID",
+        "Agreement Date",
+        "Lender Name",
+        "Terms Text",
+        "File Path",
+        "Debt ID",
+        "Debt Name",
+        "Borrower Name",
+        "Created At",
+        "Updated At",
       ];
-      const rows = agreements.map(a => [
+      const rows = agreements.map((a) => [
         a.id,
         a.agreementDate ? new Date(a.agreementDate).toLocaleDateString() : "",
         a.lenderName || "",
@@ -435,7 +501,7 @@ class LoanAgreementService {
       ]);
       exportData = {
         format: "csv",
-        data: [headers, ...rows].map(row => row.join(",")).join("\n"),
+        data: [headers, ...rows].map((row) => row.join(",")).join("\n"),
         filename: `loan_agreements_export_${new Date().toISOString().split("T")[0]}.csv`,
       };
     } else {
@@ -447,7 +513,9 @@ class LoanAgreementService {
     }
 
     await auditLogger.logExport("LoanAgreement", format, filters, user);
-    console.log(`Exported ${agreements.length} loan agreements in ${format} format`);
+    console.log(
+      `Exported ${agreements.length} loan agreements in ${format} format`,
+    );
     return exportData;
   }
 
@@ -509,7 +577,9 @@ class LoanAgreementService {
     for (const record of records) {
       try {
         const agreementData = {
-          agreementDate: record.agreementDate ? new Date(record.agreementDate) : new Date(),
+          agreementDate: record.agreementDate
+            ? new Date(record.agreementDate)
+            : new Date(),
           lenderName: record.lenderName || null,
           termsText: record.termsText || null,
           debtId: parseInt(record.debtId, 10),

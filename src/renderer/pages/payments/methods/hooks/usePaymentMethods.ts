@@ -23,12 +23,14 @@ const usePaymentMethods = (): UsePaymentMethodsReturn => {
   const loadMethods = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await paymentMethodsAPI.getAll();
+      // Fetch all methods with a large limit (since typically few)
+      const response = await paymentMethodsAPI.getAll(1, 100);
       if (response.status) {
-        setMethods(response.data);
+        // response.data is PaginatedResult<PaymentMethod>
+        setMethods(response.data.data);
         // Load stats for each method
         const statsMap: Record<number, PaymentMethodStats> = {};
-        for (const method of response.data) {
+        for (const method of response.data.data) {
           try {
             const statsRes = await paymentMethodsAPI.getStats(method.id);
             if (statsRes.status) {

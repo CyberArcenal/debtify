@@ -1,4 +1,5 @@
 // src/renderer/api/core/group.ts
+import type { PaginatedResult } from "./common";
 
 // ----------------------------------------------------------------------
 // 📦 Types & Interfaces
@@ -31,7 +32,7 @@ export interface GroupMemberWithDebtor extends GroupMember {
 export interface GroupCreateData {
   name: string;
   description?: string | null;
-  color?: string;         // defaults to something like "#3b82f6"
+  color?: string;         // defaults to "#3b82f6"
 }
 
 export interface GroupUpdateData {
@@ -54,16 +55,18 @@ export interface GroupResponse {
   data: DebtorGroup;
 }
 
+// ✅ Now returns paginated result for groups
 export interface GroupsResponse {
   status: boolean;
   message: string;
-  data: DebtorGroup[];
+  data: PaginatedResult<DebtorGroup>;
 }
 
+// ✅ Now returns paginated result for members
 export interface GroupMembersResponse {
   status: boolean;
   message: string;
-  data: GroupMemberWithDebtor[];
+  data: PaginatedResult<GroupMemberWithDebtor>;
 }
 
 export interface BulkAssignResponse {
@@ -87,15 +90,17 @@ class GroupsAPI {
   // --------------------------------------------------------------------
 
   /**
-   * Get all debtor groups
+   * Get all debtor groups with pagination
+   * @param page - Page number (default 1)
+   * @param limit - Items per page (default 10)
    */
-  async getAll(): Promise<GroupsResponse> {
+  async getAll(page?: number, limit?: number): Promise<GroupsResponse> {
     if (!window.backendAPI?.group) {
       throw new Error("Electron API (group) not available");
     }
     const response = await window.backendAPI.group({
       method: "getAllGroups",
-      params: {},
+      params: { page, limit },
     });
     if (response.status) return response;
     throw new Error(response.message || "Failed to fetch groups");
@@ -117,27 +122,45 @@ class GroupsAPI {
   }
 
   /**
-   * Get all members of a group (with debtor details)
+   * Get all members of a group (with debtor details) with pagination
+   * @param groupId - Group ID
+   * @param page - Page number (default 1)
+   * @param limit - Items per page (default 20)
    */
-  async getMembers(groupId: number): Promise<GroupMembersResponse> {
+  async getMembers(groupId: number, page?: number, limit?: number): Promise<GroupMembersResponse> {
     if (!window.backendAPI?.group) {
       throw new Error("Electron API (group) not available");
     }
     const response = await window.backendAPI.group({
       method: "getGroupMembers",
-      params: { groupId },
+      params: { groupId, page, limit },
     });
     if (response.status) return response;
     throw new Error(response.message || "Failed to fetch group members");
   }
 
+  /**
+   * Get groups for a specific debtor with pagination
+   * @param debtorId - Debtor ID
+   * @param page - Page number (default 1)
+   * @param limit - Items per page (default 10)
+   */
+  async getGroupsForDebtor(debtorId: number, page?: number, limit?: number): Promise<GroupsResponse> {
+    if (!window.backendAPI?.group) {
+      throw new Error("Electron API (group) not available");
+    }
+    const response = await window.backendAPI.group({
+      method: "getGroupsForDebtor",
+      params: { debtorId, page, limit },
+    });
+    if (response.status) return response;
+    throw new Error(response.message || "Failed to fetch groups for debtor");
+  }
+
   // --------------------------------------------------------------------
-  // ✏️ WRITE OPERATIONS
+  // ✏️ WRITE OPERATIONS (unchanged)
   // --------------------------------------------------------------------
 
-  /**
-   * Create a new debtor group
-   */
   async create(data: GroupCreateData, user = "system"): Promise<GroupResponse> {
     if (!window.backendAPI?.group) {
       throw new Error("Electron API (group) not available");
@@ -150,9 +173,6 @@ class GroupsAPI {
     throw new Error(response.message || "Failed to create group");
   }
 
-  /**
-   * Update an existing group
-   */
   async update(id: number, data: GroupUpdateData, user = "system"): Promise<GroupResponse> {
     if (!window.backendAPI?.group) {
       throw new Error("Electron API (group) not available");
@@ -165,9 +185,6 @@ class GroupsAPI {
     throw new Error(response.message || "Failed to update group");
   }
 
-  /**
-   * Delete a group (cascade removes all memberships)
-   */
   async delete(id: number, user = "system"): Promise<DeleteResponse> {
     if (!window.backendAPI?.group) {
       throw new Error("Electron API (group) not available");
@@ -180,9 +197,6 @@ class GroupsAPI {
     throw new Error(response.message || "Failed to delete group");
   }
 
-  /**
-   * Assign a single debtor to a group
-   */
   async assignDebtor(groupId: number, debtorId: number, user = "system"): Promise<DeleteResponse> {
     if (!window.backendAPI?.group) {
       throw new Error("Electron API (group) not available");
@@ -195,9 +209,6 @@ class GroupsAPI {
     throw new Error(response.message || "Failed to assign debtor to group");
   }
 
-  /**
-   * Bulk assign multiple debtors to a group
-   */
   async bulkAssign(groupId: number, debtorIds: number[], user = "system"): Promise<BulkAssignResponse> {
     if (!window.backendAPI?.group) {
       throw new Error("Electron API (group) not available");
@@ -210,9 +221,6 @@ class GroupsAPI {
     throw new Error(response.message || "Failed to bulk assign debtors");
   }
 
-  /**
-   * Remove a debtor from a group
-   */
   async removeDebtor(groupId: number, debtorId: number, user = "system"): Promise<DeleteResponse> {
     if (!window.backendAPI?.group) {
       throw new Error("Electron API (group) not available");
@@ -225,9 +233,6 @@ class GroupsAPI {
     throw new Error(response.message || "Failed to remove debtor from group");
   }
 
-  /**
-   * Remove all debtors from a group (clear members)
-   */
   async clearMembers(groupId: number, user = "system"): Promise<DeleteResponse> {
     if (!window.backendAPI?.group) {
       throw new Error("Electron API (group) not available");
@@ -245,27 +250,13 @@ class GroupsAPI {
   // --------------------------------------------------------------------
 
   /**
-   * Get groups for a specific debtor
-   */
-  async getGroupsForDebtor(debtorId: number): Promise<GroupsResponse> {
-    if (!window.backendAPI?.group) {
-      throw new Error("Electron API (group) not available");
-    }
-    const response = await window.backendAPI.group({
-      method: "getGroupsForDebtor",
-      params: { debtorId },
-    });
-    if (response.status) return response;
-    throw new Error(response.message || "Failed to fetch groups for debtor");
-  }
-
-  /**
    * Check if a debtor is already in a group
+   * (Note: this method now uses pagination but defaults to first page only)
    */
   async isDebtorInGroup(groupId: number, debtorId: number): Promise<boolean> {
     try {
-      const members = await this.getMembers(groupId);
-      return members.data.some(m => m.debtorId === debtorId);
+      const members = await this.getMembers(groupId, 1, 100); // fetch up to 100 members
+      return members.data.data.some(m => m.debtorId === debtorId);
     } catch (error) {
       console.error("Error checking debtor in group:", error);
       return false;

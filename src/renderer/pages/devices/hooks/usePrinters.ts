@@ -24,9 +24,11 @@ const usePrinters = (): UsePrintersReturn => {
     setLoading(true);
     setError(null);
     try {
-      const response = await printerAPI.getAll();
+      // Fetch printers with a large limit to get all (since printers are typically few)
+      const response = await printerAPI.getAll(1, 100);
       if (response.status) {
-        setPrinters(response.data);
+        // response.data is PaginatedResult<Printer>, so response.data.data is the array
+        setPrinters(response.data.data);
       } else {
         throw new Error(response.message);
       }

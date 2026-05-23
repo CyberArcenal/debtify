@@ -5,8 +5,6 @@ import { Search, ChevronDown, Printer, X } from "lucide-react";
 import printerAPI from "../../../api/core/printers";
 import type { Printer as PrinterType } from "../../../api/core/printers";
 
-
-
 interface PrinterSelectProps {
   value: number | null;
   onChange: (printerId: number | null, printer?: PrinterType) => void;
@@ -27,7 +25,11 @@ const PrinterSelect: React.FC<PrinterSelectProps> = ({
   const [searchTerm, setSearchTerm] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [dropdownStyle, setDropdownStyle] = useState({ top: 0, left: 0, width: 0 });
+  const [dropdownStyle, setDropdownStyle] = useState({
+    top: 0,
+    left: 0,
+    width: 0,
+  });
 
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -37,9 +39,9 @@ const PrinterSelect: React.FC<PrinterSelectProps> = ({
     const loadPrinters = async () => {
       setLoading(true);
       try {
-        const response = await printerAPI.getAll();
+        const response = await printerAPI.getAll(1, 100); // page, limit
         if (response.status && response.data) {
-          const list = Array.isArray(response.data) ? response.data : [];
+          const list = response.data.data || [];
           setPrinters(list);
           setFilteredPrinters(list);
         }
@@ -62,8 +64,8 @@ const PrinterSelect: React.FC<PrinterSelectProps> = ({
       printers.filter(
         (p) =>
           p.name.toLowerCase().includes(lower) ||
-          (p.description && p.description.toLowerCase().includes(lower))
-      )
+          (p.description && p.description.toLowerCase().includes(lower)),
+      ),
     );
   }, [searchTerm, printers]);
 
@@ -139,17 +141,28 @@ const PrinterSelect: React.FC<PrinterSelectProps> = ({
           minHeight: "42px",
         }}
       >
-        <Printer className="w-4 h-4 flex-shrink-0" style={{ color: "var(--primary-color)" }} />
+        <Printer
+          className="w-4 h-4 flex-shrink-0"
+          style={{ color: "var(--primary-color)" }}
+        />
         <div className="flex-1 min-w-0 flex items-center gap-2">
           {selectedPrinter ? (
             <>
-              <span className="font-medium truncate">{selectedPrinter.name}</span>
-              <span className="text-xs truncate" style={{ color: "var(--text-secondary)" }}>
+              <span className="font-medium truncate">
+                {selectedPrinter.name}
+              </span>
+              <span
+                className="text-xs truncate"
+                style={{ color: "var(--text-secondary)" }}
+              >
                 ({selectedPrinter.interface})
               </span>
             </>
           ) : (
-            <span className="truncate" style={{ color: "var(--text-secondary)" }}>
+            <span
+              className="truncate"
+              style={{ color: "var(--text-secondary)" }}
+            >
               {placeholder}
             </span>
           )}
@@ -187,7 +200,10 @@ const PrinterSelect: React.FC<PrinterSelectProps> = ({
               maxHeight: "350px",
             }}
           >
-            <div className="p-2 border-b" style={{ borderColor: "var(--border-color)" }}>
+            <div
+              className="p-2 border-b"
+              style={{ borderColor: "var(--border-color)" }}
+            >
               <div className="relative">
                 <Search
                   className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4"
@@ -211,11 +227,17 @@ const PrinterSelect: React.FC<PrinterSelectProps> = ({
 
             <div className="overflow-y-auto" style={{ maxHeight: "250px" }}>
               {loading && printers.length === 0 ? (
-                <div className="p-3 text-center text-sm" style={{ color: "var(--text-secondary)" }}>
+                <div
+                  className="p-3 text-center text-sm"
+                  style={{ color: "var(--text-secondary)" }}
+                >
                   Loading...
                 </div>
               ) : filteredPrinters.length === 0 ? (
-                <div className="p-3 text-center text-sm" style={{ color: "var(--text-secondary)" }}>
+                <div
+                  className="p-3 text-center text-sm"
+                  style={{ color: "var(--text-secondary)" }}
+                >
                   No printers found
                 </div>
               ) : (
@@ -225,11 +247,16 @@ const PrinterSelect: React.FC<PrinterSelectProps> = ({
                     type="button"
                     onClick={() => handleSelect(printer)}
                     className={`w-full px-3 py-2 text-left flex items-center gap-2 transition-colors text-sm cursor-pointer hover:bg-[var(--card-hover-bg)] ${
-                      printer.id === value ? "bg-[var(--accent-blue-light)]" : ""
+                      printer.id === value
+                        ? "bg-[var(--accent-blue-light)]"
+                        : ""
                     }`}
                     style={{ borderBottom: "1px solid var(--border-color)" }}
                   >
-                    <Printer className="w-4 h-4 flex-shrink-0" style={{ color: "var(--primary-color)" }} />
+                    <Printer
+                      className="w-4 h-4 flex-shrink-0"
+                      style={{ color: "var(--primary-color)" }}
+                    />
                     <div className="flex-1 min-w-0">
                       <div className="font-medium truncate">{printer.name}</div>
                       <div className="text-xs truncate text-[var(--text-tertiary)]">
@@ -246,7 +273,7 @@ const PrinterSelect: React.FC<PrinterSelectProps> = ({
               )}
             </div>
           </div>,
-          document.body
+          document.body,
         )}
     </div>
   );

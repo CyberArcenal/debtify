@@ -1,5 +1,7 @@
 // src/renderer/api/core/paymentMethod.ts
 
+import type { PaginatedResult } from "./common";
+
 // ----------------------------------------------------------------------
 // 📦 Types & Interfaces
 // ----------------------------------------------------------------------
@@ -34,6 +36,13 @@ export interface PaymentMethodUpdateData {
   isDefault?: boolean;    // if true, unset other defaults
 }
 
+export interface DefaultPaymentMethodResponse {
+  status: boolean;
+  message: string;
+  data: PaymentMethod | null;
+}
+
+
 // ----------------------------------------------------------------------
 // 📨 Response Interfaces (mirror IPC response format)
 // ----------------------------------------------------------------------
@@ -47,7 +56,7 @@ export interface PaymentMethodResponse {
 export interface PaymentMethodsResponse {
   status: boolean;
   message: string;
-  data: PaymentMethod[];
+  data: PaginatedResult<PaymentMethod>;
 }
 
 export interface PaymentMethodStatsResponse {
@@ -73,13 +82,13 @@ class PaymentMethodsAPI {
   /**
    * Get all payment methods
    */
-  async getAll(): Promise<PaymentMethodsResponse> {
+ async getAll(page?: number, limit?: number): Promise<PaymentMethodsResponse> {
     if (!window.backendAPI?.paymentMethod) {
       throw new Error("Electron API (paymentMethod) not available");
     }
     const response = await window.backendAPI.paymentMethod({
       method: "getAllPaymentMethods",
-      params: {},
+      params: { page, limit },
     });
     if (response.status) return response;
     throw new Error(response.message || "Failed to fetch payment methods");
@@ -186,18 +195,22 @@ class PaymentMethodsAPI {
   // --------------------------------------------------------------------
 
   /**
-   * Get the default payment method
+   * Get the default payment method efficiently (without fetching all)
    */
   async getDefault(): Promise<PaymentMethod | null> {
-    try {
-      const response = await this.getAll();
-      const defaultMethod = response.data.find(m => m.isDefault);
-      return defaultMethod || null;
-    } catch (error) {
-      console.error("Error fetching default payment method:", error);
-      return null;
+    if (!window.backendAPI?.paymentMethod) {
+      throw new Error("Electron API (paymentMethod) not available");
     }
+    const response = await window.backendAPI.paymentMethod({
+      method: "getDefaultPaymentMethod",
+      params: {},
+    });
+    if (response.status) {
+      return response.data;
+    }
+    throw new Error(response.message || "Failed to fetch default payment method");
   }
+
 
   /**
    * Increment stats when a payment is recorded using this method

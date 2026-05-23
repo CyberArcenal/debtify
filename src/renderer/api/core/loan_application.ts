@@ -1,19 +1,21 @@
 // src/renderer/api/core/loanApplication.ts
 
+import type { PaginatedResult } from "./common";
+
 // ----------------------------------------------------------------------
 // 📦 Types & Interfaces
 // ----------------------------------------------------------------------
 
 export interface LoanApplication {
   id: number;
-  debtorId: number | null;        // null if new debtor was created
-  debtorName: string;             // snapshot name
+  debtorId: number | null;
+  debtorName: string;
   debtorContact: string | null;
   debtorEmail: string | null;
   debtorAddress: string | null;
   requestedAmount: number;
   purpose: string;
-  proposedDueDate: string;        // YYYY-MM-DD or ISO
+  proposedDueDate: string;
   interestRate: number | null;
   status: "pending" | "approved" | "rejected";
   approvedAt: string | null;
@@ -22,11 +24,10 @@ export interface LoanApplication {
   rejectionReason: string | null;
   createdAt: string;
   updatedAt: string;
-  deletedAt: string | null;       // soft delete
+  deletedAt: string | null;
 }
 
 export interface LoanApplicationCreateData {
-  // Either existing debtor OR new debtor data
   debtorId?: number | null;
   newDebtor?: {
     name: string;
@@ -56,6 +57,8 @@ export interface LoanApplicationFilters {
   search?: string;
   page?: number;
   limit?: number;
+  sortBy?: string;
+  sortOrder?: "ASC" | "DESC";
 }
 
 // ----------------------------------------------------------------------
@@ -68,17 +71,11 @@ export interface LoanApplicationResponse {
   data: LoanApplication;
 }
 
+// ✅ Changed: now uses PaginatedResult
 export interface LoanApplicationsResponse {
   status: boolean;
   message: string;
-  data: LoanApplication[];
-  // optional pagination metadata if backend supports
-  pagination?: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
+  data: PaginatedResult<LoanApplication>;
 }
 
 export interface ApproveRejectResponse {
@@ -108,9 +105,11 @@ class LoanApplicationsAPI {
   // --------------------------------------------------------------------
 
   /**
-   * Get all loan applications with optional filters
+   * Get all loan applications with optional filters and pagination
    */
-  async getAll(filters?: LoanApplicationFilters): Promise<LoanApplicationsResponse> {
+  async getAll(
+    filters?: LoanApplicationFilters,
+  ): Promise<LoanApplicationsResponse> {
     if (!window.backendAPI?.loanApplication) {
       throw new Error("Electron API (loanApplication) not available");
     }
@@ -138,15 +137,13 @@ class LoanApplicationsAPI {
   }
 
   // --------------------------------------------------------------------
-  // ✏️ WRITE OPERATIONS
+  // ✏️ WRITE OPERATIONS (unchanged)
   // --------------------------------------------------------------------
 
-  /**
-   * Create a new loan application
-   * @param data – can reference existing debtor or include new debtor info
-   * @param user – user performing the action
-   */
-  async create(data: LoanApplicationCreateData, user = "system"): Promise<LoanApplicationResponse> {
+  async create(
+    data: LoanApplicationCreateData,
+    user = "system",
+  ): Promise<LoanApplicationResponse> {
     if (!window.backendAPI?.loanApplication) {
       throw new Error("Electron API (loanApplication) not available");
     }
@@ -158,10 +155,11 @@ class LoanApplicationsAPI {
     throw new Error(response.message || "Failed to create loan application");
   }
 
-  /**
-   * Update an application (only allowed while status is pending)
-   */
-  async update(id: number, data: LoanApplicationUpdateData, user = "system"): Promise<LoanApplicationResponse> {
+  async update(
+    id: number,
+    data: LoanApplicationUpdateData,
+    user = "system",
+  ): Promise<LoanApplicationResponse> {
     if (!window.backendAPI?.loanApplication) {
       throw new Error("Electron API (loanApplication) not available");
     }
@@ -173,11 +171,6 @@ class LoanApplicationsAPI {
     throw new Error(response.message || "Failed to update loan application");
   }
 
-  /**
-   * Approve an application – creates an active debt
-   * @param id – application ID
-   * @param user – user performing approval
-   */
   async approve(id: number, user = "system"): Promise<ApproveRejectResponse> {
     if (!window.backendAPI?.loanApplication) {
       throw new Error("Electron API (loanApplication) not available");
@@ -190,13 +183,11 @@ class LoanApplicationsAPI {
     throw new Error(response.message || "Failed to approve application");
   }
 
-  /**
-   * Reject an application
-   * @param id – application ID
-   * @param reason – optional rejection reason
-   * @param user – user performing rejection
-   */
-  async reject(id: number, reason?: string, user = "system"): Promise<ApproveRejectResponse> {
+  async reject(
+    id: number,
+    reason?: string,
+    user = "system",
+  ): Promise<ApproveRejectResponse> {
     if (!window.backendAPI?.loanApplication) {
       throw new Error("Electron API (loanApplication) not available");
     }
@@ -208,9 +199,6 @@ class LoanApplicationsAPI {
     throw new Error(response.message || "Failed to reject application");
   }
 
-  /**
-   * Soft delete an application
-   */
   async delete(id: number, user = "system"): Promise<DeleteResponse> {
     if (!window.backendAPI?.loanApplication) {
       throw new Error("Electron API (loanApplication) not available");
@@ -223,9 +211,6 @@ class LoanApplicationsAPI {
     throw new Error(response.message || "Failed to delete loan application");
   }
 
-  /**
-   * Restore a soft-deleted application
-   */
   async restore(id: number, user = "system"): Promise<LoanApplicationResponse> {
     if (!window.backendAPI?.loanApplication) {
       throw new Error("Electron API (loanApplication) not available");
@@ -238,10 +223,10 @@ class LoanApplicationsAPI {
     throw new Error(response.message || "Failed to restore loan application");
   }
 
-  /**
-   * Permanently delete an application (hard delete)
-   */
-  async permanentlyDelete(id: number, user = "system"): Promise<DeleteResponse> {
+  async permanentlyDelete(
+    id: number,
+    user = "system",
+  ): Promise<DeleteResponse> {
     if (!window.backendAPI?.loanApplication) {
       throw new Error("Electron API (loanApplication) not available");
     }
@@ -250,37 +235,33 @@ class LoanApplicationsAPI {
       params: { id, user },
     });
     if (response.status) return response;
-    throw new Error(response.message || "Failed to permanently delete loan application");
+    throw new Error(
+      response.message || "Failed to permanently delete loan application",
+    );
   }
 
   // --------------------------------------------------------------------
   // 🧰 UTILITY METHODS
   // --------------------------------------------------------------------
 
-  /**
-   * Check if a debtor has any pending application
-   */
   async hasPendingApplication(debtorId: number): Promise<boolean> {
     try {
-      const response = await this.getAll({ debtorId, status: "pending", limit: 1 });
-      return response.data.length > 0;
+      const response = await this.getAll({
+        debtorId,
+        status: "pending",
+        limit: 1,
+      });
+      return response.data.data.length > 0; // ✅ access nested array
     } catch (error) {
       console.error("Error checking pending application:", error);
       return false;
     }
   }
 
-  /**
-   * Validate if the backend API is available
-   */
   async isAvailable(): Promise<boolean> {
-    return !!(window.backendAPI?.loanApplication);
+    return !!window.backendAPI?.loanApplication;
   }
 }
-
-// ----------------------------------------------------------------------
-// 📤 Export singleton instance
-// ----------------------------------------------------------------------
 
 const loanApplicationsAPI = new LoanApplicationsAPI();
 export default loanApplicationsAPI;

@@ -15,13 +15,16 @@ class PaymentMethodHandler {
     this.getAllPaymentMethods = this.importHandler("./get/all.ipc");
     this.getPaymentMethodById = this.importHandler("./get/by_id.ipc");
     this.getPaymentMethodStats = this.importHandler("./get/stats.ipc");
+    this.getDefaultPaymentMethod = this.importHandler("./get/default.ipc");
 
     // WRITE
     this.createPaymentMethod = this.importHandler("./create.ipc");
     this.updatePaymentMethod = this.importHandler("./update.ipc");
     this.setDefaultPaymentMethod = this.importHandler("./set_default.ipc");
     this.deletePaymentMethod = this.importHandler("./delete.ipc");
-    this.incrementPaymentMethodStats = this.importHandler("./increment_stats.ipc");
+    this.incrementPaymentMethodStats = this.importHandler(
+      "./increment_stats.ipc",
+    );
   }
 
   importHandler(path) {
@@ -29,8 +32,15 @@ class PaymentMethodHandler {
       const fullPath = require.resolve(`./${path}`, { paths: [__dirname] });
       return require(fullPath);
     } catch (error) {
-      console.warn(`[PaymentMethodHandler] Failed to load handler: ${path}`, error.message);
-      return async () => ({ status: false, message: `Handler not implemented: ${path}`, data: null });
+      console.warn(
+        `[PaymentMethodHandler] Failed to load handler: ${path}`,
+        error.message,
+      );
+      return async () => ({
+        status: false,
+        message: `Handler not implemented: ${path}`,
+        data: null,
+      });
     }
   }
 
@@ -47,22 +57,47 @@ class PaymentMethodHandler {
           return await this.getPaymentMethodById(params);
         case "getPaymentMethodStats":
           return await this.getPaymentMethodStats(params);
+        case "getDefaultPaymentMethod":
+          return await this.getDefaultPaymentMethod(params);
         case "createPaymentMethod":
-          return await this.handleWithTransaction(this.createPaymentMethod, params);
+          return await this.handleWithTransaction(
+            this.createPaymentMethod,
+            params,
+          );
         case "updatePaymentMethod":
-          return await this.handleWithTransaction(this.updatePaymentMethod, params);
+          return await this.handleWithTransaction(
+            this.updatePaymentMethod,
+            params,
+          );
         case "setDefaultPaymentMethod":
-          return await this.handleWithTransaction(this.setDefaultPaymentMethod, params);
+          return await this.handleWithTransaction(
+            this.setDefaultPaymentMethod,
+            params,
+          );
         case "deletePaymentMethod":
-          return await this.handleWithTransaction(this.deletePaymentMethod, params);
+          return await this.handleWithTransaction(
+            this.deletePaymentMethod,
+            params,
+          );
         case "incrementPaymentMethodStats":
-          return await this.handleWithTransaction(this.incrementPaymentMethodStats, params);
+          return await this.handleWithTransaction(
+            this.incrementPaymentMethodStats,
+            params,
+          );
         default:
-          return { status: false, message: `Unknown method: ${method}`, data: null };
+          return {
+            status: false,
+            message: `Unknown method: ${method}`,
+            data: null,
+          };
       }
     } catch (error) {
       console.error("PaymentMethodHandler error:", error);
-      return { status: false, message: error.message || "Internal server error", data: null };
+      return {
+        status: false,
+        message: error.message || "Internal server error",
+        data: null,
+      };
     }
   }
 
@@ -87,7 +122,10 @@ class PaymentMethodHandler {
 const paymentMethodHandler = new PaymentMethodHandler();
 ipcMain.handle(
   "paymentMethod",
-  withErrorHandling(paymentMethodHandler.handleRequest.bind(paymentMethodHandler), "IPC:paymentMethod"),
+  withErrorHandling(
+    paymentMethodHandler.handleRequest.bind(paymentMethodHandler),
+    "IPC:paymentMethod",
+  ),
 );
 
 module.exports = { PaymentMethodHandler, paymentMethodHandler };

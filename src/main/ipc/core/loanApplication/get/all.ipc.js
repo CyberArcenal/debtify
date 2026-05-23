@@ -4,8 +4,7 @@ const loanApplicationService = require("../../../../../services/LoanApplication"
 
 module.exports = async (params) => {
   try {
-    const { filters } = params;
-    const result = await loanApplicationService.getAllApplications(filters || {});
+    const result = await loanApplicationService.getAllApplications(params);
     return {
       status: true,
       message: "Loan applications retrieved successfully",

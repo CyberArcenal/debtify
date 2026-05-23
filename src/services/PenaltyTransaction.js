@@ -2,7 +2,7 @@
 
 const auditLogger = require("../utils/auditLogger");
 const { validatePenaltyData } = require("../utils/penaltyUtils");
-
+const { paginateQueryBuilder } = require("../utils/dbUtils/pagination");
 class PenaltyTransactionService {
   constructor() {
     this.penaltyRepository = null;
@@ -114,7 +114,9 @@ class PenaltyTransactionService {
 
       // If debtId is being updated, validate new debt
       if (penaltyData.debtId && penaltyData.debtId !== existing.debt.id) {
-        const newDebt = await debtRepo.findOne({ where: { id: penaltyData.debtId } });
+        const newDebt = await debtRepo.findOne({
+          where: { id: penaltyData.debtId },
+        });
         if (!newDebt) {
           throw new Error(`Debt with ID ${penaltyData.debtId} not found`);
         }
@@ -132,7 +134,13 @@ class PenaltyTransactionService {
       Object.assign(existing, penaltyData);
 
       const saved = await updateDb(penaltyRepo, existing);
-      await auditLogger.logUpdate("PenaltyTransaction", id, oldData, saved, user);
+      await auditLogger.logUpdate(
+        "PenaltyTransaction",
+        id,
+        oldData,
+        saved,
+        user,
+      );
       return saved;
     } catch (error) {
       console.error("Failed to update penalty:", error.message);
@@ -199,7 +207,13 @@ class PenaltyTransactionService {
       penalty.deletedAt = null;
 
       const saved = await updateDb(penaltyRepo, penalty);
-      await auditLogger.logUpdate("PenaltyTransaction", id, { deletedAt: true }, { deletedAt: null }, user);
+      await auditLogger.logUpdate(
+        "PenaltyTransaction",
+        id,
+        { deletedAt: true },
+        { deletedAt: null },
+        user,
+      );
       console.log(`Penalty transaction restored: #${id}`);
       return saved;
     } catch (error) {
@@ -257,7 +271,8 @@ class PenaltyTransactionService {
    */
   async findAll(options = {}) {
     const { penalty: penaltyRepo } = await this.getRepositories();
-    const qb = penaltyRepo.createQueryBuilder("penalty")
+    const qb = penaltyRepo
+      .createQueryBuilder("penalty")
       .leftJoinAndSelect("penalty.debt", "debt")
       .leftJoinAndSelect("debt.borrower", "borrower");
 
@@ -271,27 +286,39 @@ class PenaltyTransactionService {
       qb.andWhere("debt.id = :debtId", { debtId: options.debtId });
     }
     if (options.borrowerId) {
-      qb.andWhere("borrower.id = :borrowerId", { borrowerId: options.borrowerId });
+      qb.andWhere("borrower.id = :borrowerId", {
+        borrowerId: options.borrowerId,
+      });
     }
     if (options.penaltyDateFrom) {
-      qb.andWhere("penalty.penaltyDate >= :penaltyDateFrom", { penaltyDateFrom: new Date(options.penaltyDateFrom) });
+      qb.andWhere("penalty.penaltyDate >= :penaltyDateFrom", {
+        penaltyDateFrom: new Date(options.penaltyDateFrom),
+      });
     }
     if (options.penaltyDateTo) {
-      qb.andWhere("penalty.penaltyDate <= :penaltyDateTo", { penaltyDateTo: new Date(options.penaltyDateTo) });
+      qb.andWhere("penalty.penaltyDate <= :penaltyDateTo", {
+        penaltyDateTo: new Date(options.penaltyDateTo),
+      });
     }
     if (options.minAmount) {
-      qb.andWhere("penalty.amount >= :minAmount", { minAmount: options.minAmount });
+      qb.andWhere("penalty.amount >= :minAmount", {
+        minAmount: options.minAmount,
+      });
     }
     if (options.maxAmount) {
-      qb.andWhere("penalty.amount <= :maxAmount", { maxAmount: options.maxAmount });
+      qb.andWhere("penalty.amount <= :maxAmount", {
+        maxAmount: options.maxAmount,
+      });
     }
     if (options.reason) {
-      qb.andWhere("penalty.reason LIKE :reason", { reason: `%${options.reason}%` });
+      qb.andWhere("penalty.reason LIKE :reason", {
+        reason: `%${options.reason}%`,
+      });
     }
     if (options.search) {
       qb.andWhere(
         "(penalty.reason LIKE :search OR debt.name LIKE :search OR borrower.name LIKE :search)",
-        { search: `%${options.search}%` }
+        { search: `%${options.search}%` },
       );
     }
 
@@ -300,15 +327,23 @@ class PenaltyTransactionService {
     const sortOrder = options.sortOrder === "ASC" ? "ASC" : "DESC";
     qb.orderBy(`penalty.${sortBy}`, sortOrder);
 
-    // Pagination
-    if (options.page && options.limit) {
-      const offset = (options.page - 1) * options.limit;
-      qb.skip(offset).take(options.limit);
-    }
+    const result = await paginateQueryBuilder(qb, {
+      page: options.page,
+      limit: options.limit,
+    });
 
-    const penalties = await qb.getMany();
     await auditLogger.logView("PenaltyTransaction", null, "system");
-    return penalties;
+    return result; // { data: [], pagination: {} }
+
+    // Pagination
+    // if (options.page && options.limit) {
+    //   const offset = (options.page - 1) * options.limit;
+    //   qb.skip(offset).take(options.limit);
+    // }
+
+    // const penalties = await qb.getMany();
+    // await auditLogger.logView("PenaltyTransaction", null, "system");
+    // return penalties;
   }
 
   /**
@@ -316,22 +351,31 @@ class PenaltyTransactionService {
    */
   async getStatistics() {
     const { penalty: penaltyRepo } = await this.getRepositories();
-    const qb = penaltyRepo.createQueryBuilder("penalty")
+    const qb = penaltyRepo
+      .createQueryBuilder("penalty")
       .where("penalty.deletedAt IS NULL");
 
     const totalPenalties = await qb.getCount();
-    const totalAmount = await qb.clone().select("SUM(penalty.amount)", "sum").getRawOne();
-    const averageAmount = await qb.clone().select("AVG(penalty.amount)", "avg").getRawOne();
+    const totalAmount = await qb
+      .clone()
+      .select("SUM(penalty.amount)", "sum")
+      .getRawOne();
+    const averageAmount = await qb
+      .clone()
+      .select("AVG(penalty.amount)", "avg")
+      .getRawOne();
 
     // Last 30 days
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const recentPenalties = await qb.clone()
+    const recentPenalties = await qb
+      .clone()
       .andWhere("penalty.penaltyDate >= :thirtyDaysAgo", { thirtyDaysAgo })
       .getCount();
 
     // Penalties per debt (top 5)
-    const topDebts = await qb.clone()
+    const topDebts = await qb
+      .clone()
       .select("debt.id", "debtId")
       .addSelect("debt.name", "debtName")
       .addSelect("SUM(penalty.amount)", "totalPenalty")
@@ -356,11 +400,12 @@ class PenaltyTransactionService {
    * @param {number} debtId
    * @param {boolean} includeDeleted
    */
-  async getTotalPenaltyForDebt(debtId, includeDeleted = false) {
-    const penalties = await this.findAll({ debtId, includeDeleted });
-    const total = penalties.reduce((sum, p) => sum + parseFloat(p.amount), 0);
-    return { debtId, totalPenalty: total, penaltyCount: penalties.length };
-  }
+async getTotalPenaltyForDebt(debtId, includeDeleted = false) {
+  const result = await this.findAll({ debtId, includeDeleted });
+  const penalties = result.data;
+  const total = penalties.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+  return { debtId, totalPenalty: total, penaltyCount: penalties.length };
+}
 
   /**
    * Export penalties to CSV or JSON
@@ -369,15 +414,22 @@ class PenaltyTransactionService {
    * @param {string} user
    */
   async exportPenalties(format = "json", filters = {}, user = "system") {
-    const penalties = await this.findAll(filters);
+     const result = await this.findAll(filters);
+  const penalties = result.data;
 
     let exportData;
     if (format === "csv") {
       const headers = [
-        "ID", "Amount", "Penalty Date", "Reason", "Created At",
-        "Debt ID", "Debt Name", "Borrower Name"
+        "ID",
+        "Amount",
+        "Penalty Date",
+        "Reason",
+        "Created At",
+        "Debt ID",
+        "Debt Name",
+        "Borrower Name",
       ];
-      const rows = penalties.map(p => [
+      const rows = penalties.map((p) => [
         p.id,
         p.amount,
         new Date(p.penaltyDate).toLocaleDateString(),
@@ -389,7 +441,7 @@ class PenaltyTransactionService {
       ]);
       exportData = {
         format: "csv",
-        data: [headers, ...rows].map(row => row.join(",")).join("\n"),
+        data: [headers, ...rows].map((row) => row.join(",")).join("\n"),
         filename: `penalties_export_${new Date().toISOString().split("T")[0]}.csv`,
       };
     } else {

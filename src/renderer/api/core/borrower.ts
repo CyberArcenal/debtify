@@ -1,5 +1,8 @@
 // src/renderer/api/borrower.ts
 
+import type { PaginatedResult } from "./common";
+
+
 // ----------------------------------------------------------------------
 // 📦 Types & Interfaces
 // ----------------------------------------------------------------------
@@ -70,11 +73,11 @@ export interface BorrowerResponse {
   data: Borrower;
 }
 
-// ✅ Changed: data is now an array of Borrowers (not paginated wrapper)
+// ✅ Changed: data now contains pagination metadata
 export interface BorrowersResponse {
   status: boolean;
   message: string;
-  data: Borrower[];
+  data: PaginatedResult<Borrower>;
 }
 
 export interface BorrowerStatisticsResponse {
@@ -155,8 +158,7 @@ class BorrowersAPI {
 
   /**
    * Get all borrowers with optional filters and pagination
-   * @param params - Filtering, pagination, sorting options
-   * @returns BorrowersResponse with data as an array of Borrowers (no pagination metadata)
+   * @returns BorrowersResponse where data.data is Borrower[] and data.pagination contains metadata
    */
   async getAll(params?: {
     page?: number;
@@ -180,7 +182,7 @@ class BorrowersAPI {
       });
 
       if (response.status) {
-        return response; // response.data is Borrower[]
+        return response;
       }
       throw new Error(response.message || "Failed to fetch borrowers");
     } catch (error: any) {
@@ -216,7 +218,7 @@ class BorrowersAPI {
    * @param searchTerm - Search keyword
    * @param page - Page number
    * @param limit - Items per page
-   * @returns BorrowersResponse with data as an array of Borrowers
+   * @returns BorrowersResponse with paginated results
    */
   async search(searchTerm: string, page?: number, limit?: number): Promise<BorrowersResponse> {
     try {
@@ -484,7 +486,7 @@ class BorrowersAPI {
   async existsByEmail(email: string): Promise<boolean> {
     try {
       const response = await this.getAll({ email, limit: 1 });
-      return response.data.length > 0;   // ✅ changed: .data is array
+      return response.data.data.length > 0;   // ✅ access nested data array
     } catch (error) {
       console.error("Error checking borrower by email:", error);
       return false;
@@ -498,7 +500,7 @@ class BorrowersAPI {
   async existsByContact(contact: string): Promise<boolean> {
     try {
       const response = await this.getAll({ contact, limit: 1 });
-      return response.data.length > 0;   // ✅ changed: .data is array
+      return response.data.data.length > 0;   // ✅ access nested data array
     } catch (error) {
       console.error("Error checking borrower by contact:", error);
       return false;
@@ -512,7 +514,7 @@ class BorrowersAPI {
   async getByEmail(email: string): Promise<Borrower | null> {
     try {
       const response = await this.getAll({ email, limit: 1 });
-      return response.data[0] || null;   // ✅ changed: .data[0] instead of .items[0]
+      return response.data.data[0] || null;   // ✅ access nested data array
     } catch (error) {
       console.error("Error fetching borrower by email:", error);
       return null;

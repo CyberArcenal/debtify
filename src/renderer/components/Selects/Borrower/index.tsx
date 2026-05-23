@@ -49,7 +49,8 @@ const BorrowerSelect: React.FC<BorrowerSelectProps> = ({
           includeDeleted: !activeOnly,
         });
         if (response.status && response.data) {
-          const list = Array.isArray(response.data) ? response.data : [];
+          // ✅ response.data is PaginatedResult<Borrower>, so array is under .data
+          const list = response.data.data || [];
           setBorrowers(list);
           setFilteredBorrowers(list);
         }

@@ -1,6 +1,7 @@
 import React from "react";
 import { Mail, AlertCircle, CheckCircle, Clock } from "lucide-react";
-import type { NotificationStats as NotificationStatsData } from "../../../api/core/notification_log";
+import type { NotificationStats as NotificationStatsData } from "../../../api/core/reminder_log";
+
 interface NotificationStatsProps {
   stats: NotificationStatsData | null;
   loading?: boolean;
@@ -25,7 +26,7 @@ export const NotificationStats: React.FC<NotificationStatsProps> = ({
 
   const cards = [
     {
-      title: "Total Notifications",
+      title: "Total Emails",
       value: stats.total,
       icon: Mail,
       color: "text-[var(--primary-color)]",
@@ -43,7 +44,7 @@ export const NotificationStats: React.FC<NotificationStatsProps> = ({
       color: "text-orange-400",
     },
     {
-      title: "Sent",
+      title: "Successfully Sent",
       value: stats.byStatus?.sent || 0,
       icon: CheckCircle,
       color: "text-green-400",

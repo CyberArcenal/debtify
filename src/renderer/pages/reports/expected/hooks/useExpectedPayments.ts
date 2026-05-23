@@ -7,78 +7,73 @@ import type { ExpectedPayment, ExpectedReport } from "../types";
 import { format, addDays, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 
 const useExpectedPayments = () => {
-  const [activeDebts, setActiveDebts] = useState<Debt[]>([]);
+  const [relevantDebts, setRelevantDebts] = useState<Debt[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [fromDate, setFromDate] = useState<string>(() => format(new Date(), "yyyy-MM-dd"));
   const [toDate, setToDate] = useState<string>(() => format(addDays(new Date(), 30), "yyyy-MM-dd"));
   const [groupBy, setGroupBy] = useState<"day" | "week" | "month">("week");
   const [selectedGroupId, setSelectedGroupId] = useState<number | "all">("all");
-  const [groupDebtorIds, setGroupDebtorIds] = useState<number[]>([]);
 
-  const fetchActiveDebts = useCallback(async () => {
+  // Fetch debts for the selected period and group
+  const fetchExpectedPayments = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await debtsAPI.getAll({ status: "active", includeDeleted: false, limit: 10000 });
-      if (!response.status) throw new Error(response.message);
-      setActiveDebts(response.data);
+      let borrowerId: number | undefined = undefined;
+      if (selectedGroupId !== "all") {
+        // Fetch group members to get debtor IDs
+        const membersRes = await groupsAPI.getMembers(selectedGroupId);
+        if (!membersRes.status) throw new Error(membersRes.message);
+        const debtorIds = membersRes.data.data.map(m => m.debtorId);
+        // Note: debtsAPI.getAll does not accept an array of borrowerIds, so we cannot filter multiple borrowers at once.
+        // We would need a backend endpoint that accepts an array of borrowerIds. For now, we'll fetch all debts in date range and filter client-side by debtorIds.
+        // But that defeats performance. Instead, we'll fetch debts for each borrower? That's many calls. Better to add a backend endpoint.
+        // Let's keep it simple: if group is selected, we'll fetch all debts in date range, then filter by group member IDs client-side.
+        // Since date range already limits data, and groups likely small, this is acceptable.
+        // We'll still fetch all debts within date range without borrower filter, then filter.
+        const debtsRes = await debtsAPI.getAll({
+          status: "active",
+          includeDeleted: false,
+          dueDateFrom: fromDate,
+          dueDateTo: toDate,
+          limit: 1000, // assume reasonable limit
+        });
+        if (!debtsRes.status) throw new Error(debtsRes.message);
+        let debts = debtsRes.data.data;
+        // Filter by group debtor IDs
+        debts = debts.filter(debt => debtorIds.includes(debt.borrower?.id as number));
+        setRelevantDebts(debts);
+      } else {
+        // No group filter: fetch all debts in date range
+        const debtsRes = await debtsAPI.getAll({
+          status: "active",
+          includeDeleted: false,
+          dueDateFrom: fromDate,
+          dueDateTo: toDate,
+          limit: 1000,
+        });
+        if (!debtsRes.status) throw new Error(debtsRes.message);
+        setRelevantDebts(debtsRes.data.data);
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  // Fetch debtor IDs for the selected group
-  const fetchGroupDebtorIds = useCallback(async () => {
-    if (selectedGroupId === "all") {
-      setGroupDebtorIds([]);
-      return;
-    }
-    try {
-      const membersRes = await groupsAPI.getMembers(selectedGroupId);
-      if (membersRes.status) {
-        const debtorIds = membersRes.data.map(m => m.debtorId);
-        setGroupDebtorIds(debtorIds);
-      } else {
-        setGroupDebtorIds([]);
-      }
-    } catch (err) {
-      console.error("Failed to fetch group members:", err);
-      setGroupDebtorIds([]);
-    }
-  }, [selectedGroupId]);
+  }, [fromDate, toDate, selectedGroupId]);
 
   useEffect(() => {
-    fetchActiveDebts();
-  }, [fetchActiveDebts]);
+    fetchExpectedPayments();
+  }, [fetchExpectedPayments]);
 
-  useEffect(() => {
-    fetchGroupDebtorIds();
-  }, [fetchGroupDebtorIds]);
-
-  // Filter debts by group if selected
-  const filteredDebts = useMemo(() => {
-    if (selectedGroupId === "all") return activeDebts;
-    return activeDebts.filter(debt => groupDebtorIds.includes(debt.borrower?.id as number));
-  }, [activeDebts, selectedGroupId, groupDebtorIds]);
-
-  // Expected payments within date range (unchanged logic)
+  // Expected payments aggregation (unchanged, but uses relevantDebts)
   const expectedData = useMemo((): ExpectedReport | null => {
-    if (!filteredDebts.length) return null;
+    if (!relevantDebts.length) return null;
     const start = new Date(fromDate);
     const end = new Date(toDate);
     start.setHours(0,0,0,0);
     end.setHours(0,0,0,0);
-
-    const relevantDebts = filteredDebts.filter(debt => {
-      const due = new Date(debt.dueDate);
-      due.setHours(0,0,0,0);
-      return due >= start && due <= end;
-    });
-
-    if (relevantDebts.length === 0) return null;
 
     let intervals: Date[];
     if (groupBy === "day") intervals = eachDayOfInterval({ start, end });
@@ -119,11 +114,10 @@ const useExpectedPayments = () => {
 
     const totalExpected = data.reduce((sum, d) => sum + d.amount, 0);
     return { period: { from: fromDate, to: toDate }, groupBy, totalExpected, data };
-  }, [filteredDebts, fromDate, toDate, groupBy]);
+  }, [relevantDebts, fromDate, toDate, groupBy]);
 
   const refresh = () => {
-    fetchActiveDebts();
-    if (selectedGroupId !== "all") fetchGroupDebtorIds();
+    fetchExpectedPayments();
   };
 
   return {

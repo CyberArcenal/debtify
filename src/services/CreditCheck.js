@@ -1,7 +1,7 @@
 // src/main/services/CreditCheckService.js
 const auditLogger = require("../utils/auditLogger");
 const { creditBureauApiEnabled, creditBureauApiKey, creditBureauEndpoint, enforceCreditCheck } = require("../utils/system");
-
+const { paginateQueryBuilder } = require("../utils/dbUtils/pagination");
 class CreditCheckService {
   constructor() {
     this.logRepository = null;

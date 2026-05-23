@@ -31,24 +31,27 @@ const GroupSelect: React.FC<GroupSelectProps> = ({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    const loadGroups = async () => {
-      setLoading(true);
-      try {
-        const response = await groupsAPI.getAll();
-        if (response.status && response.data) {
-          const list = Array.isArray(response.data) ? response.data : [];
-          setGroups(list);
-          setFilteredGroups(list);
-        }
-      } catch (error) {
-        console.error("Failed to load groups:", error);
-      } finally {
-        setLoading(false);
+
+
+useEffect(() => {
+  const loadGroups = async () => {
+    setLoading(true);
+    try {
+      // Pass page and limit (groups are usually few, so get all)
+      const response = await groupsAPI.getAll(1, 100);
+      if (response.status && response.data) {
+        const list = response.data.data || [];
+        setGroups(list);
+        setFilteredGroups(list);
       }
-    };
-    loadGroups();
-  }, []);
+    } catch (error) {
+      console.error("Failed to load groups:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  loadGroups();
+}, []);
 
   useEffect(() => {
     if (!searchTerm.trim()) {

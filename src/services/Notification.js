@@ -1,6 +1,7 @@
 // services/NotificationService.js
 //@ts-check
 const auditLogger = require("../utils/auditLogger");
+const { paginateQueryBuilder } = require("../utils/dbUtils/pagination");
 const { validateNotificationData } = require("../utils/notificationUtils");
 
 class NotificationService {
@@ -64,7 +65,14 @@ class NotificationService {
         throw new Error(validation.errors.join(", "));
       }
 
-      const { title, message, type, scheduledFor, debtId, isRead = false } = notificationData;
+      const {
+        title,
+        message,
+        type,
+        scheduledFor,
+        debtId,
+        isRead = false,
+      } = notificationData;
 
       let debt = null;
       if (debtId) {
@@ -121,9 +129,13 @@ class NotificationService {
         if (notificationData.debtId === null) {
           existing.debt = null;
         } else {
-          const newDebt = await debtRepo.findOne({ where: { id: notificationData.debtId } });
+          const newDebt = await debtRepo.findOne({
+            where: { id: notificationData.debtId },
+          });
           if (!newDebt) {
-            throw new Error(`Debt with ID ${notificationData.debtId} not found`);
+            throw new Error(
+              `Debt with ID ${notificationData.debtId} not found`,
+            );
           }
           existing.debt = newDebt;
         }
@@ -204,7 +216,13 @@ class NotificationService {
       notification.deletedAt = null;
 
       const saved = await updateDb(notificationRepo, notification);
-      await auditLogger.logUpdate("Notification", id, { deletedAt: true }, { deletedAt: null }, user);
+      await auditLogger.logUpdate(
+        "Notification",
+        id,
+        { deletedAt: true },
+        { deletedAt: null },
+        user,
+      );
       console.log(`Notification restored: #${id}`);
       return saved;
     } catch (error) {
@@ -258,7 +276,13 @@ class NotificationService {
 
     notification.isRead = true;
     const saved = await updateDb(notificationRepo, notification);
-    await auditLogger.logUpdate("Notification", id, { isRead: false }, { isRead: true }, user);
+    await auditLogger.logUpdate(
+      "Notification",
+      id,
+      { isRead: false },
+      { isRead: true },
+      user,
+    );
     return saved;
   }
 
@@ -283,7 +307,13 @@ class NotificationService {
 
     notification.isRead = false;
     const saved = await updateDb(notificationRepo, notification);
-    await auditLogger.logUpdate("Notification", id, { isRead: true }, { isRead: false }, user);
+    await auditLogger.logUpdate(
+      "Notification",
+      id,
+      { isRead: true },
+      { isRead: false },
+      user,
+    );
     return saved;
   }
 
@@ -309,7 +339,7 @@ class NotificationService {
       ids.join(","),
       { action: "markManyAsRead" },
       { count: result.affected },
-      user
+      user,
     );
     return { updatedCount: result.affected };
   }
@@ -321,7 +351,8 @@ class NotificationService {
    */
   async getUnreadCount(filters = {}, includeDeleted = false) {
     const { notification: notificationRepo } = await this.getRepositories();
-    const qb = notificationRepo.createQueryBuilder("notification")
+    const qb = notificationRepo
+      .createQueryBuilder("notification")
       .where("notification.isRead = :isRead", { isRead: false });
 
     if (!includeDeleted) {
@@ -362,7 +393,8 @@ class NotificationService {
    */
   async findAll(options = {}) {
     const { notification: notificationRepo } = await this.getRepositories();
-    const qb = notificationRepo.createQueryBuilder("notification")
+    const qb = notificationRepo
+      .createQueryBuilder("notification")
       .leftJoinAndSelect("notification.debt", "debt")
       .leftJoinAndSelect("debt.borrower", "borrower");
 
@@ -404,7 +436,7 @@ class NotificationService {
     if (options.search) {
       qb.andWhere(
         "(notification.title LIKE :search OR notification.message LIKE :search OR debt.name LIKE :search OR borrower.name LIKE :search)",
-        { search: `%${options.search}%` }
+        { search: `%${options.search}%` },
       );
     }
 
@@ -413,15 +445,23 @@ class NotificationService {
     const sortOrder = options.sortOrder === "ASC" ? "ASC" : "DESC";
     qb.orderBy(`notification.${sortBy}`, sortOrder);
 
-    // Pagination
-    if (options.page && options.limit) {
-      const offset = (options.page - 1) * options.limit;
-      qb.skip(offset).take(options.limit);
-    }
+    const result = await paginateQueryBuilder(qb, {
+      page: options.page,
+      limit: options.limit,
+    });
 
-    const notifications = await qb.getMany();
     await auditLogger.logView("Notification", null, "system");
-    return notifications;
+    return result; // { data: [], pagination: {} }
+
+    // Pagination
+    // if (options.page && options.limit) {
+    //   const offset = (options.page - 1) * options.limit;
+    //   qb.skip(offset).take(options.limit);
+    // }
+
+    // const notifications = await qb.getMany();
+    // await auditLogger.logView("Notification", null, "system");
+    // return notifications;
   }
 
   /**
@@ -429,15 +469,20 @@ class NotificationService {
    */
   async getStatistics() {
     const { notification: notificationRepo } = await this.getRepositories();
-    const qb = notificationRepo.createQueryBuilder("notification")
+    const qb = notificationRepo
+      .createQueryBuilder("notification")
       .where("notification.deletedAt IS NULL");
 
     const total = await qb.getCount();
-    const unread = await qb.clone().andWhere("notification.isRead = :isRead", { isRead: false }).getCount();
+    const unread = await qb
+      .clone()
+      .andWhere("notification.isRead = :isRead", { isRead: false })
+      .getCount();
     const read = total - unread;
 
     // By type
-    const byType = await qb.clone()
+    const byType = await qb
+      .clone()
       .select("notification.type", "type")
       .addSelect("COUNT(*)", "count")
       .groupBy("notification.type")
@@ -445,7 +490,8 @@ class NotificationService {
 
     // Scheduled for future (scheduledFor > now)
     const now = new Date();
-    const scheduledFuture = await qb.clone()
+    const scheduledFuture = await qb
+      .clone()
       .andWhere("notification.scheduledFor IS NOT NULL")
       .andWhere("notification.scheduledFor > :now", { now })
       .getCount();
@@ -453,7 +499,8 @@ class NotificationService {
     // Last 7 days created
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const last7Days = await qb.clone()
+    const last7Days = await qb
+      .clone()
       .andWhere("notification.createdAt >= :sevenDaysAgo", { sevenDaysAgo })
       .getCount();
 
@@ -474,15 +521,24 @@ class NotificationService {
    * @param {string} user
    */
   async exportNotifications(format = "json", filters = {}, user = "system") {
-    const notifications = await this.findAll(filters);
+    const results = await this.findAll(filters);
+    const notifications = results.data;
 
     let exportData;
     if (format === "csv") {
       const headers = [
-        "ID", "Title", "Message", "Type", "Is Read", "Scheduled For",
-        "Created At", "Debt ID", "Debt Name", "Borrower Name"
+        "ID",
+        "Title",
+        "Message",
+        "Type",
+        "Is Read",
+        "Scheduled For",
+        "Created At",
+        "Debt ID",
+        "Debt Name",
+        "Borrower Name",
       ];
-      const rows = notifications.map(n => [
+      const rows = notifications.map((n) => [
         n.id,
         n.title,
         (n.message || "").replace(/,/g, " "),
@@ -496,7 +552,7 @@ class NotificationService {
       ]);
       exportData = {
         format: "csv",
-        data: [headers, ...rows].map(row => row.join(",")).join("\n"),
+        data: [headers, ...rows].map((row) => row.join(",")).join("\n"),
         filename: `notifications_export_${new Date().toISOString().split("T")[0]}.csv`,
       };
     } else {
@@ -508,7 +564,9 @@ class NotificationService {
     }
 
     await auditLogger.logExport("Notification", format, filters, user);
-    console.log(`Exported ${notifications.length} notifications in ${format} format`);
+    console.log(
+      `Exported ${notifications.length} notifications in ${format} format`,
+    );
     return exportData;
   }
 

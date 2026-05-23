@@ -14,6 +14,7 @@ class PrinterHandler {
     // READ-ONLY
     this.getAllPrinters = this.importHandler("./get/all.ipc");
     this.getPrinterById = this.importHandler("./get/by_id.ipc");
+    this.getDefaultPrinter = this.importHandler("./get/default.ipc");
 
     // WRITE
     this.createPrinter = this.importHandler("./create.ipc");
@@ -29,8 +30,15 @@ class PrinterHandler {
       const fullPath = require.resolve(`./${path}`, { paths: [__dirname] });
       return require(fullPath);
     } catch (error) {
-      console.warn(`[PrinterHandler] Failed to load handler: ${path}`, error.message);
-      return async () => ({ status: false, message: `Handler not implemented: ${path}`, data: null });
+      console.warn(
+        `[PrinterHandler] Failed to load handler: ${path}`,
+        error.message,
+      );
+      return async () => ({
+        status: false,
+        message: `Handler not implemented: ${path}`,
+        data: null,
+      });
     }
   }
 
@@ -45,24 +53,40 @@ class PrinterHandler {
           return await this.getAllPrinters(params);
         case "getPrinterById":
           return await this.getPrinterById(params);
+        case "getDefaultPrinter":
+          return await this.getDefaultPrinter(params);
         case "createPrinter":
           return await this.handleWithTransaction(this.createPrinter, params);
         case "updatePrinter":
           return await this.handleWithTransaction(this.updatePrinter, params);
         case "setDefaultPrinter":
-          return await this.handleWithTransaction(this.setDefaultPrinter, params);
+          return await this.handleWithTransaction(
+            this.setDefaultPrinter,
+            params,
+          );
         case "deletePrinter":
           return await this.handleWithTransaction(this.deletePrinter, params);
         case "testPrinter":
           return await this.handleWithTransaction(this.testPrinter, params);
         case "refreshPrinterStatus":
-          return await this.handleWithTransaction(this.refreshPrinterStatus, params);
+          return await this.handleWithTransaction(
+            this.refreshPrinterStatus,
+            params,
+          );
         default:
-          return { status: false, message: `Unknown method: ${method}`, data: null };
+          return {
+            status: false,
+            message: `Unknown method: ${method}`,
+            data: null,
+          };
       }
     } catch (error) {
       console.error("PrinterHandler error:", error);
-      return { status: false, message: error.message || "Internal server error", data: null };
+      return {
+        status: false,
+        message: error.message || "Internal server error",
+        data: null,
+      };
     }
   }
 
@@ -87,7 +111,10 @@ class PrinterHandler {
 const printerHandler = new PrinterHandler();
 ipcMain.handle(
   "printer",
-  withErrorHandling(printerHandler.handleRequest.bind(printerHandler), "IPC:printer"),
+  withErrorHandling(
+    printerHandler.handleRequest.bind(printerHandler),
+    "IPC:printer",
+  ),
 );
 
 module.exports = { PrinterHandler, printerHandler };

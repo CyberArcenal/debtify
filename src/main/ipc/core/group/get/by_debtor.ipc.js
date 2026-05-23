@@ -3,7 +3,7 @@ const groupService = require("../../../../../services/Group");
 
 module.exports = async (params) => {
   try {
-    const { debtorId } = params;
+    const { debtorId, page, limit } = params;
     if (!debtorId) {
       return {
         status: false,
@@ -11,11 +11,11 @@ module.exports = async (params) => {
         data: null,
       };
     }
-    const groups = await groupService.getGroupsForDebtor(debtorId);
+    const result = await groupService.getGroupsForDebtor(debtorId, page, limit);
     return {
       status: true,
       message: "Groups for debtor retrieved successfully",
-      data: groups,
+      data: result,
     };
   } catch (error) {
     console.error("Error in getGroupsForDebtor:", error);

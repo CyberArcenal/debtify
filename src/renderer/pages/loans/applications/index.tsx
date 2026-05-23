@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { FileText, Plus, RefreshCw, CheckCircle, XCircle, Clock } from "lucide-react";
 import Button from "../../../components/UI/Button";
+import Pagination from "../../../components/Shared/Pagination";
 import useLoanApplications from "./hooks/useLoanApplications";
 import ApplicationCard from "./components/ApplicationCard";
 import ApplicationFormModal from "./components/ApplicationFormModal";
@@ -11,15 +12,18 @@ import { dialogs } from "../../../utils/dialogs";
 
 const LoanApplicationsPage: React.FC = () => {
   const {
-    pendingApps,
-    approvedApps,
-    rejectedApps,
+    applications,
     loading,
+    pagination,
+    activeTab,
+    setActiveTab,
+    currentPage,
+    setCurrentPage,
+    pageSize,
+    setPageSize,
     refresh,
     approve,
     reject,
-    activeTab,
-    setActiveTab,
   } = useLoanApplications();
 
   const [formOpen, setFormOpen] = useState(false);
@@ -49,12 +53,15 @@ const LoanApplicationsPage: React.FC = () => {
     }
   };
 
-  const currentApps = activeTab === "pending" ? pendingApps : activeTab === "approved" ? approvedApps : rejectedApps;
+  const handleTabChange = (tab: "pending" | "approved" | "rejected") => {
+    setActiveTab(tab);
+    setCurrentPage(1); // reset to first page when tab changes
+  };
 
   const tabs = [
-    { id: "pending", label: "Pending", icon: Clock, count: pendingApps.length, colorKey: "warning" },
-    { id: "approved", label: "Approved", icon: CheckCircle, count: approvedApps.length, colorKey: "success" },
-    { id: "rejected", label: "Rejected", icon: XCircle, count: rejectedApps.length, colorKey: "danger" },
+    { id: "pending", label: "Pending", icon: Clock, colorKey: "warning" },
+    { id: "approved", label: "Approved", icon: CheckCircle, colorKey: "success" },
+    { id: "rejected", label: "Rejected", icon: XCircle, colorKey: "danger" },
   ];
 
   const getTabStyle = (tabId: string) => {
@@ -85,11 +92,11 @@ const LoanApplicationsPage: React.FC = () => {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => handleTabChange(tab.id as any)}
                 className="px-4 py-2 text-sm font-medium transition-colors border-b-2"
                 style={{ color: style.color, borderBottomColor: style.borderColor }}
               >
-                <div className="flex items-center gap-2"><tab.icon className="w-4 h-4" />{tab.label} <span className="ml-1 px-2 py-0.5 rounded-full text-xs" style={{ backgroundColor: "var(--card-secondary-bg)", color: "var(--text-secondary)" }}>{tab.count}</span></div>
+                <div className="flex items-center gap-2"><tab.icon className="w-4 h-4" />{tab.label}</div>
               </button>
             );
           })}
@@ -97,24 +104,39 @@ const LoanApplicationsPage: React.FC = () => {
 
         {loading ? (
           <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: "var(--primary-color)" }}></div></div>
-        ) : currentApps.length === 0 ? (
+        ) : applications.length === 0 ? (
           <div className="text-center py-12 border rounded-md" style={{ borderColor: "var(--border-color)" }}>
             <FileText className="w-12 h-12 mx-auto mb-3" style={{ color: "var(--text-tertiary)" }} />
             <p className="text-lg font-medium" style={{ color: "var(--text-primary)" }}>No {activeTab} applications</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {currentApps.map(app => (
-              <ApplicationCard
-                key={app.id}
-                application={app}
-                onView={openDetail}
-                onApprove={handleApprove}
-                onReject={handleReject}
-                showActions={app.status === "pending"}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {applications.map(app => (
+                <ApplicationCard
+                  key={app.id}
+                  application={app}
+                  onView={openDetail}
+                  onApprove={handleApprove}
+                  onReject={handleReject}
+                  showActions={app.status === "pending"}
+                />
+              ))}
+            </div>
+            {pagination.totalPages > 1 && (
+              <div className="mt-6">
+                <Pagination
+                  currentPage={currentPage}
+                  totalItems={pagination.totalItems}
+                  pageSize={pageSize}
+                  onPageChange={setCurrentPage}
+                  onPageSizeChange={setPageSize}
+                  pageSizeOptions={[9, 18, 27]}
+                  showPageSize={true}
+                />
+              </div>
+            )}
+          </>
         )}
       </div>
 

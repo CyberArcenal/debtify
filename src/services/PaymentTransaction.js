@@ -6,7 +6,7 @@ const {
   enableEarlyPaymentDiscount,
   earlyPaymentDiscountRate,
 } = require("../utils/system");
-
+const { paginateQueryBuilder } = require("../utils/dbUtils/pagination");
 // Time limit for editing payments (in hours)
 const EDIT_TIME_LIMIT_HOURS = 24;
 
@@ -411,15 +411,23 @@ class PaymentTransactionService {
     const sortOrder = options.sortOrder === "ASC" ? "ASC" : "DESC";
     qb.orderBy(`payment.${sortBy}`, sortOrder);
 
-    // Pagination
-    if (options.page && options.limit) {
-      const offset = (options.page - 1) * options.limit;
-      qb.skip(offset).take(options.limit);
-    }
+    const result = await paginateQueryBuilder(qb, {
+      page: options.page,
+      limit: options.limit,
+    });
 
-    const payments = await qb.getMany();
     await auditLogger.logView("PaymentTransaction", null, "system");
-    return payments;
+    return result; // { data: [], pagination: {} }
+
+    // Pagination
+    // if (options.page && options.limit) {
+    //   const offset = (options.page - 1) * options.limit;
+    //   qb.skip(offset).take(options.limit);
+    // }
+
+    // const payments = await qb.getMany();
+    // await auditLogger.logView("PaymentTransaction", null, "system");
+    // return payments;
   }
 
   /**
@@ -466,7 +474,8 @@ class PaymentTransactionService {
    * Export payment transactions to CSV or JSON (read-only)
    */
   async exportPayments(format = "json", filters = {}, user = "system") {
-    const payments = await this.findAll(filters);
+    const results = await this.findAll(filters);
+    const payments = results.data;
 
     let exportData;
     if (format === "csv") {
@@ -601,6 +610,101 @@ class PaymentTransactionService {
       reference = `PAY-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     }
     return reference;
+  }
+
+
+  /**
+   * Get collection report aggregated by date and debtor
+   * @param {string} fromDate - YYYY-MM-DD
+   * @param {string} toDate - YYYY-MM-DD
+   * @param {number} target - expected total collection amount
+   */
+  async getCollectionReport(fromDate, toDate, target) {
+    const { payment: paymentRepo } = await this.getRepositories();
+    const qb = paymentRepo
+      .createQueryBuilder("payment")
+      .leftJoinAndSelect("payment.debt", "debt")
+      .leftJoinAndSelect("debt.borrower", "borrower")
+      .where("payment.paymentDate >= :fromDate", {
+        fromDate: new Date(fromDate),
+      })
+      .andWhere("payment.paymentDate <= :toDate", { toDate: new Date(toDate) })
+      .andWhere("payment.deletedAt IS NULL");
+
+    const payments = await qb.getMany();
+
+    // Group by date
+    const byDate = new Map(); // date string -> total
+    const byDebtor = new Map(); // debtorId -> { name, total, count, lastDate }
+    for (const p of payments) {
+      const dateKey = p.paymentDate.toISOString().slice(0, 10);
+      byDate.set(dateKey, (byDate.get(dateKey) || 0) + p.amount);
+
+      const debtor = p.debt?.borrower;
+      if (debtor) {
+        const existing = byDebtor.get(debtor.id);
+        const newTotal = (existing?.total || 0) + p.amount;
+        const newCount = (existing?.count || 0) + 1;
+        const paymentDateStr = p.paymentDate.toISOString().slice(0, 10);
+        const lastDate =
+          !existing?.lastDate || paymentDateStr > existing.lastDate
+            ? paymentDateStr
+            : existing.lastDate;
+        byDebtor.set(debtor.id, {
+          name: debtor.name,
+          total: newTotal,
+          count: newCount,
+          lastDate,
+        });
+      }
+    }
+
+    // Generate date range
+    const start = new Date(fromDate);
+    const end = new Date(toDate);
+    const daysInPeriod = Math.max(
+      1,
+      Math.ceil((end - start) / (1000 * 3600 * 24)) + 1,
+    );
+    const dailyExpected = target / daysInPeriod;
+
+    const dataPoints = [];
+    let current = new Date(start);
+    while (current <= end) {
+      const dateStr = current.toISOString().slice(0, 10);
+      dataPoints.push({
+        date: dateStr,
+        actualCollected: byDate.get(dateStr) || 0,
+        expectedCollected: dailyExpected,
+      });
+      current.setDate(current.getDate() + 1);
+    }
+
+    const totalActual = Array.from(byDate.values()).reduce((a, b) => a + b, 0);
+    const totalExpected = target;
+    const collectionRate =
+      totalExpected > 0 ? (totalActual / totalExpected) * 100 : 0;
+    const averagePerDay = totalActual / daysInPeriod;
+
+    const paymentsByDebtor = Array.from(byDebtor.entries())
+      .map(([id, data]) => ({
+        debtorId: id,
+        debtorName: data.name,
+        totalPaid: data.total,
+        transactionCount: data.count,
+        lastPaymentDate: data.lastDate,
+      }))
+      .sort((a, b) => b.totalPaid - a.totalPaid);
+
+    return {
+      period: { from: fromDate, to: toDate },
+      totalActual,
+      totalExpected,
+      collectionRate,
+      averagePerDay,
+      dataPoints,
+      paymentsByDebtor,
+    };
   }
 }
 

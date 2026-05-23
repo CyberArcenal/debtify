@@ -1,5 +1,7 @@
 // src/renderer/api/notification.ts
 
+import type { PaginatedResult } from "./common";
+
 // ----------------------------------------------------------------------
 // 📦 Types & Interfaces
 // ----------------------------------------------------------------------
@@ -81,11 +83,11 @@ export interface NotificationResponse {
   data: Notification;
 }
 
-// ✅ Changed: data is now an array of Notifications (no pagination metadata)
+// ✅ Changed: now uses PaginatedResult for list endpoints
 export interface NotificationsResponse {
   status: boolean;
   message: string;
-  data: Notification[];
+  data: PaginatedResult<Notification>;
 }
 
 export interface NotificationStatisticsResponse {
@@ -171,7 +173,7 @@ class NotificationsAPI {
 
   /**
    * Get all notifications with optional filters and pagination
-   * @returns NotificationsResponse where data is an array of Notifications (no pagination metadata)
+   * @returns NotificationsResponse where data.data is Notification[] and data.pagination contains metadata
    */
   async getAll(params?: {
     page?: number;
@@ -408,7 +410,7 @@ class NotificationsAPI {
   async markAllAsReadForDebt(debtId: number, user = "system"): Promise<MarkManyReadResponse> {
     // Fetch all unread notification ids for the debt
     const response = await this.getAll({ debtId, isRead: false, limit: 1000 });
-    const ids = response.data.map(n => n.id);   // ✅ changed: response.data is array
+    const ids = response.data.data.map(n => n.id);   // ✅ access nested data array
     if (ids.length === 0) {
       return { status: true, message: "No unread notifications", data: { updatedCount: 0 } };
     }
@@ -419,10 +421,6 @@ class NotificationsAPI {
     return !!(window.backendAPI?.notification);
   }
 }
-
-// ----------------------------------------------------------------------
-// 📤 Export singleton instance
-// ----------------------------------------------------------------------
 
 const notificationsAPI = new NotificationsAPI();
 export default notificationsAPI;

@@ -1,11 +1,9 @@
 // src/channels/email.sender.js
-//@ts-check
 const nodemailer = require("nodemailer");
 const PQueue = require("p-queue").default;
 const NotificationLog = require("../entities/NotificationLog");
 const { logger } = require("../utils/logger");
 const { AppDataSource } = require("../main/db/data-source");
-const notificationService = require("../services/Notification");
 const { BrowserWindow } = require("electron");
 
 class EmailSender {
@@ -51,10 +49,10 @@ class EmailSender {
   /**
    * @private
    */
-  // @ts-ignore
   async _sendWithRetry(to, subject, html, text, options) {
     let attempt = 0;
     let lastError;
+    let currentLogId = null;
 
     this._sendToRenderers("email:status", {
       to,
@@ -71,15 +69,17 @@ class EmailSender {
           `📨 Attempt ${attempt} sending email → To: ${to}, Subject: "${subject}"`,
         );
 
-        // 1. Create/update log entry (QUEUED or RETRY)
+        // 1. Create/update log entry (first attempt = queued, retries = resend)
         const log = await this._updateLog(
           to,
           subject,
           html,
-          attempt === 1 ? "queued" : "resend", // first attempt = queued, retries = resend
+          attempt === 1 ? "queued" : "resend",
           attempt,
           null,
+          currentLogId,
         );
+        currentLogId = log?.id || null;
 
         // 2. Actually send the email
         const result = await this._sendInternal(
@@ -98,8 +98,7 @@ class EmailSender {
           "sent",
           attempt,
           null,
-          // @ts-ignore
-          log?.id, // pass the log ID so we update the same row
+          currentLogId,
         );
 
         logger.info(`✅ Email sent → To: ${to}, Attempt: ${attempt}`);
@@ -114,7 +113,6 @@ class EmailSender {
         return result;
       } catch (error) {
         lastError = error;
-        // @ts-ignore
         logger.error(`❌ Attempt ${attempt} failed → To: ${to}`, error);
 
         this._sendToRenderers("email:status", {
@@ -122,20 +120,19 @@ class EmailSender {
           subject,
           status: "failed",
           attempt,
-          // @ts-ignore
           error: error.message,
           timestamp: new Date().toISOString(),
         });
 
-        // Update log with failure (always update the existing row)
+        // Update log with failure
         await this._updateLog(
           to,
           subject,
           html,
           "failed",
           attempt,
-          // @ts-ignore
           error.message,
+          currentLogId,
         );
 
         if (attempt < this.maxRetries) {
@@ -145,38 +142,13 @@ class EmailSender {
       }
     }
 
-    try {
-      await notificationService.create(
-        {
-          userId: 1, // system user
-          title: "Email Sending Failed",
-          // @ts-ignore
-          message: `Failed to send email to ${to}: ${lastError.message}`,
-          type: "error",
-          metadata: {
-            to,
-            subject,
-            // @ts-ignore
-            error: lastError.message,
-            // @ts-ignore
-            stack: lastError.stack,
-          },
-        },
-        "system",
-      );
-    } catch (notifErr) {
-      // @ts-ignore
-      logger.error("Failed to send error notification for email", notifErr);
-    }
-
-    // Final failure – rethrow after all retries
+    // All retries exhausted – the failure is already logged. No need to create an extra notification.
     throw lastError;
   }
 
   /**
    * @private
    */
-  // @ts-ignore
   async _sendInternal(to, subject, html, text, options = {}) {
     const {
       emailEnabled,
@@ -185,7 +157,6 @@ class EmailSender {
       smtpUsername,
       smtpPassword,
       companyName,
-      smtpFromName,
       smtpFromEmail,
     } = require("../utils/system");
 
@@ -197,7 +168,6 @@ class EmailSender {
     const port = await smtpPort();
 
     const transporter = nodemailer.createTransport({
-      // @ts-ignore
       host,
       port,
       secure: port === 465,
@@ -230,21 +200,15 @@ class EmailSender {
    * @private
    */
   async _updateLog(
-    // @ts-ignore
     to,
-    // @ts-ignore
     subject,
-    // @ts-ignore
     html,
-    // @ts-ignore
     status,
-    // @ts-ignore
     retryCount,
     errorMessage = null,
     existingLogId = null,
   ) {
     const { saveDb } = require("../utils/dbUtils/dbActions");
-    // Wait for DB connection (non‑blocking, with backoff)
     await this._waitForDbReady();
 
     const repo = AppDataSource.getRepository(NotificationLog);
@@ -252,12 +216,10 @@ class EmailSender {
     try {
       let log = null;
 
-      // 1. If we have an existingLogId, fetch that row
       if (existingLogId) {
         log = await repo.findOneBy({ id: existingLogId });
       }
 
-      // 3. Still not found? Create a new one
       if (!log) {
         log = repo.create({
           recipient_email: to,
@@ -270,9 +232,8 @@ class EmailSender {
           last_error_at: status === "failed" ? new Date() : null,
         });
       } else {
-        // Update existing log – increment counters, change status, etc.
         log.status = status;
-        log.retry_count = retryCount; // will increase on each attempt
+        log.retry_count = retryCount;
         if (status === "sent") {
           log.sent_at = new Date();
           log.error_message = null;
@@ -280,12 +241,10 @@ class EmailSender {
           log.last_error_at = new Date();
           log.error_message = errorMessage;
         } else if (status === "resend") {
-          // @ts-ignore
           log.resend_count = (log.resend_count || 0) + 1;
         }
       }
 
-      // @ts-ignore
       const saved = await saveDb(repo, log, { skipSignal: true });
       logger.debug(
         `📌 NotificationLog ${saved.id} → Status: ${status}, Retry: ${retryCount}`,
@@ -294,11 +253,8 @@ class EmailSender {
     } catch (err) {
       logger.error(
         "❌ Failed to update NotificationLog (will retry later)",
-        // @ts-ignore
         err,
       );
-      // We do NOT throw – email sending should continue even if logging fails temporarily.
-      // The log will be retried on the next attempt.
       return null;
     }
   }
@@ -310,7 +266,7 @@ class EmailSender {
    */
   async _waitForDbReady() {
     const maxAttempts = 20;
-    let delay = 50; // ms
+    let delay = 50;
 
     for (let i = 0; i < maxAttempts; i++) {
       if (AppDataSource.isInitialized) {
@@ -320,7 +276,7 @@ class EmailSender {
         `⏳ Waiting for database connection... (${i + 1}/${maxAttempts})`,
       );
       await new Promise((resolve) => setTimeout(resolve, delay));
-      delay = Math.min(delay * 1.5, 2000); // cap at 2s
+      delay = Math.min(delay * 1.5, 2000);
     }
 
     logger.error(

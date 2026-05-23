@@ -16,6 +16,7 @@ class PaymentTransactionHandler {
     this.getAllPayments = this.importHandler("./get/all.ipc");
     this.getPaymentStatistics = this.importHandler("./get/statistics.ipc");
     this.searchPayments = this.importHandler("./search.ipc");
+    this.getCollectionReport = this.importHandler("./get/collection_report.ipc");
 
     // ✏️ WRITE OPERATION HANDLERS
     this.createPayment = this.importHandler("./create.ipc");
@@ -58,6 +59,8 @@ class PaymentTransactionHandler {
           return await this.getPaymentStatistics(params);
         case "searchPayments":
           return await this.searchPayments(params);
+          case "getCollectionReport":
+  return await this.getCollectionReport(params);
 
         // ✏️ WRITE (with transaction)
         case "createPayment":

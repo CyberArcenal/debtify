@@ -1,5 +1,7 @@
 // src/renderer/api/penaltytransaction.ts
 
+import type { PaginatedResult } from "./common";
+
 // ----------------------------------------------------------------------
 // 📦 Types & Interfaces
 // ----------------------------------------------------------------------
@@ -86,11 +88,11 @@ export interface PenaltyResponse {
   data: PenaltyTransaction;
 }
 
-// ✅ Changed: data is now an array of PenaltyTransactions (no pagination metadata)
+// ✅ Changed: now uses PaginatedResult for list endpoints
 export interface PenaltiesResponse {
   status: boolean;
   message: string;
-  data: PenaltyTransaction[];
+  data: PaginatedResult<PenaltyTransaction>;
 }
 
 export interface PenaltyStatisticsResponse {
@@ -164,7 +166,7 @@ class PenaltiesAPI {
 
   /**
    * Get all penalty transactions with optional filters and pagination
-   * @returns PenaltiesResponse where data is an array of PenaltyTransactions (no pagination metadata)
+   * @returns PenaltiesResponse where data.data is PenaltyTransaction[] and data.pagination contains metadata
    */
   async getAll(params?: {
     page?: number;
@@ -358,7 +360,7 @@ class PenaltiesAPI {
 
   async getByDebtId(debtId: number, includeDeleted = false): Promise<PenaltyTransaction[]> {
     const response = await this.getAll({ debtId, includeDeleted, limit: 1000 });
-    return response.data;   // ✅ changed: .data is array directly
+    return response.data.data;   // ✅ access nested data array
   }
 
   async getTotalAmountForDebt(debtId: number, includeDeleted = false): Promise<number> {

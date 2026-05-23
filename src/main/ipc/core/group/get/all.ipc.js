@@ -5,11 +5,12 @@ const groupService = require("../../../../../services/Group");
 
 module.exports = async (params) => {
   try {
-    const groups = await groupService.getAllGroups();
+    const { page, limit } = params;
+    const result = await groupService.getAllGroups(page, limit);
     return {
       status: true,
       message: "Groups retrieved successfully",
-      data: groups,
+      data: result,
     };
   } catch (error) {
     console.error("Error in getAllGroups:", error);

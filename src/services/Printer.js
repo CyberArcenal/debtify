@@ -8,7 +8,7 @@ const PaymentTransaction = require("../entities/PaymentTransaction");
 const { companyName, receiptFooterMessage } = require("../utils/system");
 const { logger } = require("../utils/logger");
 const { updateDb, saveDb, removeDb } = require("../utils/dbUtils/dbActions");
-
+const { paginateQueryBuilder } = require("../utils/dbUtils/pagination");
 class PrinterService {
   constructor() {
     this.printerRepository = null;
@@ -94,14 +94,16 @@ class PrinterService {
     }
   }
 
-  async getAllPrinters() {
-    const { printer: repo } = await this.getRepositories();
-    const printers = await repo.find({
-      order: { isDefault: "DESC", name: "ASC" },
-    });
-    await auditLogger.logView("Printer", null, "system");
-    return printers;
-  }
+async getAllPrinters(page = 1, limit = 10) {
+  const { printer: repo } = await this.getRepositories();
+  const qb = repo
+    .createQueryBuilder("printer")
+    .orderBy("printer.isDefault", "DESC")
+    .addOrderBy("printer.name", "ASC");
+  const result = await paginateQueryBuilder(qb, { page, limit });
+  await auditLogger.logView("Printer", null, "system");
+  return result;
+}
 
   async getPrinterById(id) {
     const { printer: repo } = await this.getRepositories();

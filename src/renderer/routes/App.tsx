@@ -1,7 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "../layouts/Layout";
 import AuditTrailPage from "../pages/AuditTrail";
-import NotificationLogPage from "../pages/NotificationLog";
 import SettingsPage from "../pages/Settings";
 import { useEffect, useState } from "react";
 import { LicenseModal } from "../components/Shared/LicenseModal";
@@ -22,6 +21,7 @@ import CollectionReportPage from "../pages/reports/collection";
 import DebtorStatementPage from "../pages/reports/debtor-stmt";
 import ExpectedPaymentsPage from "../pages/reports/expected";
 import DevicesPage from "../pages/devices";
+import NotificationLogPage from "../pages/reminder";
 // import DebtDashboard from "../pages/dashboard";
 
 function App() {

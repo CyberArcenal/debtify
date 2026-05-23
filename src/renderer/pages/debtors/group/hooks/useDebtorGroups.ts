@@ -4,15 +4,21 @@ import { dialogs } from "../../../../utils/dialogs";
 import borrowersAPI from "../../../../api/core/borrower";
 import groupsAPI from "../../../../api/core/group";
 import type { Borrower } from "../../../../api/core/borrower";
-import type { DebtorGroup } from "../../../../api/core/group";
+import type { DebtorGroup, GroupMemberWithDebtor } from "../../../../api/core/group";
 
 interface UseDebtorGroupsReturn {
   groups: DebtorGroup[];
   loadingGroups: boolean;
+  groupsPagination: { page: number; totalPages: number; totalItems: number } | null;
   selectedGroup: DebtorGroup | null;
   setSelectedGroup: (group: DebtorGroup | null) => void;
-  groupMembers: Borrower[];
+  groupMembers: GroupMemberWithDebtor[];
   loadingMembers: boolean;
+  membersPagination: { page: number; totalPages: number; totalItems: number; pageSize: number };
+  membersCurrentPage: number;
+  setMembersCurrentPage: (page: number) => void;
+  membersPageSize: number;
+  setMembersPageSize: (size: number) => void;
   availableDebtors: Borrower[];
   loadingDebtors: boolean;
   createGroupModalOpen: boolean;
@@ -34,9 +40,13 @@ interface UseDebtorGroupsReturn {
 const useDebtorGroups = (): UseDebtorGroupsReturn => {
   const [groups, setGroups] = useState<DebtorGroup[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(true);
+  const [groupsPagination, setGroupsPagination] = useState<{ page: number; totalPages: number; totalItems: number } | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<DebtorGroup | null>(null);
-  const [groupMembers, setGroupMembers] = useState<Borrower[]>([]);
+  const [groupMembers, setGroupMembers] = useState<GroupMemberWithDebtor[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
+  const [membersPagination, setMembersPagination] = useState({ page: 1, totalPages: 1, totalItems: 0, pageSize: 10 });
+  const [membersCurrentPage, setMembersCurrentPage] = useState(1);
+  const [membersPageSize, setMembersPageSize] = useState(10);
   const [availableDebtors, setAvailableDebtors] = useState<Borrower[]>([]);
   const [loadingDebtors, setLoadingDebtors] = useState(false);
 
@@ -44,13 +54,19 @@ const useDebtorGroups = (): UseDebtorGroupsReturn => {
   const [editGroupModalOpen, setEditGroupModalOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<DebtorGroup | null>(null);
 
-  // Load all groups from API
+  // Load all groups (with pagination – but groups are usually few, so we can fetch all)
   const loadGroups = useCallback(async () => {
     setLoadingGroups(true);
     try {
-      const response = await groupsAPI.getAll();
+      // For groups, we can fetch all since typically limited, but we'll support pagination if needed
+      const response = await groupsAPI.getAll(1, 100); // fetch up to 100 groups
       if (response.status) {
-        setGroups(response.data);
+        setGroups(response.data.data);
+        setGroupsPagination({
+          page: response.data.pagination.page,
+          totalPages: response.data.pagination.pages,
+          totalItems: response.data.pagination.total,
+        });
       } else {
         throw new Error(response.message);
       }
@@ -62,24 +78,19 @@ const useDebtorGroups = (): UseDebtorGroupsReturn => {
     }
   }, []);
 
-  // Load members of the selected group
-  const loadGroupMembers = useCallback(async (groupId: number) => {
+  // Load members of the selected group with pagination
+  const loadGroupMembers = useCallback(async (groupId: number, page: number, limit: number) => {
     setLoadingMembers(true);
     try {
-      const response = await groupsAPI.getMembers(groupId);
+      const response = await groupsAPI.getMembers(groupId, page, limit);
       if (response.status) {
-        const members = response.data.map(m => ({
-          id: m.debtor.id,
-          name: m.debtor.name,
-          contact: m.debtor.contact,
-          email: m.debtor.email,
-          address: null,
-          notes: null,
-          createdAt: m.assignedAt,
-          updatedAt: m.assignedAt,
-          deletedAt: null,
-        } as Borrower));
-        setGroupMembers(members);
+        setGroupMembers(response.data.data);
+        setMembersPagination({
+          page: response.data.pagination.page,
+          totalPages: response.data.pagination.pages,
+          totalItems: response.data.pagination.total,
+          pageSize: response.data.pagination.limit,
+        });
       } else {
         throw new Error(response.message);
       }
@@ -87,18 +98,19 @@ const useDebtorGroups = (): UseDebtorGroupsReturn => {
       console.error("Failed to load group members:", err);
       dialogs.error(err.message || "Failed to load group members");
       setGroupMembers([]);
+      setMembersPagination({ page: 1, totalPages: 1, totalItems: 0, pageSize: limit });
     } finally {
       setLoadingMembers(false);
     }
   }, []);
 
-  // Load all active debtors for assignment dropdown
+  // Load all active debtors for assignment dropdown (use pagination if needed, but fetch up to 1000)
   const loadAvailableDebtors = useCallback(async () => {
     setLoadingDebtors(true);
     try {
       const res = await borrowersAPI.getAll({ includeDeleted: false, limit: 1000 });
       if (res.status) {
-        setAvailableDebtors(res.data);
+        setAvailableDebtors(res.data.data);
       } else {
         throw new Error(res.message);
       }
@@ -117,16 +129,17 @@ const useDebtorGroups = (): UseDebtorGroupsReturn => {
     loadAvailableDebtors();
   }, [loadGroups, loadAvailableDebtors]);
 
-  // Reload members when selected group changes
+  // Reload members when selected group changes or pagination changes
   useEffect(() => {
     if (selectedGroup) {
-      loadGroupMembers(selectedGroup.id);
+      loadGroupMembers(selectedGroup.id, membersCurrentPage, membersPageSize);
     } else {
       setGroupMembers([]);
+      setMembersPagination({ page: 1, totalPages: 1, totalItems: 0, pageSize: membersPageSize });
     }
-  }, [selectedGroup, loadGroupMembers]);
+  }, [selectedGroup, membersCurrentPage, membersPageSize, loadGroupMembers]);
 
-  // --- CRUD operations ---
+  // --- CRUD operations (unchanged except using updated API responses) ---
   const handleCreateGroup = async (data: { name: string; description: string; color: string }) => {
     try {
       const response = await groupsAPI.create({
@@ -192,7 +205,8 @@ const useDebtorGroups = (): UseDebtorGroupsReturn => {
     try {
       const response = await groupsAPI.assignDebtor(selectedGroup.id, debtorId);
       if (response.status) {
-        await loadGroupMembers(selectedGroup.id);
+        // Reload current page of members
+        await loadGroupMembers(selectedGroup.id, membersCurrentPage, membersPageSize);
         dialogs.success("Debtor assigned");
       } else {
         throw new Error(response.message);
@@ -207,7 +221,7 @@ const useDebtorGroups = (): UseDebtorGroupsReturn => {
     try {
       const response = await groupsAPI.removeDebtor(selectedGroup.id, debtorId);
       if (response.status) {
-        await loadGroupMembers(selectedGroup.id);
+        await loadGroupMembers(selectedGroup.id, membersCurrentPage, membersPageSize);
         dialogs.success("Debtor removed from group");
       } else {
         throw new Error(response.message);
@@ -222,7 +236,7 @@ const useDebtorGroups = (): UseDebtorGroupsReturn => {
     try {
       const response = await groupsAPI.bulkAssign(selectedGroup.id, debtorIds);
       if (response.status) {
-        await loadGroupMembers(selectedGroup.id);
+        await loadGroupMembers(selectedGroup.id, membersCurrentPage, membersPageSize);
         dialogs.success(`${debtorIds.length} debtor(s) assigned to group`);
       } else {
         throw new Error(response.message);
@@ -235,16 +249,22 @@ const useDebtorGroups = (): UseDebtorGroupsReturn => {
   const refresh = () => {
     loadGroups();
     loadAvailableDebtors();
-    if (selectedGroup) loadGroupMembers(selectedGroup.id);
+    if (selectedGroup) loadGroupMembers(selectedGroup.id, membersCurrentPage, membersPageSize);
   };
 
   return {
     groups,
     loadingGroups,
+    groupsPagination,
     selectedGroup,
     setSelectedGroup,
     groupMembers,
     loadingMembers,
+    membersPagination,
+    membersCurrentPage,
+    setMembersCurrentPage,
+    membersPageSize,
+    setMembersPageSize,
     availableDebtors,
     loadingDebtors,
     createGroupModalOpen,

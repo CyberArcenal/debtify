@@ -2,10 +2,11 @@
 import React, { useState } from "react";
 import { User, X, UserPlus, CheckSquare, Square, Users } from "lucide-react";
 import type { Borrower } from "../../../../api/core/borrower";
+import type { GroupMemberWithDebtor } from "../../../../api/core/group";
 
 interface GroupMembersProps {
   groupName: string;
-  members: Borrower[];
+  members: GroupMemberWithDebtor[];  // ✅ binago mula Borrower[] patungong GroupMemberWithDebtor[]
   loading: boolean;
   availableDebtors: Borrower[];
   onAssign: (debtorId: number) => void;
@@ -27,7 +28,7 @@ const GroupMembers: React.FC<GroupMembersProps> = ({
   const [searchTerm, setSearchTerm] = useState("");
 
   const filteredAvailable = availableDebtors.filter(d => 
-    !members.some(m => m.id === d.id) &&
+    !members.some(m => m.debtorId === d.id) &&  // ✅ gamitin ang debtorId mula sa member
     (d.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
      (d.email && d.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
      (d.contact && d.contact.includes(searchTerm)))
@@ -71,18 +72,18 @@ const GroupMembers: React.FC<GroupMembersProps> = ({
         ) : (
           <ul className="space-y-2">
             {members.map((member) => (
-              <li key={member.id} className="flex justify-between items-center p-2 rounded border" style={{ borderColor: "var(--border-color)" }}>
+              <li key={member.debtorId} className="flex justify-between items-center p-2 rounded border" style={{ borderColor: "var(--border-color)" }}>
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-full bg-[var(--primary-color)]/20 flex items-center justify-center">
                     <User className="w-4 h-4 text-[var(--primary-color)]" />
                   </div>
                   <div>
-                    <div className="font-medium">{member.name}</div>
-                    <div className="text-xs text-[var(--text-tertiary)]">{member.email || member.contact || "No contact"}</div>
+                    <div className="font-medium">{member.debtor.name}</div>
+                    <div className="text-xs text-[var(--text-tertiary)]">{member.debtor.email || member.debtor.contact || "No contact"}</div>
                   </div>
                 </div>
                 <button
-                  onClick={() => onRemove(member.id)}
+                  onClick={() => onRemove(member.debtorId)}
                   className="p-1 rounded hover:bg-[var(--card-hover-bg)] text-red-500"
                   title="Remove"
                 >

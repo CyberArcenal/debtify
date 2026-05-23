@@ -35,32 +35,36 @@ const DebtSelect: React.FC<DebtSelectProps> = ({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    const loadDebts = async () => {
-      setLoading(true);
-      try {
-        const params: any = {
-          sortBy: "dueDate",
-          sortOrder: "ASC",
-          limit: 1000,
-          includeDeleted: false,
-        };
-        if (statusFilter !== "all") params.status = statusFilter;
-        if (borrowerId) params.borrowerId = borrowerId;
-        const response = await debtsAPI.getAll(params);
-        if (response.status && response.data) {
-          const list = Array.isArray(response.data) ? response.data : [];
-          setDebts(list);
-          setFilteredDebts(list);
-        }
-      } catch (error) {
-        console.error("Failed to load debts:", error);
-      } finally {
-        setLoading(false);
+// src/renderer/components/Selects/Debt/index.tsx
+// Only the loadDebts useEffect needs to change:
+
+useEffect(() => {
+  const loadDebts = async () => {
+    setLoading(true);
+    try {
+      const params: any = {
+        sortBy: "dueDate",
+        sortOrder: "ASC",
+        limit: 1000,
+        includeDeleted: false,
+      };
+      if (statusFilter !== "all") params.status = statusFilter;
+      if (borrowerId) params.borrowerId = borrowerId;
+      const response = await debtsAPI.getAll(params);
+      if (response.status && response.data) {
+        // ✅ Fix: response.data is PaginatedResult<Debt>, so array is under .data
+        const list = response.data.data || [];
+        setDebts(list);
+        setFilteredDebts(list);
       }
-    };
-    loadDebts();
-  }, [statusFilter, borrowerId]);
+    } catch (error) {
+      console.error("Failed to load debts:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  loadDebts();
+}, [statusFilter, borrowerId]);
 
   useEffect(() => {
     if (!searchTerm.trim()) {

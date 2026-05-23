@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld("backendAPI", {
   activation: (payload) => ipcRenderer.invoke("activation", payload),
   systemConfig: (payload) => ipcRenderer.invoke("systemConfig", payload),
   dashboard: (payload) => ipcRenderer.invoke("dashboard", payload),
+  reminderLog: (payload) => ipcRenderer.invoke("reminderLog", payload),
   notificationLog: (payload) => ipcRenderer.invoke("notificationLog", payload),
   notification: (payload) => ipcRenderer.invoke("notification", payload),
   updater: (payload) => ipcRenderer.invoke("updater", payload),

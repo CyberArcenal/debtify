@@ -1,15 +1,15 @@
 import React, { useState } from "react";
 import { Filter, RefreshCw } from "lucide-react";
-import { useNotificationLogs } from "./hooks/useNotificationLogs";
+import { useNotificationLogs } from "../reminder/hooks/useNotificationLogs";
 import { NotificationSearch } from "./components/NotificationSearch";
 import { NotificationFilterPanel } from "./components/NotificationFilterPanel";
 import { NotificationStats } from "./components/NotificationStats";
 import { NotificationTable } from "./components/NotificationTable";
 import { NotificationViewDialog } from "./Dialogs/NotificationViewDialog";
 import { dialogs } from "../../utils/dialogs";
-import notificationLogAPI from "../../api/core/notification_log";
+import notificationLogAPI from "../../api/core/reminder_log";
 import { showSuccess, showError } from "../../utils/notification";
-import type { NotificationLogEntry } from "../../api/core/notification_log";
+import type { NotificationLogEntry } from "../../api/core/reminder_log";
 import Pagination from "../../components/Shared/Pagination";
 
 const NotificationLogPage: React.FC = () => {

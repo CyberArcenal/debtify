@@ -1,10 +1,11 @@
+// src/renderer/pages/notification/hooks/useNotificationLogs.ts
 import { useState, useEffect, useCallback } from "react";
 import type {
   NotificationLogEntry,
   NotificationStats,
   PaginatedNotifications,
-} from "../../../api/core/notification_log";
-import notificationLogAPI from "../../../api/core/notification_log";
+} from "../../../api/core/reminder_log";
+import reminderLogAPI from "../../../api/core/reminder_log";
 
 interface UseNotificationLogsParams {
   page?: number;
@@ -46,13 +47,13 @@ export const useNotificationLogs = (
     try {
       let response;
       if (filters.keyword) {
-        response = await notificationLogAPI.search({
+        response = await reminderLogAPI.search({
           keyword: filters.keyword,
           page: filters.page,
           limit: filters.limit,
         });
       } else {
-        response = await notificationLogAPI.getAll({
+        response = await reminderLogAPI.getAll({
           page: filters.page,
           limit: filters.limit,
           status: filters.status,
@@ -75,6 +76,7 @@ export const useNotificationLogs = (
         throw new Error(response.message);
       }
     } catch (err: any) {
+      console.error("Error fetching reminder logs:", err);
       setError(err.message || "Failed to fetch notification logs");
     } finally {
       setLoading(false);
@@ -83,7 +85,7 @@ export const useNotificationLogs = (
 
   const fetchStats = useCallback(async () => {
     try {
-      const response = await notificationLogAPI.getStats();
+      const response = await reminderLogAPI.getStats();
       if (response.status) {
         setStats(response.data);
       }
@@ -99,7 +101,7 @@ export const useNotificationLogs = (
 
   const updateFilters = useCallback(
     (newFilters: Partial<UseNotificationLogsParams>) => {
-      setFilters((prev) => ({ ...prev, ...newFilters, page: 1 })); // reset to first page
+      setFilters((prev) => ({ ...prev, ...newFilters, page: 1 }));
     },
     [],
   );

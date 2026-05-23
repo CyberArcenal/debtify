@@ -1,6 +1,6 @@
 // src/main/services/PaymentMethodService.js
 const auditLogger = require("../utils/auditLogger");
-
+const { paginateQueryBuilder } = require("../utils/dbUtils/pagination");
 class PaymentMethodService {
   constructor() {
     this.methodRepository = null;
@@ -61,14 +61,15 @@ class PaymentMethodService {
   // ----------------------------------------------------------------------
   // 📋 READ OPERATIONS
   // ----------------------------------------------------------------------
-
-  async getAllPaymentMethods() {
+  async getAllPaymentMethods(page = 1, limit = 10) {
     const { method: repo } = await this.getRepositories();
-    const methods = await repo.find({
-      order: { isDefault: "DESC", name: "ASC" },
-    });
+    const qb = repo
+      .createQueryBuilder("method")
+      .orderBy("method.isDefault", "DESC")
+      .addOrderBy("method.name", "ASC");
+    const result = await paginateQueryBuilder(qb, { page, limit });
     await auditLogger.logView("PaymentMethod", null, "system");
-    return methods;
+    return result;
   }
 
   async getPaymentMethodById(id) {
@@ -79,6 +80,16 @@ class PaymentMethodService {
     }
     await auditLogger.logView("PaymentMethod", id, "system");
     return method;
+  }
+
+  /**
+   * Get the default payment method
+   * @returns {Promise<PaymentMethod|null>}
+   */
+  async getDefaultPaymentMethod() {
+    const { method: repo } = await this.getRepositories();
+    const defaultMethod = await repo.findOne({ where: { isDefault: true } });
+    return defaultMethod || null;
   }
 
   async getPaymentMethodStats(methodId) {

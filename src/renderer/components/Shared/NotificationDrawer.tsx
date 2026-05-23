@@ -1,4 +1,4 @@
-// components/Shared/NotificationDrawer.tsx (Debt Management Version - using notification.ts API)
+// components/Shared/NotificationDrawer.tsx (In-App Notifications)
 import React, { useState, useEffect, useCallback } from "react";
 import {
   X,
@@ -60,10 +60,9 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
         sortOrder: "DESC",
       });
       if (response.status) {
-        // ✅ response.data is directly Notification[]
-        const items = response.data;
+        // ✅ response.data is PaginatedResult<Notification>
+        const items = response.data.data; // array of notifications
         setNotifications((prev) => (reset ? items : [...prev, ...items]));
-        // ✅ hasMore if we received exactly 'limit' items (implies more may exist)
         setHasMore(items.length === limit);
       } else {
         throw new Error(response.message);
@@ -77,7 +76,6 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
 
   const fetchUnreadCount = async () => {
     try {
-      // ✅ getUnreadCount returns a number directly
       const count = await notificationAPI.getUnreadCount();
       setUnreadCount(count);
     } catch (err) {
@@ -131,7 +129,6 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
       const response = await notificationAPI.delete(id);
       if (response.status) {
         setNotifications((prev) => prev.filter((n) => n.id !== id));
-        // if it was unread, decrease count
         const wasUnread = notifications.find((n) => n.id === id)?.isRead === false;
         if (wasUnread) setUnreadCount((prev) => Math.max(0, prev - 1));
       } else {
@@ -162,7 +159,6 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
 
   const isLongMessage = (message: string) => message.length > 100;
 
-  // Map API notification types to UI indicators
   const getTypeIcon = (type: Notification["type"]) => {
     switch (type) {
       case "payment_confirmation":
@@ -180,13 +176,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
-      />
-
-      {/* Drawer */}
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="absolute right-0 top-0 h-full w-full max-w-md bg-[var(--card-bg)] border-l border-[var(--border-color)] shadow-xl transform transition-transform duration-300 ease-in-out windows-fade-in">
         <div className="flex flex-col h-full">
           {/* Header */}
@@ -202,10 +192,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
                 )}
               </h2>
             </div>
-            <button
-              onClick={onClose}
-              className="p-1 hover:bg-[var(--card-hover-bg)] rounded"
-            >
+            <button onClick={onClose} className="p-1 hover:bg-[var(--card-hover-bg)] rounded">
               <X className="w-5 h-5 text-[var(--text-tertiary)]" />
             </button>
           </div>
@@ -285,7 +272,6 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
                             {notification.title}
                           </p>
 
-                          {/* Message with expand/collapse */}
                           <div className="mt-1">
                             <p
                               className={`text-xs text-[var(--text-tertiary)] ${
@@ -319,7 +305,6 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
                             )}
                           </p>
 
-                          {/* Optional: show debt reference if available */}
                           {notification.debt && expanded && (
                             <div className="mt-2 text-xs text-[var(--text-tertiary)] bg-[var(--card-bg)] p-2 rounded border border-[var(--border-color)]">
                               <span className="font-medium">Debt ID:</span>{" "}
@@ -335,7 +320,6 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
                           )}
                         </div>
 
-                        {/* Action buttons */}
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           {!notification.isRead && (
                             <button
@@ -359,7 +343,6 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
                   );
                 })}
 
-                {/* Load more */}
                 {hasMore && (
                   <button
                     onClick={loadMore}

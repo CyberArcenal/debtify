@@ -1,7 +1,7 @@
 // src/services/InterestRateChangeLogService.js
 const auditLogger = require("../utils/auditLogger");
 const { logger } = require("../utils/logger");
-
+const { paginateQueryBuilder } = require("../utils/dbUtils/pagination");
 class InterestRateChangeLogService {
   constructor() {
     this.logRepository = null;
@@ -38,7 +38,15 @@ class InterestRateChangeLogService {
    * @param {string|null} reason
    * @param {import("typeorm").QueryRunner} [queryRunner]
    */
-  async createLog(settingKey, oldValue, newValue, user = "system", loanId = null, reason = null, queryRunner = null) {
+  async createLog(
+    settingKey,
+    oldValue,
+    newValue,
+    user = "system",
+    loanId = null,
+    reason = null,
+    queryRunner = null,
+  ) {
     const InterestRateChangeLog = require("../entities/InterestRateChangeLog");
     const repo = this._getRepo(queryRunner, InterestRateChangeLog);
     const log = repo.create({
@@ -69,18 +77,26 @@ class InterestRateChangeLogService {
     const repo = await this.getRepository();
     const qb = repo.createQueryBuilder("log").orderBy("log.changed_at", "DESC");
 
-    if (filters.settingKey) qb.andWhere("log.setting_key = :key", { key: filters.settingKey });
-    if (filters.loanId) qb.andWhere("log.loan_id = :loanId", { loanId: filters.loanId });
-    if (filters.changedBy) qb.andWhere("log.changed_by = :user", { user: filters.changedBy });
-    if (filters.fromDate) qb.andWhere("log.changed_at >= :from", { from: new Date(filters.fromDate) });
-    if (filters.toDate) qb.andWhere("log.changed_at <= :to", { to: new Date(filters.toDate) });
+    if (filters.settingKey)
+      qb.andWhere("log.setting_key = :key", { key: filters.settingKey });
+    if (filters.loanId)
+      qb.andWhere("log.loan_id = :loanId", { loanId: filters.loanId });
+    if (filters.changedBy)
+      qb.andWhere("log.changed_by = :user", { user: filters.changedBy });
+    if (filters.fromDate)
+      qb.andWhere("log.changed_at >= :from", {
+        from: new Date(filters.fromDate),
+      });
+    if (filters.toDate)
+      qb.andWhere("log.changed_at <= :to", { to: new Date(filters.toDate) });
 
-    qb.skip((page - 1) * limit).take(limit);
-    const [data, total] = await qb.getManyAndCount();
-    return {
-      data,
-      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
-    };
+    const result = await paginateQueryBuilder(qb, {
+      page: page,
+      limit: limit,
+    });
+
+    await auditLogger.logView("InterestRateChangeLog", null, "system");
+    return result; // { data: [], pagination: {} }
   }
 
   /**

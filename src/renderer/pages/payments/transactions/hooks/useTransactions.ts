@@ -14,12 +14,11 @@ export interface TransactionFilters {
 }
 
 interface UseTransactionsReturn {
-  transactions: PaymentTransaction[];
-  paginatedTransactions: PaymentTransaction[];
-  filters: TransactionFilters;
+  transactions: PaymentTransaction[];      // current page data
   loading: boolean;
   error: string | null;
-  pagination: { current_page: number; total_pages: number; count: number; page_size: number };
+  pagination: { page: number; totalPages: number; totalItems: number; pageSize: number };
+  filters: TransactionFilters;
   pageSize: number;
   setPageSize: (size: number) => void;
   currentPage: number;
@@ -29,109 +28,114 @@ interface UseTransactionsReturn {
   resetFilters: () => void;
   handleSort: (key: string) => void;
   sortConfig: { key: string; direction: "asc" | "desc" };
-  totalAmount: number;
+  totalAmount: number;   // sum of amounts in current page
   // Admin actions
   updateTransaction: (id: number, data: any) => Promise<void>;
   deleteTransaction: (id: number) => Promise<void>;
 }
 
 const useTransactions = (): UseTransactionsReturn => {
-  const [allTransactions, setAllTransactions] = useState<PaymentTransaction[]>([]);
+  const [transactions, setTransactions] = useState<PaymentTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
+  const [paginationMeta, setPaginationMeta] = useState({ page: 1, totalPages: 1, totalItems: 0, pageSize: 10 });
   const [sortConfig, setSortConfig] = useState({ key: "paymentDate", direction: "desc" });
   const [filters, setFilters] = useState<TransactionFilters>({
     search: "", dateFrom: "", dateTo: "", debtorId: "", debtId: "", minAmount: 0, maxAmount: 0,
   });
 
+  // Helper to convert client filters to backend parameters
+  const buildApiParams = useCallback(() => {
+    const params: any = {
+      page: currentPage,
+      limit: pageSize,
+      sortBy: sortConfig.key === "borrower" ? "borrowerName" : sortConfig.key,
+      sortOrder: sortConfig.direction.toUpperCase(),
+    };
+    if (filters.search) params.search = filters.search;
+    if (filters.dateFrom) params.paymentDateFrom = filters.dateFrom;
+    if (filters.dateTo) params.paymentDateTo = filters.dateTo;
+    if (filters.debtorId) params.borrowerId = filters.debtorId;
+    if (filters.debtId) params.debtId = filters.debtId;
+    if (filters.minAmount > 0) params.minAmount = filters.minAmount;
+    if (filters.maxAmount > 0) params.maxAmount = filters.maxAmount;
+    return params;
+  }, [currentPage, pageSize, sortConfig, filters]);
+
   const fetchTransactions = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await paymentsAPI.getAll({ limit: 10000, includeDeleted: false });
+      const params = buildApiParams();
+      const response = await paymentsAPI.getAll(params);
       if (!response.status) throw new Error(response.message);
-      setAllTransactions(response.data);
+      const paginated = response.data; // PaginatedResult<PaymentTransaction>
+      setTransactions(paginated.data);
+      setPaginationMeta({
+        page: paginated.pagination.page,
+        totalPages: paginated.pagination.pages,
+        totalItems: paginated.pagination.total,
+        pageSize: paginated.pagination.limit,
+      });
     } catch (err: any) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [buildApiParams]);
 
-  useEffect(() => { fetchTransactions(); }, [fetchTransactions]);
+  useEffect(() => {
+    fetchTransactions();
+  }, [fetchTransactions]);
 
-  // Filtering
-  const filteredTransactions = useMemo(() => {
-    let filtered = [...allTransactions];
-    if (filters.search.trim()) {
-      const term = filters.search.toLowerCase();
-      filtered = filtered.filter(t =>
-        (t.debt?.name && t.debt.name.toLowerCase().includes(term)) ||
-        (t.debt?.borrower?.name && t.debt.borrower.name.toLowerCase().includes(term)) ||
-        (t.reference && t.reference.toLowerCase().includes(term))
-      );
-    }
-    if (filters.dateFrom) filtered = filtered.filter(t => t.paymentDate >= filters.dateFrom);
-    if (filters.dateTo) filtered = filtered.filter(t => t.paymentDate <= filters.dateTo);
-    if (filters.debtorId) filtered = filtered.filter(t => t.debt?.borrower?.id === filters.debtorId);
-    if (filters.debtId) filtered = filtered.filter(t => t.debt?.id === filters.debtId);
-    if (filters.minAmount > 0) filtered = filtered.filter(t => t.amount >= filters.minAmount);
-    if (filters.maxAmount > 0) filtered = filtered.filter(t => t.amount <= filters.maxAmount);
-    return filtered;
-  }, [allTransactions, filters]);
-
-  // Sorting
-  const sortedTransactions = useMemo(() => {
-    const sorted = [...filteredTransactions];
-    const { key, direction } = sortConfig;
-    sorted.sort((a, b) => {
-      let aVal: any, bVal: any;
-      if (key === "paymentDate") { aVal = new Date(a.paymentDate).getTime(); bVal = new Date(b.paymentDate).getTime(); }
-      else if (key === "amount") { aVal = a.amount; bVal = b.amount; }
-      else if (key === "debtName") { aVal = a.debt?.name || ""; bVal = b.debt?.name || ""; }
-      else if (key === "borrower") { aVal = a.debt?.borrower?.name || ""; bVal = b.debt?.borrower?.name || ""; }
-      else { aVal = a[key as keyof PaymentTransaction]; bVal = b[key as keyof PaymentTransaction]; }
-      if (typeof aVal === "string") aVal = aVal.toLowerCase();
-      if (typeof bVal === "string") bVal = bVal.toLowerCase();
-      if (aVal < bVal) return direction === "asc" ? -1 : 1;
-      if (aVal > bVal) return direction === "asc" ? 1 : -1;
-      return 0;
-    });
-    return sorted;
-  }, [filteredTransactions, sortConfig]);
-
-  const totalItems = sortedTransactions.length;
-  const totalPages = Math.ceil(totalItems / pageSize);
-  const paginatedTransactions = sortedTransactions.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-  const totalAmount = filteredTransactions.reduce((sum, t) => sum + t.amount, 0);
+  const totalAmount = useMemo(() => {
+    return transactions.reduce((sum, t) => sum + t.amount, 0);
+  }, [transactions]);
 
   const handleFilterChange = (key: keyof TransactionFilters, value: string | number) => {
     setFilters(prev => ({ ...prev, [key]: value }));
     setCurrentPage(1);
   };
-  const resetFilters = () => setFilters({ search: "", dateFrom: "", dateTo: "", debtorId: "", debtId: "", minAmount: 0, maxAmount: 0 });
-  const handleSort = (key: string) => setSortConfig(prev => ({ key, direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc" }));
+
+  const resetFilters = () => {
+    setFilters({ search: "", dateFrom: "", dateTo: "", debtorId: "", debtId: "", minAmount: 0, maxAmount: 0 });
+    setCurrentPage(1);
+  };
+
+  const handleSort = (key: string) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc",
+    }));
+    setCurrentPage(1);
+  };
+
   const reload = () => fetchTransactions();
 
-  // Admin actions (wrap API calls)
+  // Admin actions
   const updateTransaction = async (id: number, data: any) => {
     await paymentsAPI.update(id, data);
     await fetchTransactions();
   };
+
   const deleteTransaction = async (id: number) => {
     await paymentsAPI.delete(id);
     await fetchTransactions();
   };
 
   return {
-    transactions: sortedTransactions,
-    paginatedTransactions,
-    filters,
+    transactions,
     loading,
     error,
-    pagination: { current_page: currentPage, total_pages: totalPages, count: totalItems, page_size: pageSize },
+    pagination: {
+      page: paginationMeta.page,
+      totalPages: paginationMeta.totalPages,
+      totalItems: paginationMeta.totalItems,
+      pageSize: paginationMeta.pageSize,
+    },
+    filters,
     pageSize,
     setPageSize,
     currentPage,

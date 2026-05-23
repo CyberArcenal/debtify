@@ -2,7 +2,7 @@
 
 const auditLogger = require("../utils/auditLogger");
 const { validateBorrowerData } = require("../utils/borrowerUtils");
-
+const { paginateQueryBuilder } = require("../utils/dbUtils/pagination");
 class BorrowerService {
   constructor() {
     this.borrowerRepository = null;
@@ -198,7 +198,13 @@ class BorrowerService {
       borrower.updatedAt = new Date();
 
       const saved = await updateDb(repo, borrower);
-      await auditLogger.logUpdate("Borrower", id, { deletedAt: true }, { deletedAt: null }, user);
+      await auditLogger.logUpdate(
+        "Borrower",
+        id,
+        { deletedAt: true },
+        { deletedAt: null },
+        user,
+      );
       console.log(`Borrower restored: #${id}`);
       return saved;
     } catch (error) {
@@ -263,7 +269,7 @@ class BorrowerService {
     if (options.search) {
       qb.andWhere(
         "(borrower.name LIKE :search OR borrower.email LIKE :search OR borrower.contact LIKE :search OR borrower.address LIKE :search)",
-        { search: `%${options.search}%` }
+        { search: `%${options.search}%` },
       );
     }
     if (options.name) {
@@ -281,15 +287,14 @@ class BorrowerService {
     const sortOrder = options.sortOrder === "ASC" ? "ASC" : "DESC";
     qb.orderBy(`borrower.${sortBy}`, sortOrder);
 
-    // Pagination
-    if (options.page && options.limit) {
-      const offset = (options.page - 1) * options.limit;
-      qb.skip(offset).take(options.limit);
-    }
+    // 👇 Use the utility
+    const result = await paginateQueryBuilder(qb, {
+      page: options.page,
+      limit: options.limit,
+    });
 
-    const borrowers = await qb.getMany();
     await auditLogger.logView("Borrower", null, "system");
-    return borrowers;
+    return result; // { data: [], pagination: {} }
   }
 
   /**
@@ -321,12 +326,22 @@ class BorrowerService {
    * @param {string} user
    */
   async exportBorrowers(format = "json", filters = {}, user = "system") {
-    const borrowers = await this.findAll(filters);
+    const result = await this.findAll(filters);
+    const borrowers = result.data;
 
     let exportData;
     if (format === "csv") {
-      const headers = ["ID", "Name", "Contact", "Email", "Address", "Notes", "Created At", "Updated At"];
-      const rows = borrowers.map(b => [
+      const headers = [
+        "ID",
+        "Name",
+        "Contact",
+        "Email",
+        "Address",
+        "Notes",
+        "Created At",
+        "Updated At",
+      ];
+      const rows = borrowers.map((b) => [
         b.id,
         b.name,
         b.contact || "",
@@ -338,7 +353,7 @@ class BorrowerService {
       ]);
       exportData = {
         format: "csv",
-        data: [headers, ...rows].map(row => row.join(",")).join("\n"),
+        data: [headers, ...rows].map((row) => row.join(",")).join("\n"),
         filename: `borrowers_export_${new Date().toISOString().split("T")[0]}.csv`,
       };
     } else {

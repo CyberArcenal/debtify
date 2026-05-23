@@ -9,6 +9,7 @@ declare global {
       auditLog: (payload: any) => Promise<any>;
       activation: (payload: any) => Promise<any>;
       notification: (payload: any) => Promise<any>;
+      reminderLog: (payload: any) => Promise<any>;
       notificationLog: (payload: any) => Promise<any>;
       systemConfig: (payload: { method: string; params?: any }) => Promise<{
         status: boolean;

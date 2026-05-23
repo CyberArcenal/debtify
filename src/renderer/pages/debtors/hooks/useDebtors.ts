@@ -1,5 +1,5 @@
 // src/renderer/pages/debtors/hooks/useDebtors.ts
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import borrowersAPI from "../../../api/core/borrower";
 import debtsAPI from "../../../api/core/debt";
 import type { Borrower } from "../../../api/core/borrower";
@@ -14,12 +14,11 @@ export interface DebtorWithTotal extends Borrower {
 }
 
 interface UseDebtorsReturn {
-  debtors: DebtorWithTotal[];
-  paginatedDebtors: DebtorWithTotal[];
-  filters: DebtorFilters;
+  debtors: DebtorWithTotal[];           // current page data with total_debt
   loading: boolean;
   error: string | null;
-  pagination: { current_page: number; total_pages: number; count: number; page_size: number };
+  pagination: { page: number; totalPages: number; totalItems: number; pageSize: number };
+  filters: DebtorFilters;
   selectedDebtors: number[];
   setSelectedDebtors: React.Dispatch<React.SetStateAction<number[]>>;
   sortConfig: { key: string; direction: "asc" | "desc" };
@@ -37,7 +36,7 @@ interface UseDebtorsReturn {
 }
 
 const useDebtors = (initialFilters?: Partial<DebtorFilters>): UseDebtorsReturn => {
-  const [allDebtors, setAllDebtors] = useState<DebtorWithTotal[]>([]);
+  const [debtors, setDebtors] = useState<DebtorWithTotal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedDebtors, setSelectedDebtors] = useState<number[]>([]);
@@ -47,6 +46,7 @@ const useDebtors = (initialFilters?: Partial<DebtorFilters>): UseDebtorsReturn =
   });
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
+  const [paginationMeta, setPaginationMeta] = useState({ page: 1, totalPages: 1, totalItems: 0, pageSize: 10 });
   const [filters, setFilters] = useState<DebtorFilters>({
     search: "",
     status: "active",
@@ -60,39 +60,80 @@ const useDebtors = (initialFilters?: Partial<DebtorFilters>): UseDebtorsReturn =
     return () => { mountedRef.current = false; };
   }, []);
 
+  // Helper: map status filter to includeDeleted and any other params
+  const getIncludeDeleted = (status: string) => {
+    if (status === "deleted") return true;
+    if (status === "active") return false;
+    return true; // 'all' includes deleted
+  };
+
   const fetchDebtors = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      // Fetch all debtors (include deleted for status filtering)
-      const response = await borrowersAPI.getAll({ includeDeleted: true });
-      if (!response.status) throw new Error(response.message || "Failed to fetch debtors");
-
-      let debtorsList = response.data;
-
-      // Fetch all debts to compute total debt per debtor
-      const debtsRes = await debtsAPI.getAll({ limit: 10000 });
-      if (!debtsRes.status) throw new Error(debtsRes.message || "Failed to fetch debts");
-      const allDebts = debtsRes.data;
-
-      // Compute total outstanding (remainingAmount) per borrower
-      const debtMap = new Map<number, number>();
-      allDebts.forEach(debt => {
-        if (debt.remainingAmount > 0) {
-          const current = debtMap.get(debt.borrower?.id as number | 0) || 0;
-          debtMap.set(debt.borrower?.id as number, current + debt.remainingAmount);
-        }
+      const includeDeleted = getIncludeDeleted(filters.status);
+      const response = await borrowersAPI.getAll({
+        page: currentPage,
+        limit: pageSize,
+        search: filters.search || undefined,
+        sortBy: sortConfig.key,
+        sortOrder: sortConfig.direction.toUpperCase() as "ASC" | "DESC",
+        includeDeleted,
       });
 
-      const debtorsWithTotal: DebtorWithTotal[] = debtorsList.map(d => ({
-        ...d,
-        total_debt: debtMap.get(d.id) || 0,
-      }));
+      if (!response.status) throw new Error(response.message || "Failed to fetch debtors");
 
-      if (mountedRef.current) {
-        setAllDebtors(debtorsWithTotal);
-        setError(null);
+      const borrowersData = response.data.data;       // Borrower[]
+      const pagination = response.data.pagination;    // { page, limit, total, pages }
+
+      // Fetch total debt for each borrower in the current page (efficiently)
+      if (borrowersData.length > 0) {
+        const borrowerIds = borrowersData.map(b => b.id);
+        // Use debtsAPI.getAll with borrowerId filter (but we need multiple borrowerIds)
+        // Option: backend endpoint to get total debt for multiple borrowers? For now, fetch debts per borrower individually (but in parallel)
+        // To avoid N+1, we can fetch all debts for these borrowerIds with a single query if backend supports filter by list of borrowerIds.
+        // Let's assume we have a way: we can call debtsAPI.getAll with borrowerId list (if supported) or do parallel requests.
+        // Simpler: we can compute total_debt on backend and add to Borrower DTO. For now, we'll do parallel requests (acceptable for small page size).
+        const debtPromises = borrowerIds.map(async (id) => {
+          try {
+            const debtsRes = await debtsAPI.getAll({ borrowerId: id, limit: 1000 });
+            if (debtsRes.status) {
+              const total = debtsRes.data.data.reduce((sum, debt) => sum + debt.remainingAmount, 0);
+              return { id, total };
+            }
+            return { id, total: 0 };
+          } catch {
+            return { id, total: 0 };
+          }
+        });
+        const totals = await Promise.all(debtPromises);
+        const totalMap = new Map(totals.map(t => [t.id, t.total]));
+
+        const debtorsWithTotal: DebtorWithTotal[] = borrowersData.map(d => ({
+          ...d,
+          total_debt: totalMap.get(d.id) || 0,
+        }));
+        if (mountedRef.current) {
+          setDebtors(debtorsWithTotal);
+          setPaginationMeta({
+            page: pagination.page,
+            totalPages: pagination.pages,
+            totalItems: pagination.total,
+            pageSize: pagination.limit,
+          });
+        }
+      } else {
+        if (mountedRef.current) {
+          setDebtors([]);
+          setPaginationMeta({
+            page: pagination.page,
+            totalPages: pagination.pages,
+            totalItems: pagination.total,
+            pageSize: pagination.limit,
+          });
+        }
       }
+      setError(null);
     } catch (err: any) {
       if (mountedRef.current) {
         setError(err.message || "Failed to load debtors");
@@ -101,72 +142,11 @@ const useDebtors = (initialFilters?: Partial<DebtorFilters>): UseDebtorsReturn =
     } finally {
       if (mountedRef.current) setLoading(false);
     }
-  }, []);
+  }, [currentPage, pageSize, filters.search, filters.status, sortConfig.key, sortConfig.direction]);
 
   useEffect(() => {
     fetchDebtors();
   }, [fetchDebtors]);
-
-  // Client-side filtering
-  const filteredDebtors = useMemo(() => {
-    let filtered = [...allDebtors];
-
-    // Status filter
-    if (filters.status === "active") {
-      filtered = filtered.filter(d => !d.deletedAt);
-    } else if (filters.status === "deleted") {
-      filtered = filtered.filter(d => d.deletedAt);
-    }
-
-    // Search (name, email, contact)
-    if (filters.search.trim()) {
-      const term = filters.search.toLowerCase();
-      filtered = filtered.filter(d =>
-        d.name.toLowerCase().includes(term) ||
-        (d.email && d.email.toLowerCase().includes(term)) ||
-        (d.contact && d.contact.toLowerCase().includes(term))
-      );
-    }
-
-    return filtered;
-  }, [allDebtors, filters]);
-
-  // Client-side sorting
-  const sortedDebtors = useMemo(() => {
-    const sorted = [...filteredDebtors];
-    const { key, direction } = sortConfig;
-    if (key) {
-      sorted.sort((a, b) => {
-        let aVal: any = a[key as keyof DebtorWithTotal];
-        let bVal: any = b[key as keyof DebtorWithTotal];
-        if (key === "total_debt") {
-          aVal = a.total_debt;
-          bVal = b.total_debt;
-        } else if (key === "createdAt") {
-          aVal = new Date(a.createdAt).getTime();
-          bVal = new Date(b.createdAt).getTime();
-        } else if (typeof aVal === "string") {
-          aVal = aVal.toLowerCase();
-          bVal = bVal.toLowerCase();
-        }
-        if (aVal < bVal) return direction === "asc" ? -1 : 1;
-        if (aVal > bVal) return direction === "asc" ? 1 : -1;
-        return 0;
-      });
-    }
-    return sorted;
-  }, [filteredDebtors, sortConfig]);
-
-  const totalItems = sortedDebtors.length;
-  const totalPages = Math.ceil(totalItems / pageSize);
-  const paginatedDebtors = sortedDebtors.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
-  const pagination = {
-    current_page: currentPage,
-    total_pages: totalPages,
-    count: totalItems,
-    page_size: pageSize,
-  };
 
   const handleFilterChange = useCallback((key: keyof DebtorFilters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -185,10 +165,12 @@ const useDebtors = (initialFilters?: Partial<DebtorFilters>): UseDebtorsReturn =
   }, []);
 
   const toggleSelectAll = useCallback(() => {
-    setSelectedDebtors(prev =>
-      prev.length === paginatedDebtors.length ? [] : paginatedDebtors.map(d => d.id)
-    );
-  }, [paginatedDebtors]);
+    if (selectedDebtors.length === debtors.length) {
+      setSelectedDebtors([]);
+    } else {
+      setSelectedDebtors(debtors.map(d => d.id));
+    }
+  }, [debtors, selectedDebtors]);
 
   const handleSort = useCallback((key: string) => {
     setSortConfig(prev => ({
@@ -208,12 +190,16 @@ const useDebtors = (initialFilters?: Partial<DebtorFilters>): UseDebtorsReturn =
   }, []);
 
   return {
-    debtors: sortedDebtors,
-    paginatedDebtors,
-    filters,
+    debtors,
     loading,
     error,
-    pagination,
+    pagination: {
+      page: paginationMeta.page,
+      totalPages: paginationMeta.totalPages,
+      totalItems: paginationMeta.totalItems,
+      pageSize: paginationMeta.pageSize,
+    },
+    filters,
     selectedDebtors,
     setSelectedDebtors,
     sortConfig,

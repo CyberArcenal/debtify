@@ -1,4 +1,5 @@
 // src/main/services/LoanApplication.js
+const { paginateQueryBuilder } = require("../utils/dbUtils/pagination");
 const auditLogger = require("../utils/auditLogger");
 const debtService = require("./Debt");
 const {
@@ -57,19 +58,28 @@ class LoanApplicationService {
     if (!data.requestedAmount || data.requestedAmount <= 0) {
       errors.push("Requested amount must be greater than zero");
     }
-    if (!data.purpose || typeof data.purpose !== "string" || data.purpose.trim() === "") {
+    if (
+      !data.purpose ||
+      typeof data.purpose !== "string" ||
+      data.purpose.trim() === ""
+    ) {
       errors.push("Purpose is required");
     }
     if (!data.proposedDueDate) {
       errors.push("Proposed due date is required");
     }
     // If new debtor is provided, name is required
-    if (data.newDebtor && (!data.newDebtor.name || data.newDebtor.name.trim() === "")) {
+    if (
+      data.newDebtor &&
+      (!data.newDebtor.name || data.newDebtor.name.trim() === "")
+    ) {
       errors.push("New debtor name is required");
     }
     // If existing debtor, debtorId must be provided and valid
     if (!data.newDebtor && !data.debtorId) {
-      errors.push("Either existing debtorId or newDebtor data must be provided");
+      errors.push(
+        "Either existing debtorId or newDebtor data must be provided",
+      );
     }
     return { valid: errors.length === 0, errors };
   }
@@ -84,7 +94,8 @@ class LoanApplicationService {
    */
   async getAllApplications(filters = {}) {
     const { application: repo } = await this.getRepositories();
-    const qb = repo.createQueryBuilder("app")
+    const qb = repo
+      .createQueryBuilder("app")
       .leftJoinAndSelect("app.debtor", "debtor")
       .where("app.deletedAt IS NULL");
 
@@ -95,16 +106,19 @@ class LoanApplicationService {
       qb.andWhere("app.debtorId = :debtorId", { debtorId: filters.debtorId });
     }
     if (filters.fromDate) {
-      qb.andWhere("app.createdAt >= :fromDate", { fromDate: new Date(filters.fromDate) });
+      qb.andWhere("app.createdAt >= :fromDate", {
+        fromDate: new Date(filters.fromDate),
+      });
     }
     if (filters.toDate) {
-      qb.andWhere("app.createdAt <= :toDate", { toDate: new Date(filters.toDate) });
+      qb.andWhere("app.createdAt <= :toDate", {
+        toDate: new Date(filters.toDate),
+      });
     }
     if (filters.search) {
-      qb.andWhere(
-        "(app.debtorName LIKE :search OR app.purpose LIKE :search)",
-        { search: `%${filters.search}%` }
-      );
+      qb.andWhere("(app.debtorName LIKE :search OR app.purpose LIKE :search)", {
+        search: `%${filters.search}%`,
+      });
     }
 
     const sortBy = filters.sortBy || "createdAt";
@@ -116,12 +130,13 @@ class LoanApplicationService {
       qb.skip(offset).take(filters.limit);
     }
 
-    let applications = await qb.getMany();
-    if (filters.page && filters.limit) {
-      const total = await qb.getCount();
-      return { items: applications, total, page: filters.page, limit: filters.limit };
-    }
-    return applications;
+    const result = await paginateQueryBuilder(qb, {
+      page: filters.page,
+      limit: filters.limit,
+    });
+
+    await auditLogger.logView("LoanApplication", null, "system");
+    return result; // { data: [], pagination: {} }
   }
 
   /**
@@ -187,7 +202,9 @@ class LoanApplicationService {
       debtorAddress = savedBorrower.address;
     } else if (data.debtorId) {
       const borrowerRepo = this._getRepo(qr, require("../entities/Borrower"));
-      const debtor = await borrowerRepo.findOne({ where: { id: data.debtorId } });
+      const debtor = await borrowerRepo.findOne({
+        where: { id: data.debtorId },
+      });
       if (!debtor) {
         throw new Error(`Debtor with ID ${data.debtorId} not found`);
       }
@@ -214,7 +231,9 @@ class LoanApplicationService {
 
     const saved = await saveDb(appRepo, application);
     await auditLogger.logCreate("LoanApplication", saved.id, saved, user);
-    console.log(`Loan application created: ID ${saved.id} for debtor ${debtorName}`);
+    console.log(
+      `Loan application created: ID ${saved.id} for debtor ${debtorName}`,
+    );
     return saved;
   }
 
@@ -239,9 +258,11 @@ class LoanApplicationService {
     }
 
     const oldData = { ...app };
-    if (data.requestedAmount !== undefined) app.requestedAmount = data.requestedAmount;
+    if (data.requestedAmount !== undefined)
+      app.requestedAmount = data.requestedAmount;
     if (data.purpose !== undefined) app.purpose = data.purpose;
-    if (data.proposedDueDate !== undefined) app.proposedDueDate = new Date(data.proposedDueDate);
+    if (data.proposedDueDate !== undefined)
+      app.proposedDueDate = new Date(data.proposedDueDate);
     if (data.interestRate !== undefined) app.interestRate = data.interestRate;
     app.updatedAt = new Date();
 
@@ -277,10 +298,14 @@ class LoanApplicationService {
     const maxAmount = await maxLoanAmount();
     const minAmount = await minLoanAmount();
     if (maxAmount > 0 && app.requestedAmount > maxAmount) {
-      throw new Error(`Requested amount (${app.requestedAmount}) exceeds maximum loan amount (${maxAmount})`);
+      throw new Error(
+        `Requested amount (${app.requestedAmount}) exceeds maximum loan amount (${maxAmount})`,
+      );
     }
     if (minAmount > 0 && app.requestedAmount < minAmount) {
-      throw new Error(`Requested amount (${app.requestedAmount}) is below minimum loan amount (${minAmount})`);
+      throw new Error(
+        `Requested amount (${app.requestedAmount}) is below minimum loan amount (${minAmount})`,
+      );
     }
 
     // --- Interest rate: use application rate or system default ---
@@ -294,13 +319,17 @@ class LoanApplicationService {
     // --- Credit check enforcement (only if required) – just log, not enforce here ---
     const needCreditCheck = await enforceCreditCheck();
     if (needCreditCheck) {
-      console.log(`Credit check required for debtor ${app.debtorId} – ensure it was done.`);
+      console.log(
+        `Credit check required for debtor ${app.debtorId} – ensure it was done.`,
+      );
     }
 
     // --- Loan agreement requirement – just log, not enforce here ---
     const needAgreement = await requireLoanAgreement();
     if (needAgreement) {
-      console.log(`Loan agreement required for application ${id} – ensure document exists.`);
+      console.log(
+        `Loan agreement required for application ${id} – ensure document exists.`,
+      );
     }
 
     // Update application status only – debt creation will be done by state transition service
@@ -310,7 +339,13 @@ class LoanApplicationService {
     app.updatedAt = new Date();
 
     const saved = await updateDb(appRepo, app);
-    await auditLogger.logUpdate("LoanApplication", id, { status: "pending" }, { status: "approved" }, user);
+    await auditLogger.logUpdate(
+      "LoanApplication",
+      id,
+      { status: "pending" },
+      { status: "approved" },
+      user,
+    );
     console.log(`Application ${id} approved by ${user}`);
 
     return { application: saved };
@@ -342,7 +377,13 @@ class LoanApplicationService {
     app.updatedAt = new Date();
 
     const saved = await updateDb(appRepo, app);
-    await auditLogger.logUpdate("LoanApplication", id, { status: "pending" }, { status: "rejected" }, user);
+    await auditLogger.logUpdate(
+      "LoanApplication",
+      id,
+      { status: "pending" },
+      { status: "rejected" },
+      user,
+    );
     console.log(`Application ${id} rejected`);
     return saved;
   }
@@ -398,7 +439,13 @@ class LoanApplicationService {
     app.updatedAt = new Date();
 
     const saved = await updateDb(appRepo, app);
-    await auditLogger.logUpdate("LoanApplication", id, { deletedAt: true }, { deletedAt: null }, user);
+    await auditLogger.logUpdate(
+      "LoanApplication",
+      id,
+      { deletedAt: true },
+      { deletedAt: null },
+      user,
+    );
     return saved;
   }
 

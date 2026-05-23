@@ -18,18 +18,18 @@ const useDebtorStatement = () => {
     try {
       const debtsRes = await debtsAPI.getAll({ borrowerId: debtor.id, limit: 1000 });
       if (!debtsRes.status) throw new Error(debtsRes.message);
-      const debts = debtsRes.data;
+      const debts = debtsRes.data.data; // ✅ access nested data array
 
       let allPayments: any[] = [];
       for (const debt of debts) {
-        const paymentsRes = await paymentsAPI.getByDebtId(debt.id);
-        allPayments = allPayments.concat(paymentsRes);
+        const payments = await paymentsAPI.getByDebtId(debt.id);
+        allPayments = allPayments.concat(payments);
       }
 
       let allPenalties: any[] = [];
       for (const debt of debts) {
-        const penaltiesRes = await penaltiesAPI.getByDebtId(debt.id);
-        allPenalties = allPenalties.concat(penaltiesRes);
+        const penalties = await penaltiesAPI.getByDebtId(debt.id);
+        allPenalties = allPenalties.concat(penalties);
       }
 
       const totalBorrowed = debts.reduce((sum, d) => sum + d.totalAmount, 0);
