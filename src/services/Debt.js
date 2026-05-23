@@ -1,8 +1,10 @@
 // services/DebtService.js
+//@ts-check
 const auditLogger = require("../utils/auditLogger");
 const { validateDebtData } = require("../utils/debtUtils");
 const { defaultInterestRate, defaultPenaltyRate } = require("../utils/system");
 const { paginateQueryBuilder } = require("../utils/dbUtils/pagination");
+// @ts-ignore
 const { logger } = require("../utils/logger");
 class DebtService {
   constructor() {
@@ -68,7 +70,9 @@ class DebtService {
   async create(debtData, user = "system", qr = null) {
     const { saveDb } = require("../utils/dbUtils/dbActions");
     const Debt = require("../entities/Debt");
+    // @ts-ignore
     const debtRepo = this._getRepo(qr, Debt);
+    // @ts-ignore
     const borrowerRepo = this._getRepo(qr, require("../entities/Borrower"));
 
     try {
@@ -78,13 +82,21 @@ class DebtService {
       }
 
       const {
+        // @ts-ignore
         name,
+        // @ts-ignore
         totalAmount,
+        // @ts-ignore
         paidAmount = 0,
+        // @ts-ignore
         dueDate,
+        // @ts-ignore
         status = "active",
+        // @ts-ignore
         interestRate = null,
+        // @ts-ignore
         penaltyRate = null,
+        // @ts-ignore
         borrowerId,
       } = debtData;
 
@@ -122,10 +134,12 @@ class DebtService {
         updatedAt: new Date(),
       });
 
+      // @ts-ignore
       const saved = await saveDb(debtRepo, debt);
       await auditLogger.logCreate("Debt", saved.id, saved, user);
       return saved;
     } catch (error) {
+      // @ts-ignore
       console.error("Failed to create debt:", error.message);
       throw error;
     }
@@ -141,7 +155,9 @@ class DebtService {
   async update(id, debtData, user = "system", qr = null) {
     const { updateDb } = require("../utils/dbUtils/dbActions");
     const Debt = require("../entities/Debt");
+    // @ts-ignore
     const debtRepo = this._getRepo(qr, Debt);
+    // @ts-ignore
     const borrowerRepo = this._getRepo(qr, require("../entities/Borrower"));
 
     try {
@@ -152,14 +168,18 @@ class DebtService {
       const oldData = { ...existing };
 
       // If borrowerId is being updated, validate new borrower
+      // @ts-ignore
       if (debtData.borrowerId && debtData.borrowerId !== existing.borrower.id) {
         const newBorrower = await borrowerRepo.findOne({
+          // @ts-ignore
           where: { id: debtData.borrowerId },
         });
         if (!newBorrower) {
+          // @ts-ignore
           throw new Error(`Borrower with ID ${debtData.borrowerId} not found`);
         }
         existing.borrower = newBorrower;
+        // @ts-ignore
         delete debtData.borrowerId;
       }
 
@@ -168,23 +188,29 @@ class DebtService {
 
       // Recalculate remaining amount if totalAmount or paidAmount changed
       if (
+        // @ts-ignore
         debtData.totalAmount !== undefined ||
+        // @ts-ignore
         debtData.paidAmount !== undefined
       ) {
         existing.remainingAmount = existing.totalAmount - existing.paidAmount;
       }
 
       // Ensure dueDate is a Date object
+      // @ts-ignore
       if (debtData.dueDate) {
+        // @ts-ignore
         existing.dueDate = new Date(debtData.dueDate);
       }
 
       existing.updatedAt = new Date();
 
+      // @ts-ignore
       const saved = await updateDb(debtRepo, existing);
       await auditLogger.logUpdate("Debt", id, oldData, saved, user);
       return saved;
     } catch (error) {
+      // @ts-ignore
       console.error("Failed to update debt:", error.message);
       throw error;
     }
@@ -199,6 +225,7 @@ class DebtService {
   async delete(id, user = "system", qr = null) {
     const { updateDb } = require("../utils/dbUtils/dbActions");
     const Debt = require("../entities/Debt");
+    // @ts-ignore
     const debtRepo = this._getRepo(qr, Debt);
 
     try {
@@ -214,11 +241,13 @@ class DebtService {
       debt.deletedAt = new Date();
       debt.updatedAt = new Date();
 
+      // @ts-ignore
       const saved = await updateDb(debtRepo, debt);
       await auditLogger.logDelete("Debt", id, oldData, user);
       console.log(`Debt soft deleted: #${id}`);
       return saved;
     } catch (error) {
+      // @ts-ignore
       console.error("Failed to delete debt:", error.message);
       throw error;
     }
@@ -233,6 +262,7 @@ class DebtService {
   async restore(id, user = "system", qr = null) {
     const { updateDb } = require("../utils/dbUtils/dbActions");
     const Debt = require("../entities/Debt");
+    // @ts-ignore
     const debtRepo = this._getRepo(qr, Debt);
 
     try {
@@ -247,6 +277,7 @@ class DebtService {
       debt.deletedAt = null;
       debt.updatedAt = new Date();
 
+      // @ts-ignore
       const saved = await updateDb(debtRepo, debt);
       await auditLogger.logUpdate(
         "Debt",
@@ -258,6 +289,7 @@ class DebtService {
       console.log(`Debt restored: #${id}`);
       return saved;
     } catch (error) {
+      // @ts-ignore
       console.error("Failed to restore debt:", error.message);
       throw error;
     }
@@ -272,6 +304,7 @@ class DebtService {
   async permanentlyDelete(id, user = "system", qr = null) {
     const { removeDb } = require("../utils/dbUtils/dbActions");
     const Debt = require("../entities/Debt");
+    // @ts-ignore
     const debtRepo = this._getRepo(qr, Debt);
 
     const debt = await debtRepo.findOne({ where: { id }, withDeleted: true });
@@ -279,6 +312,7 @@ class DebtService {
       throw new Error(`Debt with ID ${id} not found`);
     }
 
+    // @ts-ignore
     await removeDb(debtRepo, debt);
     await auditLogger.logDelete("Debt", id, debt, user);
     console.log(`Debt #${id} permanently deleted`);
@@ -294,6 +328,7 @@ class DebtService {
   async recalculateRemainingAmount(id, user = "system", qr = null) {
     const { updateDb } = require("../utils/dbUtils/dbActions");
     const Debt = require("../entities/Debt");
+    // @ts-ignore
     const debtRepo = this._getRepo(qr, Debt);
 
     const debt = await debtRepo.findOne({ where: { id } });
@@ -306,6 +341,7 @@ class DebtService {
     if (debt.remainingAmount < 0) debt.remainingAmount = 0;
     debt.updatedAt = new Date();
 
+    // @ts-ignore
     const saved = await updateDb(debtRepo, debt);
     await auditLogger.logUpdate(
       "Debt",
@@ -329,12 +365,15 @@ class DebtService {
     const { debt: debtRepo } = await this.getRepositories();
     const options = { where: { id }, relations: ["borrower"] };
     if (!includeDeleted) {
+      // @ts-ignore
       options.where.deletedAt = null;
     }
+    // @ts-ignore
     const debt = await debtRepo.findOne(options);
     if (!debt) {
       throw new Error(`Debt with ID ${id} not found`);
     }
+    // @ts-ignore
     await auditLogger.logView("Debt", id, "system");
     return debt;
   }
@@ -345,77 +384,106 @@ class DebtService {
    */
   async findAll(options = {}) {
     const { debt: debtRepo } = await this.getRepositories();
+    // @ts-ignore
     const qb = debtRepo
       .createQueryBuilder("debt")
       .leftJoinAndSelect("debt.borrower", "borrower");
 
     // Exclude soft-deleted unless requested
+    // @ts-ignore
     if (!options.includeDeleted) {
       qb.andWhere("debt.deletedAt IS NULL");
     }
 
     // Filters
+    // @ts-ignore
     if (options.status) {
+      // @ts-ignore
       qb.andWhere("debt.status = :status", { status: options.status });
     }
+    // @ts-ignore
     if (options.borrowerId) {
       qb.andWhere("borrower.id = :borrowerId", {
+        // @ts-ignore
         borrowerId: options.borrowerId,
       });
     }
+    // @ts-ignore
     if (options.dueDateFrom) {
       qb.andWhere("debt.dueDate >= :dueDateFrom", {
+        // @ts-ignore
         dueDateFrom: new Date(options.dueDateFrom),
       });
     }
+    // @ts-ignore
     if (options.dueDateTo) {
       qb.andWhere("debt.dueDate <= :dueDateTo", {
+        // @ts-ignore
         dueDateTo: new Date(options.dueDateTo),
       });
     }
+    // @ts-ignore
     if (options.minTotalAmount) {
       qb.andWhere("debt.totalAmount >= :minTotalAmount", {
+        // @ts-ignore
         minTotalAmount: options.minTotalAmount,
       });
     }
+    // @ts-ignore
     if (options.maxTotalAmount) {
       qb.andWhere("debt.totalAmount <= :maxTotalAmount", {
+        // @ts-ignore
         maxTotalAmount: options.maxTotalAmount,
       });
     }
+    // @ts-ignore
     if (options.search) {
       qb.andWhere("(debt.name LIKE :search OR borrower.name LIKE :search)", {
+        // @ts-ignore
         search: `%${options.search}%`,
       });
     }
 
     // Sorting
+    // @ts-ignore
     const sortBy = options.sortBy || "dueDate";
+    // @ts-ignore
     const sortOrder = options.sortOrder === "ASC" ? "ASC" : "DESC";
     qb.orderBy(`debt.${sortBy}`, sortOrder);
 
     // Pagination
     const result = await paginateQueryBuilder(qb, {
+      // @ts-ignore
       page: options.page,
+      // @ts-ignore
       limit: options.limit,
     });
     await auditLogger.logView("Debt", null, "system");
     return result;
   }
 
+  // @ts-ignore
   async correctTotalAmount(id, newTotalAmount, user, qr) {
     const existing = await this.findById(id);
+    // @ts-ignore
     const oldTotal = existing.totalAmount;
     existing.totalAmount = newTotalAmount;
+    // @ts-ignore
     existing.remainingAmount = existing.totalAmount - existing.paidAmount;
     // I-save na may skipSignal para hindi mag-trigger ng forgiveness
     const { updateDb } = require("../utils/dbUtils/dbActions");
+    // @ts-ignore
     const repo = this._getRepo(qr, require("../entities/Debt"));
+    // @ts-ignore
     return await updateDb(repo, existing, { skipSignal: true });
   }
 
+  // services/DebtService.js – inside applyForgiveness
+
   async applyForgiveness(
+    // @ts-ignore
     id,
+    // @ts-ignore
     amountForgiven,
     user = "system",
     reason = null,
@@ -424,23 +492,41 @@ class DebtService {
     const debt = await this.findById(id);
     if (amountForgiven <= 0)
       throw new Error("Forgiveness amount must be positive");
+    // @ts-ignore
     if (amountForgiven > debt.totalAmount)
       throw new Error("Cannot forgive more than total amount");
 
     const oldTotal = debt.totalAmount;
+    // @ts-ignore
     debt.totalAmount -= amountForgiven;
+    // @ts-ignore
     debt.remainingAmount = debt.totalAmount - debt.paidAmount;
+    // @ts-ignore
     if (debt.remainingAmount < 0) debt.remainingAmount = 0;
     debt.updatedAt = new Date();
 
-    const saved = await this.update(
-      id,
-      { totalAmount: debt.totalAmount },
+    const { updateDb } = require("../utils/dbUtils/dbActions");
+    // @ts-ignore
+    const repo = this._getRepo(qr, require("../entities/Debt"));
+    // @ts-ignore
+    await updateDb(repo, debt, { skipSignal: true });
+
+    // ✅ Reload the debt with borrower relation after update
+    const refreshedDebt = await this.findById(id); // includes borrower via relations
+
+    const {
+      DebtStateTransitionService,
+    } = require("../StateTransitionServices/Debt");
+    const { AppDataSource } = require("../main/db/data-source");
+    const transitionService = new DebtStateTransitionService(AppDataSource);
+    await transitionService.onForgiveness(
+      refreshedDebt,
+      amountForgiven,
       user,
       qr,
+      reason,
     );
-    // Note: subscriber will still detect the change and call onForgiveness.
-    // But we also log a specific audit entry.
+
     await auditLogger.logUpdate(
       "Debt",
       id,
@@ -448,7 +534,8 @@ class DebtService {
       { totalAmount: oldTotal, newTotal: debt.totalAmount },
       user,
     );
-    return saved;
+
+    return refreshedDebt;
   }
 
   /**
@@ -456,6 +543,7 @@ class DebtService {
    */
   async getStatistics() {
     const { debt: debtRepo } = await this.getRepositories();
+    // @ts-ignore
     const qb = debtRepo
       .createQueryBuilder("debt")
       .where("debt.deletedAt IS NULL");
@@ -553,6 +641,7 @@ class DebtService {
       };
     }
 
+    // @ts-ignore
     await auditLogger.logExport("Debt", format, filters, user);
     console.log(`Exported ${debts.length} debts in ${format} format`);
     return exportData;
@@ -569,8 +658,10 @@ class DebtService {
     for (const data of debtsArray) {
       try {
         const saved = await this.create(data, user, qr);
+        // @ts-ignore
         results.created.push(saved);
       } catch (err) {
+        // @ts-ignore
         results.errors.push({ debt: data, error: err.message });
       }
     }
@@ -588,8 +679,10 @@ class DebtService {
     for (const { id, updates } of updatesArray) {
       try {
         const saved = await this.update(id, updates, user, qr);
+        // @ts-ignore
         results.updated.push(saved);
       } catch (err) {
+        // @ts-ignore
         results.errors.push({ id, updates, error: err.message });
       }
     }
@@ -616,24 +709,36 @@ class DebtService {
     for (const record of records) {
       try {
         const debtData = {
+          // @ts-ignore
           name: record.name,
+          // @ts-ignore
           totalAmount: parseFloat(record.totalAmount),
+          // @ts-ignore
           paidAmount: parseFloat(record.paidAmount) || 0,
+          // @ts-ignore
           dueDate: record.dueDate,
+          // @ts-ignore
           status: record.status || "active",
+          // @ts-ignore
           interestRate: record.interestRate
+            // @ts-ignore
             ? parseFloat(record.interestRate)
             : null,
+          // @ts-ignore
           penaltyRate: record.penaltyRate
+            // @ts-ignore
             ? parseFloat(record.penaltyRate)
             : null,
+          // @ts-ignore
           borrowerId: parseInt(record.borrowerId, 10),
         };
         const validation = validateDebtData(debtData);
         if (!validation.valid) throw new Error(validation.errors.join(", "));
         const saved = await this.create(debtData, user, qr);
+        // @ts-ignore
         results.imported.push(saved);
       } catch (err) {
+        // @ts-ignore
         results.errors.push({ row: record, error: err.message });
       }
     }
@@ -650,6 +755,7 @@ class DebtService {
   async getAgingSummary(asOfDate) {
     const { debt: debtRepo } = await this.getRepositories();
     // Fetch all active debts (status = 'active', not deleted)
+    // @ts-ignore
     const qb = debtRepo
       .createQueryBuilder("debt")
       .leftJoinAndSelect("debt.borrower", "borrower")
@@ -701,6 +807,7 @@ class DebtService {
     ];
 
     for (const debt of debts) {
+      // @ts-ignore
       const dueDate = new Date(debt.dueDate);
       dueDate.setHours(0, 0, 0, 0);
       let daysPastDue = Math.floor(
@@ -714,6 +821,7 @@ class DebtService {
       else if (daysPastDue <= 90) bucketIndex = 2;
       else bucketIndex = 3;
 
+      // @ts-ignore
       buckets[bucketIndex].totalAmount += debt.remainingAmount;
       buckets[bucketIndex].count += 1;
       // Do not store full debts here to keep lightweight; for drill-down we have separate endpoint.
@@ -740,6 +848,7 @@ class DebtService {
    */
   async getDebtsInBucket(bucketRange, asOfDate, page = 1, limit = 10) {
     const { debt: debtRepo } = await this.getRepositories();
+    // @ts-ignore
     const qb = debtRepo
       .createQueryBuilder("debt")
       .leftJoinAndSelect("debt.borrower", "borrower")
@@ -774,6 +883,7 @@ class DebtService {
     // But since we already have paginateQueryBuilder, we'll do a subquery or raw SQL.
     // Let's use raw SQL for efficiency.
 
+    // @ts-ignore
     const queryRunner = debtRepo.manager.connection.createQueryRunner();
     await queryRunner.connect();
     try {
@@ -785,6 +895,7 @@ class DebtService {
       }
       const parameters = { asOfDate, minDays, maxDays };
       const debts = await queryRunner.manager
+        // @ts-ignore
         .createQueryBuilder(Debt, "debt")
         .leftJoinAndSelect("debt.borrower", "borrower")
         .where(whereClause, parameters)
@@ -794,6 +905,7 @@ class DebtService {
         .getMany();
 
       const total = await queryRunner.manager
+        // @ts-ignore
         .createQueryBuilder(Debt, "debt")
         .where(whereClause, parameters)
         .getCount();

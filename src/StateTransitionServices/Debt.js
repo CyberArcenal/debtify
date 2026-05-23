@@ -1,5 +1,5 @@
 // src/services/DebtStateTransitionService.js
-
+//@ts-check
 const Debt = require("../entities/Debt");
 const PenaltyTransaction = require("../entities/PenaltyTransaction");
 const Notification = require("../entities/Notification");
@@ -13,55 +13,50 @@ const {
   emailEnabled,
   smsEnabled,
 } = require("../utils/system");
-const { NotificationLogService } = require("../services/NotificationLog");
 const notificationService = require("../services/Notification");
+const { reminderLogService } = require("../services/ReminderLog");
 
 class DebtStateTransitionService {
   constructor(dataSource) {
     this.dataSource = dataSource;
     this.debtRepo = dataSource.getRepository(Debt);
-    this.notificationLogService = new NotificationLogService();
   }
 
-  /**
-   * Helper: get repository (transactional if queryRunner provided)
-   * @param {import("typeorm").QueryRunner|null} qr
-   * @param {Function} entityClass
-   * @returns {import("typeorm").Repository}
-   */
   _getRepo(qr, entityClass) {
-    if (qr) {
-      return qr.manager.getRepository(entityClass);
-    }
+    if (qr) return qr.manager.getRepository(entityClass);
     return this.dataSource.getRepository(entityClass);
   }
 
+  /**
+   * Send email via ReminderLogService (queues and logs automatically)
+   */
   async _sendEmail(recipient, subject, message, user, queryRunner) {
-    const logService = this.notificationLogService;
-    const logResult = await logService.createLog(
-      { to: recipient, subject, html: message },
-      user,
-      queryRunner,
-    );
-    if (!logResult.status) {
-      logger.error(`Failed to create email log: ${logResult.message}`);
+    try {
+      await reminderLogService.createReminder(
+        {
+          to: recipient,
+          subject,
+          html: `<p>${message.replace(/\n/g, "<br/>")}</p>`,
+          text: message,
+        },
+        user,
+        queryRunner,
+      );
+      return true;
+    } catch (err) {
+      logger.error(`Failed to queue email to ${recipient}:`, err);
       return false;
     }
-    const sendResult = await logService.retryFailedNotification(
-      { id: logResult.data.id },
-      user,
-      queryRunner,
-    );
-    return sendResult.status;
   }
 
   async _sendSms(phoneNumber, message, user, queryRunner) {
+    // Placeholder – actual SMS sending would go through a similar ReminderSmsService
     logger.info(`[SMS] Would send to ${phoneNumber}: ${message}`);
     return true;
   }
 
   async onPaid(debt, user = "system", queryRunner = null) {
-    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
+    const { updateDb } = require("../utils/dbUtils/dbActions");
     logger.info(`[Transition] Marking debt #${debt.id} as paid by ${user}`);
 
     const debtRepo = this._getRepo(queryRunner, Debt);
@@ -70,7 +65,7 @@ class DebtStateTransitionService {
     // Update debt status to paid
     debt.status = "paid";
     debt.updatedAt = new Date();
-    const savedDebt = await updateDb(debtRepo, debt); // no extra args
+    const savedDebt = await updateDb(debtRepo, debt);
 
     // Mark all unread notifications for this debt as read
     const unreadNotifs = await notifRepo.find({
@@ -118,14 +113,14 @@ class DebtStateTransitionService {
       queryRunner,
     );
 
-    // Email/SMS
+    // Email/SMS via ReminderLogService
     const canSendEmail = await emailEnabled();
     const canSendSms = await smsEnabled();
     if (debt.borrower?.email && canSendEmail) {
       await this._sendEmail(
         debt.borrower.email,
         "Payment Complete",
-        `Dear ${debt.borrower.name}, your debt "${debt.name}" has been fully paid. Thank you!`,
+        `Dear ${debt.borrower.name},\n\nYour debt "${debt.name}" has been fully paid. Thank you!`,
         user,
         queryRunner,
       );
@@ -146,7 +141,6 @@ class DebtStateTransitionService {
       { status: "paid" },
       user,
     );
-
     return savedDebt;
   }
 
@@ -212,7 +206,7 @@ class DebtStateTransitionService {
       await this._sendEmail(
         debt.borrower.email,
         "Payment Overdue",
-        `Dear ${debt.borrower.name}, your payment for debt "${debt.name}" is now overdue. Please settle immediately.`,
+        `Dear ${debt.borrower.name},\n\nYour payment for debt "${debt.name}" is now overdue. Please settle immediately.`,
         user,
         queryRunner,
       );
@@ -234,12 +228,11 @@ class DebtStateTransitionService {
       { status: "overdue" },
       user,
     );
-
     return savedDebt;
   }
 
   async onDefaulted(debt, user = "system", queryRunner = null) {
-    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
+    const { updateDb } = require("../utils/dbUtils/dbActions");
     logger.info(
       `[Transition] Marking debt #${debt.id} as defaulted by ${user}`,
     );
@@ -276,14 +269,14 @@ class DebtStateTransitionService {
       queryRunner,
     );
 
-    // Email/SMS to debtor
+    // Email/SMS
     const canSendEmail = await emailEnabled();
     const canSendSms = await smsEnabled();
     if (debt.borrower?.email && canSendEmail) {
       await this._sendEmail(
         debt.borrower.email,
         "Final Default Notice",
-        `Dear ${debt.borrower.name}, your debt "${debt.name}" has been declared in default. Legal action may follow.`,
+        `Dear ${debt.borrower.name},\n\nYour debt "${debt.name}" has been declared in default. Legal action may follow.`,
         user,
         queryRunner,
       );
@@ -304,12 +297,11 @@ class DebtStateTransitionService {
       { status: "defaulted" },
       user,
     );
-
     return savedDebt;
   }
 
   async onRestoreToActive(debt, user = "system", queryRunner = null) {
-    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
+    const { updateDb } = require("../utils/dbUtils/dbActions");
     logger.info(`[Transition] Restoring debt #${debt.id} to active by ${user}`);
 
     const debtRepo = this._getRepo(queryRunner, Debt);
@@ -344,7 +336,7 @@ class DebtStateTransitionService {
       await this._sendEmail(
         debt.borrower.email,
         "Debt Restored",
-        `Dear ${debt.borrower.name}, your debt "${debt.name}" has been restored to active status.`,
+        `Dear ${debt.borrower.name},\n\nYour debt "${debt.name}" has been restored to active status.`,
         user,
         queryRunner,
       );
@@ -365,7 +357,6 @@ class DebtStateTransitionService {
       { status: "active" },
       user,
     );
-
     return savedDebt;
   }
 
@@ -376,12 +367,10 @@ class DebtStateTransitionService {
     queryRunner = null,
     reason = null,
   ) {
-    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
+    // No debt update here – already done by DebtService.applyForgiveness
     logger.info(
       `[Transition] Forgiving ${amountForgiven} from debt #${debt.id} by ${user}`,
     );
-
-    // ❌ DO NOT UPDATE THE DEBT HERE – it's already updated by DebtService.applyForgiveness
 
     const note = reason || "Debt forgiveness applied";
     await auditLogger.logUpdate(
@@ -406,15 +395,29 @@ class DebtStateTransitionService {
 
     const canSendEmail = await emailEnabled();
     const canSendSms = await smsEnabled();
+
+    // Log email conditions
+    logger.info(
+      `[Forgiveness] Email enabled: ${canSendEmail}, Debtor email: ${debt.borrower?.email || "NONE"}, Debtor name: ${debt.borrower?.name || "Unknown"}`,
+    );
+
     if (debt.borrower?.email && canSendEmail) {
+      logger.info(
+        `[Forgiveness] Attempting to send email to ${debt.borrower.email}`,
+      );
       await this._sendEmail(
         debt.borrower.email,
         "Debt Forgiveness Applied",
-        `Dear ${debt.borrower.name}, an amount of ${amountForgiven} has been forgiven from your debt "${debt.name}". Remaining balance: ${debt.remainingAmount}.`,
+        `Dear ${debt.borrower.name},\n\nAn amount of ${amountForgiven} has been forgiven from your debt "${debt.name}". Remaining balance: ${debt.remainingAmount}.`,
         user,
         queryRunner,
       );
+    } else {
+      logger.warn(
+        `[Forgiveness] Email not sent. Reason: ${!debt.borrower?.email ? "No debtor email" : "Email disabled"}`,
+      );
     }
+
     if (debt.borrower?.contact && canSendSms) {
       await this._sendSms(
         debt.borrower.contact,
@@ -423,8 +426,6 @@ class DebtStateTransitionService {
         queryRunner,
       );
     }
-
-    return debt;
   }
 }
 
