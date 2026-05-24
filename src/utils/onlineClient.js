@@ -1,4 +1,3 @@
-//@ts-check
 const Store = require('electron-store').default;
 const fetch = require('electron-fetch').default;
 const { logger } = require('./logger');
