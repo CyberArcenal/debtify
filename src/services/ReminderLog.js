@@ -225,7 +225,7 @@ class ReminderLogService {
       retry_count: 0,
       resend_count: 0,
     });
-    const saved = await saveDb(repo, log);
+    const saved = await saveDb(repo, log, { queryRunner: qr });
     await auditLogger.logCreate("ReminderLog", saved.id, saved, user);
     return saved;
   }
@@ -251,7 +251,7 @@ class ReminderLogService {
     if (status === LOG_STATUS.SENT) reminder.sent_at = new Date();
     else if (status === LOG_STATUS.FAILED) reminder.last_error_at = new Date();
     reminder.updated_at = new Date();
-    const saved = await updateDb(repo, reminder);
+    const saved = await updateDb(repo, reminder, { queryRunner: qr });
     await auditLogger.logUpdate("ReminderLog", id, oldData, saved, user);
     return saved;
   }
@@ -320,7 +320,7 @@ class ReminderLogService {
     }
     const oldData = { ...reminder };
     const sendResult = await this._sendAndUpdate(reminder, false);
-    const saved = await updateDb(repo, reminder);
+    const saved = await updateDb(repo, reminder, { queryRunner: qr });
     await auditLogger.logUpdate("ReminderLog", id, oldData, saved, user);
     return saved;
   }
@@ -347,7 +347,7 @@ class ReminderLogService {
     for (const reminder of reminders) {
       const oldData = { ...reminder };
       const sendResult = await this._sendAndUpdate(reminder, false);
-      const saved = await updateDb(repo, reminder);
+      const saved = await updateDb(repo, reminder, { queryRunner: qr });
       await auditLogger.logUpdate("ReminderLog", reminder.id, oldData, saved, user);
       results.push({ id: reminder.id, success: sendResult?.success, error: sendResult?.error });
     }
@@ -369,7 +369,7 @@ class ReminderLogService {
     if (!reminder) throw new Error(`Reminder with ID ${id} not found`);
     const oldData = { ...reminder };
     const sendResult = await this._sendAndUpdate(reminder, true);
-    const saved = await updateDb(repo, reminder);
+    const saved = await updateDb(repo, reminder, { queryRunner: qr });
     await auditLogger.logUpdate("ReminderLog", id, oldData, saved, user);
     return saved;
   }

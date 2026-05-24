@@ -194,7 +194,7 @@ class GroupService {
       updatedAt: new Date(),
     });
 
-    const saved = await saveDb(groupRepo, group);
+    const saved = await saveDb(groupRepo, group, { queryRunner: qr });
     await auditLogger.logCreate("DebtorGroup", saved.id, saved, user);
     console.log(`Group created: ${saved.name} (ID: ${saved.id})`);
     return saved;
@@ -223,7 +223,7 @@ class GroupService {
     if (data.color !== undefined) existing.color = data.color;
     existing.updatedAt = new Date();
 
-    const saved = await updateDb(groupRepo, existing);
+    const saved = await updateDb(groupRepo, existing, { queryRunner: qr });
     await auditLogger.logUpdate("DebtorGroup", id, oldData, saved, user);
     console.log(`Group updated: ${saved.name} (ID: ${saved.id})`);
     return saved;
@@ -283,7 +283,7 @@ class GroupService {
       assignedAt: new Date(),
     });
 
-    const saved = await saveDb(memberRepo, member);
+    const saved = await saveDb(memberRepo, member, { queryRunner: qr });
     await auditLogger.logCreate(
       "DebtorGroupMember",
       saved.id,

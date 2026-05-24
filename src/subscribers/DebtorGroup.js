@@ -1,9 +1,6 @@
 // src/subscribers/DebtorGroupSubscriber.js
-//@ts-check
 const DebtorGroup = require("../entities/DebtorGroup");
 const { logger } = require("../utils/logger");
-
-const { AppDataSource } = require("../main/db/data-source");
 const { DebtorGroupStateTransitionService } = require("../StateTransitionServices/DebtorGroup");
 
 console.log("[Subscriber] Loading DebtorGroupSubscriber");
@@ -13,9 +10,9 @@ class DebtorGroupSubscriber {
     this.transitionService = null;
   }
 
-  async getTransitionService() {
+  async getTransitionService(dataSource) {
     if (!this.transitionService) {
-      this.transitionService = new DebtorGroupStateTransitionService(AppDataSource);
+      this.transitionService = new DebtorGroupStateTransitionService(dataSource);
     }
     return this.transitionService;
   }
@@ -24,7 +21,7 @@ class DebtorGroupSubscriber {
     return DebtorGroup;
   }
 
-  async beforeInsert(entity) {
+  async beforeInsert(entity, { manager, queryRunner }) {
     try {
       logger.info("[DebtorGroupSubscriber] beforeInsert", {
         id: entity.id,
@@ -32,70 +29,72 @@ class DebtorGroupSubscriber {
       });
     } catch (err) {
       logger.error("[DebtorGroupSubscriber] beforeInsert error", err);
+      throw err;
     }
   }
 
-  async afterInsert(entity) {
+  async afterInsert(entity, { manager, queryRunner }) {
     try {
       logger.info("[DebtorGroupSubscriber] afterInsert", {
         id: entity.id,
         name: entity.name,
       });
-      const service = await this.getTransitionService();
+      const service = await this.getTransitionService(manager.connection);
       if (service.onCreated) {
-        await service.onCreated(entity, "system");
+        await service.onCreated(entity, "system", queryRunner);
       }
     } catch (err) {
       logger.error("[DebtorGroupSubscriber] afterInsert error", err);
+      throw err;
     }
   }
 
-  async beforeUpdate(entity) {
+  async beforeUpdate(entity, { manager, queryRunner }) {
     try {
       logger.info("[DebtorGroupSubscriber] beforeUpdate", { id: entity.id });
-      const service = await this.getTransitionService();
-      if (service.onBeforeUpdate) {
-        // We need the old state; fetch from DB or use event later. Simpler to call in afterUpdate.
-      }
     } catch (err) {
       logger.error("[DebtorGroupSubscriber] beforeUpdate error", err);
+      throw err;
     }
   }
 
-  async afterUpdate(event) {
+  async afterUpdate(event, { manager, queryRunner }) {
     try {
       const { entity, databaseEntity } = event;
       logger.info("[DebtorGroupSubscriber] afterUpdate", { id: entity.id });
-      const service = await this.getTransitionService();
+      const service = await this.getTransitionService(manager.connection);
       if (service.onAfterUpdate) {
-        await service.onAfterUpdate(databaseEntity, entity, "system");
+        await service.onAfterUpdate(databaseEntity, entity, "system", queryRunner);
       }
     } catch (err) {
       logger.error("[DebtorGroupSubscriber] afterUpdate error", err);
+      throw err;
     }
   }
 
-  async beforeRemove(entity) {
+  async beforeRemove(entity, { manager, queryRunner }) {
     try {
       logger.info("[DebtorGroupSubscriber] beforeRemove", { id: entity.id });
-      const service = await this.getTransitionService();
+      const service = await this.getTransitionService(manager.connection);
       if (service.onBeforeDelete) {
-        await service.onBeforeDelete(entity, "system");
+        await service.onBeforeDelete(entity, "system", queryRunner);
       }
     } catch (err) {
       logger.error("[DebtorGroupSubscriber] beforeRemove error", err);
+      throw err;
     }
   }
 
-  async afterRemove(event) {
+  async afterRemove(event, { manager, queryRunner }) {
     try {
       logger.info("[DebtorGroupSubscriber] afterRemove", { id: event.entityId });
-      const service = await this.getTransitionService();
+      const service = await this.getTransitionService(manager.connection);
       if (service.onAfterDelete) {
-        await service.onAfterDelete({ id: event.entityId }, "system");
+        await service.onAfterDelete({ id: event.entityId }, "system", queryRunner);
       }
     } catch (err) {
       logger.error("[DebtorGroupSubscriber] afterRemove error", err);
+      throw err;
     }
   }
 }

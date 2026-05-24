@@ -231,7 +231,7 @@ class CreditCheckService {
       createdAt: new Date(),
     });
 
-    const saved = await saveDb(logRepo, logEntry);
+    const saved = await saveDb(logRepo, logEntry, { queryRunner: qr });
     await auditLogger.logCreate("CreditCheckLog", saved.id, saved, user);
     console.log(`Credit check performed for debtor ${debtorId}: score=${score}, risk=${riskLevel}`);
     return { score, riskLevel, remarks, dateChecked: saved.dateChecked };

@@ -155,7 +155,7 @@ class PaymentMethodService {
       updatedAt: new Date(),
     });
 
-    const saved = await saveDb(methodRepo, method);
+    const saved = await saveDb(methodRepo, method, { queryRunner: qr });
     await auditLogger.logCreate("PaymentMethod", saved.id, saved, user);
     console.log(`Payment method created: ${saved.name}`);
     return saved;
@@ -183,7 +183,7 @@ class PaymentMethodService {
     if (data.isDefault !== undefined) existing.isDefault = data.isDefault;
     existing.updatedAt = new Date();
 
-    const saved = await updateDb(methodRepo, existing);
+    const saved = await updateDb(methodRepo, existing, { queryRunner: qr });
     await auditLogger.logUpdate("PaymentMethod", id, oldData, saved, user);
     return saved;
   }
@@ -202,7 +202,7 @@ class PaymentMethodService {
     // Ngayon i-set ang method na ito bilang default
     method.isDefault = true;
     method.updatedAt = new Date();
-    const saved = await updateDb(methodRepo, method);
+    const saved = await updateDb(methodRepo, method, { queryRunner: qr });
     await auditLogger.logUpdate(
       "PaymentMethod",
       id,
@@ -276,7 +276,7 @@ class PaymentMethodService {
       if (method.id !== excludeId) {
         method.isDefault = false;
         method.updatedAt = new Date();
-        await updateDb(methodRepo, method);
+        await updateDb(methodRepo, method, { queryRunner: qr });
       }
     }
   }

@@ -1,7 +1,6 @@
 // src/subscribers/SystemSettingSubscriber.js
 const { SystemSetting } = require("../entities/systemSettings");
 const { logger } = require("../utils/logger");
-const { AppDataSource } = require("../main/db/data-source");
 const {
   SystemSettingStateTransitionService,
 } = require("../StateTransitionServices/systemSettings");
@@ -13,11 +12,9 @@ class SystemSettingSubscriber {
     this.transitionService = null;
   }
 
-  async getTransitionService() {
+  async getTransitionService(dataSource) {
     if (!this.transitionService) {
-      this.transitionService = new SystemSettingStateTransitionService(
-        AppDataSource,
-      );
+      this.transitionService = new SystemSettingStateTransitionService(dataSource);
     }
     return this.transitionService;
   }
@@ -26,7 +23,7 @@ class SystemSettingSubscriber {
     return SystemSetting;
   }
 
-  async beforeInsert(entity) {
+  async beforeInsert(entity, { manager, queryRunner }) {
     try {
       logger.info("[SystemSettingSubscriber] beforeInsert", {
         id: entity.id,
@@ -35,57 +32,53 @@ class SystemSettingSubscriber {
       });
     } catch (err) {
       logger.error("[SystemSettingSubscriber] beforeInsert error", err);
+      throw err;
     }
   }
 
-  async afterInsert(entity) {
+  async afterInsert(entity, { manager, queryRunner }) {
     try {
       logger.info("[SystemSettingSubscriber] afterInsert", {
         id: entity.id,
         key: entity.key,
         setting_type: entity.setting_type,
       });
-      const service = await this.getTransitionService();
+      const service = await this.getTransitionService(manager.connection);
       if (service.onApply) {
-        await service.onApply(entity, null, entity.value, "system");
+        await service.onApply(entity, null, entity.value, "system", queryRunner);
       }
     } catch (err) {
       logger.error("[SystemSettingSubscriber] afterInsert error", err);
+      throw err;
     }
   }
 
-  async beforeUpdate(entity) {
+  async beforeUpdate(entity, { manager, queryRunner }) {
     try {
       logger.info("[SystemSettingSubscriber] beforeUpdate", { id: entity.id });
     } catch (err) {
       logger.error("[SystemSettingSubscriber] beforeUpdate error", err);
+      throw err;
     }
   }
 
-  async afterUpdate(event) {
+  async afterUpdate(event, { manager, queryRunner }) {
     try {
       const { entity, databaseEntity } = event;
       logger.info("[SystemSettingSubscriber] afterUpdate", { id: entity.id });
-      const service = await this.getTransitionService();
+      const service = await this.getTransitionService(manager.connection);
       if (service.onApply) {
-        await service.onApply(
-          entity,
-          databaseEntity.value,
-          entity.value,
-          "system",
-        );
+        await service.onApply(entity, databaseEntity.value, entity.value, "system", queryRunner);
       }
 
-      // Inside afterUpdate of SystemSettingSubscriber
-
+      // Interest rate change logging – but now using the transaction manager
       const interestRateKeys = ["default_interest_rate"];
       if (
         interestRateKeys.includes(entity.key) &&
         entity.value !== databaseEntity.value
       ) {
-        const { AppDataSource } = require("../main/db/data-source");
         const InterestRateChangeLog = require("../entities/InterestRateChangeLog");
-        const logRepo = AppDataSource.getRepository(InterestRateChangeLog);
+        const logRepo = manager.getRepository(InterestRateChangeLog);
         const log = logRepo.create({
           setting_key: entity.key,
           old_value: parseFloat(databaseEntity.value),
@@ -102,24 +95,25 @@ class SystemSettingSubscriber {
       }
     } catch (err) {
       logger.error("[SystemSettingSubscriber] afterUpdate error", err);
+      throw err;
     }
   }
 
-  async beforeRemove(entity) {
+  async beforeRemove(entity, { manager, queryRunner }) {
     try {
       logger.info("[SystemSettingSubscriber] beforeRemove", { id: entity.id });
     } catch (err) {
       logger.error("[SystemSettingSubscriber] beforeRemove error", err);
+      throw err;
     }
   }
 
-  async afterRemove(event) {
+  async afterRemove(event, { manager, queryRunner }) {
     try {
-      logger.info("[SystemSettingSubscriber] afterRemove", {
-        id: event.entityId,
-      });
+      logger.info("[SystemSettingSubscriber] afterRemove", { id: event.entityId });
     } catch (err) {
       logger.error("[SystemSettingSubscriber] afterRemove error", err);
+      throw err;
     }
   }
 }

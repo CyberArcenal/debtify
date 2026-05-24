@@ -109,6 +109,8 @@ export interface NotificationsSettings {
   email_smtp_host?: string;
   email_smtp_port?: number;
   email_from_address?: string;
+  email_smtp_username?: string;  
+  email_smtp_password?: string;  
   sms_enabled?: boolean;
   sms_provider?: string; // e.g., "twilio"
   reminder_days_before_due?: number[]; // days before due to send reminders

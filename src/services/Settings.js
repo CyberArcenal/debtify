@@ -152,7 +152,7 @@ class SystemSettingService {
       is_public: data.is_public ?? false,
       is_deleted: false,
     });
-    const saved = await saveDb(repo, setting);
+    const saved = await saveDb(repo, setting, { queryRunner: qr });
     await auditLogger.logCreate("SystemSetting", saved.id, saved, user);
     return { ...saved, value: this._normalizeOutput(saved.value) };
   }
@@ -176,7 +176,7 @@ class SystemSettingService {
     if (data.is_public !== undefined) existing.is_public = data.is_public;
     if (data.is_deleted !== undefined) existing.is_deleted = data.is_deleted;
     existing.updated_at = new Date();
-    const saved = await updateDb(repo, existing);
+    const saved = await updateDb(repo, existing, { queryRunner: qr });
     await auditLogger.logUpdate("SystemSetting", id, oldData, saved, user);
     return { ...saved, value: this._normalizeOutput(saved.value) };
   }
@@ -216,7 +216,7 @@ class SystemSettingService {
     if (!setting) throw new Error(`Setting with id ${id} not found`);
     setting.is_deleted = true;
     setting.updated_at = new Date();
-    const saved = await updateDb(repo, setting);
+    const saved = await updateDb(repo, setting, { queryRunner: qr });
     await auditLogger.logDelete("SystemSetting", id, setting, user);
     return saved;
   }

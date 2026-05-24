@@ -39,7 +39,7 @@ class NotificationStateTransitionService {
     notification.updatedAt = new Date();
 
     // Use updateDb instead of repo.save
-    const saved = await updateDb(repo, notification);
+    const saved = await updateDb(repo, notification, { queryRunner: queryRunner });
 
     await auditLogger.logUpdate(
       "Notification",
@@ -68,7 +68,7 @@ class NotificationStateTransitionService {
     notification.isRead = true;
     notification.updatedAt = new Date();
 
-    const saved = await updateDb(repo, notification);
+    const saved = await updateDb(repo, notification, { queryRunner: queryRunner });
 
     await auditLogger.logUpdate(
       "Notification",

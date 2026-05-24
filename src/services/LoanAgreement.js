@@ -144,7 +144,7 @@ class LoanAgreementService {
       });
 
       // Save to get ID for file naming
-      const saved = await saveDb(agreementRepo, agreement);
+      const saved = await saveDb(agreementRepo, agreement, { queryRunner: qr });
 
       // Handle file upload if provided
       let savedFilePath = null;
@@ -155,7 +155,7 @@ class LoanAgreementService {
           saved.id,
         );
         saved.filePath = savedFilePath;
-        await saveDb(agreementRepo, saved); // update with file path
+        await saveDb(agreementRepo, saved, { queryRunner: qr }); // update with file path
       }
 
       await auditLogger.logCreate("LoanAgreement", saved.id, saved, user);
@@ -231,7 +231,7 @@ class LoanAgreementService {
       Object.assign(existing, agreementData);
       existing.updatedAt = new Date();
 
-      const saved = await updateDb(agreementRepo, existing);
+      const saved = await updateDb(agreementRepo, existing, { queryRunner: qr });
       await auditLogger.logUpdate("LoanAgreement", id, oldData, saved, user);
       return saved;
     } catch (error) {
@@ -264,7 +264,7 @@ class LoanAgreementService {
       agreement.deletedAt = new Date();
       agreement.updatedAt = new Date();
 
-      const saved = await updateDb(agreementRepo, agreement);
+      const saved = await updateDb(agreementRepo, agreement, { queryRunner: qr });
       await auditLogger.logDelete("LoanAgreement", id, oldData, user);
       console.log(`Loan agreement soft deleted: #${id}`);
       return saved;
@@ -300,7 +300,7 @@ class LoanAgreementService {
       agreement.deletedAt = null;
       agreement.updatedAt = new Date();
 
-      const saved = await updateDb(agreementRepo, agreement);
+      const saved = await updateDb(agreementRepo, agreement, { queryRunner: qr });
       await auditLogger.logUpdate(
         "LoanAgreement",
         id,

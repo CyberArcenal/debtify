@@ -9,7 +9,7 @@ class PaymentMethodStatSubscriber {
     return PaymentMethodStat;
   }
 
-  async beforeInsert(entity) {
+  async beforeInsert(entity, { manager, queryRunner }) {
     try {
       logger.info("[PaymentMethodStatSubscriber] beforeInsert", {
         id: entity.id,
@@ -18,10 +18,11 @@ class PaymentMethodStatSubscriber {
       });
     } catch (err) {
       logger.error("[PaymentMethodStatSubscriber] beforeInsert error", err);
+      throw err;
     }
   }
 
-  async afterInsert(entity) {
+  async afterInsert(entity, { manager, queryRunner }) {
     try {
       logger.info("[PaymentMethodStatSubscriber] afterInsert", {
         id: entity.id,
@@ -30,39 +31,44 @@ class PaymentMethodStatSubscriber {
       });
     } catch (err) {
       logger.error("[PaymentMethodStatSubscriber] afterInsert error", err);
+      throw err;
     }
   }
 
-  async beforeUpdate(entity) {
+  async beforeUpdate(entity, { manager, queryRunner }) {
     try {
       logger.info("[PaymentMethodStatSubscriber] beforeUpdate", { id: entity.id });
     } catch (err) {
       logger.error("[PaymentMethodStatSubscriber] beforeUpdate error", err);
+      throw err;
     }
   }
 
-  async afterUpdate(event) {
+  async afterUpdate(event, { manager, queryRunner }) {
     try {
       const { entity } = event;
       logger.info("[PaymentMethodStatSubscriber] afterUpdate", { id: entity.id });
     } catch (err) {
       logger.error("[PaymentMethodStatSubscriber] afterUpdate error", err);
+      throw err;
     }
   }
 
-  async beforeRemove(entity) {
+  async beforeRemove(entity, { manager, queryRunner }) {
     try {
       logger.info("[PaymentMethodStatSubscriber] beforeRemove", { id: entity.id });
     } catch (err) {
       logger.error("[PaymentMethodStatSubscriber] beforeRemove error", err);
+      throw err;
     }
   }
 
-  async afterRemove(event) {
+  async afterRemove(event, { manager, queryRunner }) {
     try {
       logger.info("[PaymentMethodStatSubscriber] afterRemove", { id: event.entityId });
     } catch (err) {
       logger.error("[PaymentMethodStatSubscriber] afterRemove error", err);
+      throw err;
     }
   }
 }

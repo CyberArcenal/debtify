@@ -38,7 +38,7 @@ class PaymentMethodStateTransitionService {
       if (method.id !== excludeId) {
         method.isDefault = false;
         method.updatedAt = new Date();
-        await updateDb(methodRepo, method);
+        await updateDb(methodRepo, method, { queryRunner: queryRunner });
       }
     }
   }
@@ -59,7 +59,7 @@ class PaymentMethodStateTransitionService {
       transactionCount: 0,
       totalAmount: 0,
     });
-    await saveDb(statRepo, stats);
+    await saveDb(statRepo, stats, { queryRunner: queryRunner });
 
     // 2. If this method is default, ensure others are not default
     if (method.isDefault) {
@@ -129,7 +129,7 @@ class PaymentMethodStateTransitionService {
       if (another && another.id !== method.id) {
         another.isDefault = true;
         another.updatedAt = new Date();
-        await updateDb(methodRepo, another);
+        await updateDb(methodRepo, another, { queryRunner: queryRunner });
         logger.info(`[PaymentMethod] Set method #${another.id} as new default.`);
       }
     }
