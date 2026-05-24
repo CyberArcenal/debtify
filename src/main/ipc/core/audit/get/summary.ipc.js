@@ -1,32 +1,46 @@
 // src/main/ipc/audit/get/summary.ipc.js
+
 const { AuditLog } = require("../../../../../entities/AuditLog");
+const onlineClient = require("../../../../../utils/onlineClient");
+const { syncMode, serverUrl } = require("../../../../../utils/system");
 const { AppDataSource } = require("../../../../db/data-source");
 
 module.exports = async (params) => {
-  const { startDate, endDate } = params;
-  const repo = AppDataSource.getRepository(AuditLog);
-  let qb = repo.createQueryBuilder("log");
-  if (startDate && endDate) {
-    qb = qb.where("log.timestamp BETWEEN :start AND :end", { start: new Date(startDate), end: new Date(endDate) });
+  const mode = await syncMode();
+
+  if (mode === "online") {
+    const url = await serverUrl();
+    if (!url) throw new Error("Server URL not configured");
+    onlineClient.setBaseUrl(url);
+    const response = await onlineClient.get('/api/v1/audit/summary', { params });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Server error: ${response.status} - ${errorText}`);
+    }
+    const result = await response.json();
+    return { status: true, message: "Audit summary retrieved from server", data: result.data };
+  } else {
+    const { startDate, endDate } = params;
+    const repo = AppDataSource.getRepository(AuditLog);
+    let qb = repo.createQueryBuilder("log");
+    if (startDate && endDate) {
+      qb = qb.where("log.timestamp BETWEEN :start AND :end", { start: new Date(startDate), end: new Date(endDate) });
+    }
+    const byAction = await qb.clone()
+      .select("log.action", "action")
+      .addSelect("COUNT(*)", "count")
+      .groupBy("log.action")
+      .getRawMany();
+    const byEntity = await qb.clone()
+      .select("log.entity", "entity")
+      .addSelect("COUNT(*)", "count")
+      .groupBy("log.entity")
+      .getRawMany();
+    const byUser = await qb.clone()
+      .select("log.user", "user")
+      .addSelect("COUNT(*)", "count")
+      .groupBy("log.user")
+      .getRawMany();
+    return { status: true, message: "Audit summary retrieved locally", data: { byAction, byEntity, byUser } };
   }
-  const byAction = await qb.clone()
-    .select("log.action", "action")
-    .addSelect("COUNT(*)", "count")
-    .groupBy("log.action")
-    .getRawMany();
-  const byEntity = await qb.clone()
-    .select("log.entity", "entity")
-    .addSelect("COUNT(*)", "count")
-    .groupBy("log.entity")
-    .getRawMany();
-  const byUser = await qb.clone()
-    .select("log.user", "user")
-    .addSelect("COUNT(*)", "count")
-    .groupBy("log.user")
-    .getRawMany();
-  return {
-    status: true,
-    message: "Audit summary retrieved",
-    data: { byAction, byEntity, byUser },
-  };
 };

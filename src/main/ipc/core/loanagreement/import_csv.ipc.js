@@ -1,4 +1,4 @@
-// src/main/ipc/loanagreement/import_csv.ipc.js
+// src/main/ipc/core/loanagreement/import_csv.ipc.js
 const loanAgreementService = require("../../../../services/LoanAgreement");
 
 module.exports = async (params, queryRunner) => {

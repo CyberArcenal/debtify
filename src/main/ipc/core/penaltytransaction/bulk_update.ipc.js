@@ -1,4 +1,4 @@
-// src/main/ipc/penaltytransaction/bulk_update.ipc.js
+// src/main/ipc/core/penaltytransaction/bulk_update.ipc.js
 const penaltyTransactionService = require("../../../../services/PenaltyTransaction");
 
 module.exports = async (params, queryRunner) => {

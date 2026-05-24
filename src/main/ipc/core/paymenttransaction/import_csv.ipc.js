@@ -1,4 +1,4 @@
-// src/main/ipc/paymenttransaction/import_csv.ipc.js
+// src/main/ipc/core/paymenttransaction/import_csv.ipc.js
 const paymentTransactionService = require("../../../../services/PaymentTransaction");
 
 module.exports = async (params, queryRunner) => {

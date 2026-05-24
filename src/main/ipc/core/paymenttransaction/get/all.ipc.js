@@ -1,4 +1,4 @@
-// src/main/ipc/paymenttransaction/get/all.ipc.js
+// src/main/ipc/core/paymenttransaction/get/all.ipc.js
 //@ts-check
 
 const paymentTransactionService = require("../../../../../services/PaymentTransaction");

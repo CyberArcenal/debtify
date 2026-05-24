@@ -1,4 +1,4 @@
-// src/main/ipc/paymentMethod/delete.ipc.js
+// src/main/ipc/core/paymentMethod/delete.ipc.js
 const paymentMethodService = require("../../../../services/PaymentMethod");
 
 module.exports = async (params, queryRunner) => {

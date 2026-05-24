@@ -1,4 +1,4 @@
-// src/main/ipc/penaltytransaction/import_csv.ipc.js
+// src/main/ipc/core/penaltytransaction/import_csv.ipc.js
 const penaltyTransactionService = require("../../../../services/PenaltyTransaction");
 
 module.exports = async (params, queryRunner) => {

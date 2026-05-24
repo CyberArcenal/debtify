@@ -1,4 +1,4 @@
-// src/main/ipc/paymenttransaction/export.ipc.js
+// src/main/ipc/core/paymenttransaction/export.ipc.js
 const paymentTransactionService = require("../../../../services/PaymentTransaction");
 
 module.exports = async (params) => {

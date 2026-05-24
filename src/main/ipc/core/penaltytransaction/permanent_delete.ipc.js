@@ -1,4 +1,4 @@
-// src/main/ipc/penaltytransaction/permanent_delete.ipc.js
+// src/main/ipc/core/penaltytransaction/permanent_delete.ipc.js
 const penaltyTransactionService = require("../../../../services/PenaltyTransaction");
 
 module.exports = async (params, queryRunner) => {

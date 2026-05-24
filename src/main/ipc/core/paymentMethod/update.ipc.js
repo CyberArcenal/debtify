@@ -1,4 +1,4 @@
-// src/main/ipc/paymentMethod/update.ipc.js
+// src/main/ipc/core/paymentMethod/update.ipc.js
 const paymentMethodService = require("../../../../services/PaymentMethod");
 
 module.exports = async (params, queryRunner) => {

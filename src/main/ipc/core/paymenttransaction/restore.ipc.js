@@ -1,4 +1,4 @@
-// src/main/ipc/paymenttransaction/restore.ipc.js
+// src/main/ipc/core/paymenttransaction/restore.ipc.js
 const paymentTransactionService = require("../../../../services/PaymentTransaction");
 
 module.exports = async (params, queryRunner) => {

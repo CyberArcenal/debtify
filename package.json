@@ -71,6 +71,7 @@
     "date-fns": "^4.1.0",
     "decimal.js": "^10.6.0",
     "electron-fetch": "^1.9.1",
+    "electron-store": "^11.0.2",
     "electron-updater": "^6.8.3",
     "escpos": "^3.0.0-alpha.6",
     "escpos-usb": "^3.0.0-alpha.4",

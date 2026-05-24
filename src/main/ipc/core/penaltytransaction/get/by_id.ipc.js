@@ -1,4 +1,4 @@
-// src/main/ipc/penaltytransaction/get/by_id.ipc.js
+// src/main/ipc/core/penaltytransaction/get/by_id.ipc.js
 //@ts-check
 
 const penaltyTransactionService = require("../../../../../services/PenaltyTransaction");

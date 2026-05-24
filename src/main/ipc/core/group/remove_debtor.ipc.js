@@ -1,28 +1,24 @@
 // src/main/ipc/group/remove_debtor.ipc.js
 const groupService = require("../../../../services/Group");
+const onlineClient = require("../../../../utils/onlineClient");
+const { syncMode, serverUrl } = require("../../../../utils/system");
 
 module.exports = async (params, queryRunner) => {
-  try {
-    const { groupId, debtorId, user } = params;
-    if (!groupId || !debtorId) {
-      return {
-        status: false,
-        message: "Group ID and Debtor ID are required",
-        data: null,
-      };
+  const { groupId, debtorId, user = "system" } = params;
+  const mode = await syncMode();
+
+  if (mode === "online") {
+    const url = await serverUrl();
+    if (!url) throw new Error("Server URL not configured");
+    onlineClient.setBaseUrl(url);
+    const response = await onlineClient.delete(`/api/v1/groups/${groupId}/members/${debtorId}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Server error: ${response.status} - ${errorText}`);
     }
+    return { status: true, message: "Debtor removed on server", data: null };
+  } else {
     await groupService.removeDebtorFromGroup(groupId, debtorId, user, queryRunner);
-    return {
-      status: true,
-      message: "Debtor removed from group successfully",
-      data: null,
-    };
-  } catch (error) {
-    console.error("Error in removeDebtorFromGroup:", error);
-    return {
-      status: false,
-      message: error.message || "Failed to remove debtor from group",
-      data: null,
-    };
+    return { status: true, message: "Debtor removed locally", data: null };
   }
 };

@@ -1,8 +1,25 @@
-// src/main/ipc/notification/export.ipc.js
+// src/main/ipc/core/notification/export.ipc.js
 const notificationService = require("../../../../services/Notification");
+const onlineClient = require("../../../../utils/onlineClient");
+const { syncMode, serverUrl } = require("../../../../utils/system");
 
 module.exports = async (params) => {
   const { format = "json", filters = {}, user = "system" } = params;
-  const exportData = await notificationService.exportNotifications(format, filters, user);
-  return { status: true, message: "Export completed", data: exportData };
+  const mode = await syncMode();
+
+  if (mode === "online") {
+    const url = await serverUrl();
+    if (!url) throw new Error("Server URL not configured");
+    onlineClient.setBaseUrl(url);
+    const response = await onlineClient.get("/api/v1/notifications/export", { params: { format, filters, user } });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Server error: ${response.status} - ${errorText}`);
+    }
+    const exportData = await response.json();
+    return { status: true, message: "Export completed from server", data: exportData };
+  } else {
+    const exportData = await notificationService.exportNotifications(format, filters, user);
+    return { status: true, message: "Export completed locally", data: exportData };
+  }
 };

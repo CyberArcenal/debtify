@@ -1,5 +1,4 @@
 // src/main/ipc/core/borrower/index.ipc.js
-//@ts-check
 const { ipcMain } = require("electron");
 const { logger } = require("../../../../utils/logger");
 const { withErrorHandling } = require("../../../../middlewares/errorHandler");

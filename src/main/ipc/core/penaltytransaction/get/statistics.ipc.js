@@ -1,4 +1,4 @@
-// src/main/ipc/penaltytransaction/get/statistics.ipc.js
+// src/main/ipc/core/penaltytransaction/get/statistics.ipc.js
 const penaltyTransactionService = require("../../../../../services/PenaltyTransaction");
 
 module.exports = async () => {
