@@ -1,8 +1,25 @@
-// src/main/ipc/loanagreement/bulk_update.ipc.js
+// src/main/ipc/core/loanagreement/bulk_update.ipc.js
 const loanAgreementService = require("../../../../services/LoanAgreement");
+const onlineClient = require("../../../../utils/onlineClient");
+const { syncMode, serverUrl } = require("../../../../utils/system");
 
 module.exports = async (params, queryRunner) => {
   const { updatesArray, user = "system" } = params;
-  const result = await loanAgreementService.bulkUpdate(updatesArray, user, queryRunner);
-  return { status: true, message: "Bulk update completed", data: result };
+  const mode = await syncMode();
+
+  if (mode === "online") {
+    const url = await serverUrl();
+    if (!url) throw new Error("Server URL not configured");
+    onlineClient.setBaseUrl(url);
+    const response = await onlineClient.put('/api/v1/loan-agreements/bulk', { updatesArray, user });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Server error: ${response.status} - ${errorText}`);
+    }
+    const result = await response.json();
+    return { status: true, message: "Bulk update completed on server", data: result };
+  } else {
+    const result = await loanAgreementService.bulkUpdate(updatesArray, user, queryRunner);
+    return { status: true, message: "Bulk update completed locally", data: result };
+  }
 };

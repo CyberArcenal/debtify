@@ -93,6 +93,7 @@ export const NotificationTable: React.FC<NotificationTableProps> = ({
             return (
               <tr
                 key={log.id}
+                onClick={(e)=> {e.stopPropagation(); onView(log)}}
                 className={`hover:bg-[var(--card-hover-bg)]/20 transition-colors ${isSending ? "sending-row" : ""}`}
               >
                 <td className="px-4 py-3 text-[var(--text-primary)] whitespace-nowrap">#{log.id}</td>
@@ -119,7 +120,7 @@ export const NotificationTable: React.FC<NotificationTableProps> = ({
                 <td className="px-4 py-3 whitespace-nowrap text-right">
                   <div className="flex items-center justify-end gap-2">
                     <button
-                      onClick={() => onView(log)}
+                      onClick={(e) =>{e.stopPropagation(); onView(log)}}
                       disabled={isSending}
                       className="p-1.5 rounded-md hover:bg-[var(--card-hover-bg)] text-[var(--text-tertiary)] hover:text-[var(--primary-color)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       title="View details"
@@ -128,7 +129,7 @@ export const NotificationTable: React.FC<NotificationTableProps> = ({
                     </button>
                     {log.status === "failed" && (
                       <button
-                        onClick={() => onRetry(log.id)}
+                        onClick={(e) =>{e.stopPropagation(); onRetry(log.id)}}
                         disabled={isSending}
                         className="p-1.5 rounded-md hover:bg-[var(--card-hover-bg)] text-[var(--text-tertiary)] hover:text-[var(--primary-color)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         title="Retry failed email"
@@ -138,7 +139,7 @@ export const NotificationTable: React.FC<NotificationTableProps> = ({
                     )}
                     {(log.status === "sent" || log.status === "resend") && (
                       <button
-                        onClick={() => onResend(log.id)}
+                        onClick={(e) =>{e.stopPropagation(); onResend(log.id)}}
                         disabled={isSending}
                         className="p-1.5 rounded-md hover:bg-[var(--card-hover-bg)] text-[var(--text-tertiary)] hover:text-[var(--primary-color)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         title="Resend email"
@@ -147,7 +148,7 @@ export const NotificationTable: React.FC<NotificationTableProps> = ({
                       </button>
                     )}
                     <button
-                      onClick={() => onDelete(log.id)}
+                      onClick={(e) =>{e.stopPropagation(); onDelete(log.id)}}
                       disabled={isSending}
                       className="p-1.5 rounded-md hover:bg-red-500/10 text-[var(--text-tertiary)] hover:text-red-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       title="Delete log"

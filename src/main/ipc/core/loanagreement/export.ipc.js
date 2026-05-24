@@ -1,4 +1,4 @@
-// src/main/ipc/loanagreement/export.ipc.js
+// src/main/ipc/core/loanagreement/export.ipc.js
 const loanAgreementService = require("../../../../services/LoanAgreement");
 
 module.exports = async (params) => {

@@ -1,40 +1,25 @@
-// src/main/ipc/paymenttransaction/get/all.ipc.js
-//@ts-check
-
+// src/main/ipc/core/paymenttransaction/get/all.ipc.js
 const paymentTransactionService = require("../../../../../services/PaymentTransaction");
-
+const onlineClient = require("../../../../../utils/onlineClient");
+const { syncMode, serverUrl } = require("../../../../../utils/system");
 
 module.exports = async (params) => {
-  const {
-    page,
-    limit,
-    search,
-    sortBy,
-    sortOrder,
-    includeDeleted,
-    debtId,
-    borrowerId,
-    reference,
-    paymentDateFrom,
-    paymentDateTo,
-    minAmount,
-    maxAmount,
-  } = params;
-  const options = {
-    page,
-    limit,
-    search,
-    sortBy,
-    sortOrder,
-    includeDeleted,
-    debtId,
-    borrowerId,
-    reference,
-    paymentDateFrom,
-    paymentDateTo,
-    minAmount,
-    maxAmount,
-  };
-  const payments = await paymentTransactionService.findAll(options);
-  return { status: true, message: "Payments retrieved", data: payments };
+  const mode = await syncMode();
+
+  if (mode === "online") {
+    const url = await serverUrl();
+    if (!url) throw new Error("Server URL not configured");
+    onlineClient.setBaseUrl(url);
+    const response = await onlineClient.get("/api/v1/payment-transactions", { params });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Server error: ${response.status} - ${errorText}`);
+    }
+    const result = await response.json();
+    return { status: true, message: "Payments retrieved from server", data: result };
+  } else {
+    const options = { ...params };
+    const payments = await paymentTransactionService.findAll(options);
+    return { status: true, message: "Payments retrieved locally", data: payments };
+  }
 };
