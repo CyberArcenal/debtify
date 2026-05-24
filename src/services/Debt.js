@@ -1,5 +1,4 @@
 // services/DebtService.js
-//@ts-check
 const auditLogger = require("../utils/auditLogger");
 const { validateDebtData } = require("../utils/debtUtils");
 const { defaultInterestRate, defaultPenaltyRate } = require("../utils/system");
@@ -135,7 +134,7 @@ class DebtService {
       });
 
       // @ts-ignore
-      const saved = await saveDb(debtRepo, debt);
+      const saved = await saveDb(debtRepo, debt, { queryRunner: qr });
       await auditLogger.logCreate("Debt", saved.id, saved, user);
       return saved;
     } catch (error) {
@@ -206,7 +205,7 @@ class DebtService {
       existing.updatedAt = new Date();
 
       // @ts-ignore
-      const saved = await updateDb(debtRepo, existing);
+      const saved = await updateDb(debtRepo, existing, { queryRunner: qr });
       await auditLogger.logUpdate("Debt", id, oldData, saved, user);
       return saved;
     } catch (error) {
@@ -242,7 +241,7 @@ class DebtService {
       debt.updatedAt = new Date();
 
       // @ts-ignore
-      const saved = await updateDb(debtRepo, debt);
+      const saved = await updateDb(debtRepo, debt, { queryRunner: qr });
       await auditLogger.logDelete("Debt", id, oldData, user);
       console.log(`Debt soft deleted: #${id}`);
       return saved;
@@ -278,7 +277,7 @@ class DebtService {
       debt.updatedAt = new Date();
 
       // @ts-ignore
-      const saved = await updateDb(debtRepo, debt);
+      const saved = await updateDb(debtRepo, debt, { queryRunner: qr });
       await auditLogger.logUpdate(
         "Debt",
         id,
@@ -342,7 +341,7 @@ class DebtService {
     debt.updatedAt = new Date();
 
     // @ts-ignore
-    const saved = await updateDb(debtRepo, debt);
+    const saved = await updateDb(debtRepo, debt, { queryRunner: qr });
     await auditLogger.logUpdate(
       "Debt",
       id,
@@ -475,7 +474,7 @@ class DebtService {
     // @ts-ignore
     const repo = this._getRepo(qr, require("../entities/Debt"));
     // @ts-ignore
-    return await updateDb(repo, existing, { skipSignal: true });
+    return await updateDb(repo, existing, { queryRunner: qr, skipSignal: true });
   }
 
   // services/DebtService.js – inside applyForgiveness
@@ -509,7 +508,7 @@ class DebtService {
     // @ts-ignore
     const repo = this._getRepo(qr, require("../entities/Debt"));
     // @ts-ignore
-    await updateDb(repo, debt, { skipSignal: true });
+    await updateDb(repo, debt, { queryRunner: qr, skipSignal: true });
 
     // ✅ Reload the debt with borrower relation after update
     const refreshedDebt = await this.findById(id); // includes borrower via relations

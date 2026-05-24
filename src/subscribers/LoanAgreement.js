@@ -1,5 +1,4 @@
 // src/subscribers/LoanAgreementSubscriber.js
-//@ts-check
 const LoanAgreement = require("../entities/LoanAgreement");
 const { logger } = require("../utils/logger");
 
@@ -10,7 +9,7 @@ class LoanAgreementSubscriber {
     return LoanAgreement;
   }
 
-  async beforeInsert(entity) {
+  async beforeInsert(entity, { manager, queryRunner }) {
     try {
       logger.info("[LoanAgreementSubscriber] beforeInsert", {
         id: entity.id,
@@ -19,10 +18,11 @@ class LoanAgreementSubscriber {
       });
     } catch (err) {
       logger.error("[LoanAgreementSubscriber] beforeInsert error", err);
+      throw err;
     }
   }
 
-  async afterInsert(entity) {
+  async afterInsert(entity, { manager, queryRunner }) {
     try {
       logger.info("[LoanAgreementSubscriber] afterInsert", {
         id: entity.id,
@@ -31,39 +31,44 @@ class LoanAgreementSubscriber {
       });
     } catch (err) {
       logger.error("[LoanAgreementSubscriber] afterInsert error", err);
+      throw err;
     }
   }
 
-  async beforeUpdate(entity) {
+  async beforeUpdate(entity, { manager, queryRunner }) {
     try {
       logger.info("[LoanAgreementSubscriber] beforeUpdate", { id: entity.id });
     } catch (err) {
       logger.error("[LoanAgreementSubscriber] beforeUpdate error", err);
+      throw err;
     }
   }
 
-  async afterUpdate(event) {
+  async afterUpdate(event, { manager, queryRunner }) {
     try {
       const { entity } = event;
       logger.info("[LoanAgreementSubscriber] afterUpdate", { id: entity.id });
     } catch (err) {
       logger.error("[LoanAgreementSubscriber] afterUpdate error", err);
+      throw err;
     }
   }
 
-  async beforeRemove(entity) {
+  async beforeRemove(entity, { manager, queryRunner }) {
     try {
       logger.info("[LoanAgreementSubscriber] beforeRemove", { id: entity.id });
     } catch (err) {
       logger.error("[LoanAgreementSubscriber] beforeRemove error", err);
+      throw err;
     }
   }
 
-  async afterRemove(event) {
+  async afterRemove(event, { manager, queryRunner }) {
     try {
       logger.info("[LoanAgreementSubscriber] afterRemove", { id: event.entityId });
     } catch (err) {
       logger.error("[LoanAgreementSubscriber] afterRemove error", err);
+      throw err;
     }
   }
 }

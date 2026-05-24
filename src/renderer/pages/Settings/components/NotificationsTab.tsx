@@ -1,27 +1,113 @@
-import React from "react";
+// src/renderer/pages/Settings/components/NotificationsTab.tsx
+import React, { useState } from "react";
 import type { NotificationsSettings } from "../../../api/utils/system_config";
 
 interface Props {
   settings: NotificationsSettings;
   onUpdate: (field: keyof NotificationsSettings, value: any) => void;
-  onTestSmtp?: () => void;
-  onTestSms?: () => void;
 }
 
-const NotificationsTab: React.FC<Props> = ({
-  settings,
-  onUpdate,
-  onTestSmtp,
-  onTestSms,
-}) => {
+const NotificationsTab: React.FC<Props> = ({ settings, onUpdate }) => {
+  // Modal state
+  const [modal, setModal] = useState<{
+    visible: boolean;
+    type: "smtp" | "sms";
+    loading: boolean;
+    result: { success: boolean; message: string } | null;
+  }>({
+    visible: false,
+    type: "smtp",
+    loading: false,
+    result: null,
+  });
+
+  const closeModal = () => {
+    setModal({ visible: false, type: "smtp", loading: false, result: null });
+  };
+
+  const testSMTP = async () => {
+    setModal({
+      visible: true,
+      type: "smtp",
+      loading: true,
+      result: null,
+    });
+
+    try {
+      if (!window.backendAPI?.systemConfig)
+        throw new Error("Electron API not available");
+
+      const response = await window.backendAPI.systemConfig({
+        method: "testSmtpConnection",
+        params: { settings },
+      });
+
+      setModal((prev) => ({
+        ...prev,
+        loading: false,
+        result: {
+          success: response.status,
+          message: response.message || (response.status ? "SMTP connection successful" : "SMTP connection failed"),
+        },
+      }));
+    } catch (err: any) {
+      setModal((prev) => ({
+        ...prev,
+        loading: false,
+        result: {
+          success: false,
+          message: err.message || "Failed to test SMTP connection",
+        },
+      }));
+    }
+  };
+
+  const testSMS = async () => {
+    setModal({
+      visible: true,
+      type: "sms",
+      loading: true,
+      result: null,
+    });
+
+    try {
+      if (!window.backendAPI?.systemConfig)
+        throw new Error("Electron API not available");
+
+      const response = await window.backendAPI.systemConfig({
+        method: "testSmsConnection",
+        params: { settings },
+      });
+
+      setModal((prev) => ({
+        ...prev,
+        loading: false,
+        result: {
+          success: response.status,
+          message: response.message || (response.status ? "SMS connection successful" : "SMS connection failed"),
+        },
+      }));
+    } catch (err: any) {
+      setModal((prev) => ({
+        ...prev,
+        loading: false,
+        result: {
+          success: false,
+          message: err.message || "Failed to test SMS connection",
+        },
+      }));
+    }
+  };
+
   return (
     <div className="space-y-6">
       <h3 className="text-lg font-semibold text-[var(--text-primary)]">
         Notification Settings
       </h3>
 
-      {/* General toggles - Debt Management Specific */}
+      {/* General toggles */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* ... existing toggles (unchanged) ... */}
         <div className="flex items-center gap-2">
           <input
             type="checkbox"
@@ -93,7 +179,6 @@ const NotificationsTab: React.FC<Props> = ({
             checked={(settings.reminder_days_before_due?.length ?? 0) > 0}
             onChange={(e) => {
               if (e.target.checked) {
-                // Default to 7,3,1 if enabling
                 onUpdate("reminder_days_before_due", [7, 3, 1]);
               } else {
                 onUpdate("reminder_days_before_due", []);
@@ -149,12 +234,13 @@ const NotificationsTab: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Email SMTP Settings (unchanged) */}
+      {/* Email SMTP Settings */}
       <div className="border-t border-[var(--border-color)] pt-4">
         <h4 className="text-md font-medium text-[var(--text-primary)] mb-3">
           Email (SMTP) Settings
         </h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* ... existing SMTP fields (host, port, from, username, password) ... */}
           <div>
             <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
               SMTP Host
@@ -193,9 +279,33 @@ const NotificationsTab: React.FC<Props> = ({
               placeholder="noreply@example.com"
             />
           </div>
+          <div>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
+              SMTP Username
+            </label>
+            <input
+              type="text"
+              value={settings.email_smtp_username || ""}
+              onChange={(e) => onUpdate("email_smtp_username", e.target.value)}
+              className="windows-input w-full"
+              placeholder="user@example.com"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
+              SMTP Password
+            </label>
+            <input
+              type="password"
+              value={settings.email_smtp_password || ""}
+              onChange={(e) => onUpdate("email_smtp_password", e.target.value)}
+              className="windows-input w-full"
+              placeholder="••••••••"
+            />
+          </div>
           <div className="md:col-span-2 flex justify-end">
             <button
-              onClick={onTestSmtp}
+              onClick={testSMTP}
               className="windows-button windows-button-secondary text-sm"
             >
               Test SMTP Connection
@@ -204,12 +314,13 @@ const NotificationsTab: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* SMS (Twilio) Settings (unchanged) */}
+      {/* SMS (Twilio) Settings */}
       <div className="border-t border-[var(--border-color)] pt-4">
         <h4 className="text-md font-medium text-[var(--text-primary)] mb-3">
           SMS (Twilio) Settings
         </h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* ... existing SMS fields ... */}
           <div>
             <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
               SMS Provider
@@ -270,16 +381,114 @@ const NotificationsTab: React.FC<Props> = ({
             />
           </div>
         </div>
+        <div className="flex justify-end mt-4">
+          <button
+            onClick={testSMS}
+            className="windows-button windows-button-secondary text-sm"
+          >
+            Test SMS Connection
+          </button>
+        </div>
       </div>
 
-      <div className="flex justify-end">
-        <button
-          onClick={onTestSms}
-          className="windows-button windows-button-secondary text-sm"
+      {/* ========== MODAL COMPONENT ========== */}
+      {modal.visible && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm transition-all duration-300"
+          onClick={closeModal}
         >
-          Test SMS Connection
-        </button>
-      </div>
+          <div
+            className="bg-[var(--card-bg)] rounded-xl shadow-2xl max-w-md w-full mx-4 transform transition-all duration-300 scale-100 opacity-100 animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              {/* Header */}
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-semibold text-[var(--text-primary)]">
+                  Testing {modal.type === "smtp" ? "SMTP" : "SMS"} Connection
+                </h3>
+                <button
+                  onClick={closeModal}
+                  className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="flex flex-col items-center justify-center py-6">
+                {modal.loading ? (
+                  <>
+                    <div className="w-12 h-12 border-4 border-[var(--primary-color)] border-t-transparent rounded-full animate-spin mb-4"></div>
+                    <p className="text-[var(--text-secondary)]">
+                      Testing connection, please wait...
+                    </p>
+                  </>
+                ) : modal.result ? (
+                  <>
+                    <div
+                      className={`w-12 h-12 rounded-full flex items-center justify-center mb-4 ${
+                        modal.result.success
+                          ? "bg-green-500/20 text-green-500"
+                          : "bg-red-500/20 text-red-500"
+                      }`}
+                    >
+                      {modal.result.success ? (
+                        <svg
+                          className="w-6 h-6"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                      ) : (
+                        <svg
+                          className="w-6 h-6"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                      )}
+                    </div>
+                    <p
+                      className={`text-center ${
+                        modal.result.success
+                          ? "text-green-500"
+                          : "text-red-500"
+                      }`}
+                    >
+                      {modal.result.message}
+                    </p>
+                  </>
+                ) : null}
+              </div>
+
+              {/* Footer */}
+              <div className="flex justify-end mt-4">
+                <button
+                  onClick={closeModal}
+                  className="windows-button windows-button-secondary"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

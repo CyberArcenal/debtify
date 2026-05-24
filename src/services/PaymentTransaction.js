@@ -156,7 +156,7 @@ class PaymentTransactionService {
         debt,
       });
 
-      const saved = await saveDb(paymentRepo, payment);
+      const saved = await saveDb(paymentRepo, payment, { queryRunner: qr });
       await auditLogger.logCreate("PaymentTransaction", saved.id, saved, user);
       return saved;
     } catch (error) {
@@ -239,7 +239,7 @@ class PaymentTransactionService {
       // Note: No validation against remaining balance because side effects are handled elsewhere.
       // The state transition service will handle consistency when needed (e.g., on confirm/void/refund).
 
-      const saved = await updateDb(paymentRepo, existing);
+      const saved = await updateDb(paymentRepo, existing, { queryRunner: qr });
       await auditLogger.logUpdate(
         "PaymentTransaction",
         id,
@@ -278,7 +278,7 @@ class PaymentTransactionService {
       payment.deletedAt = new Date();
       payment.updatedAt = new Date();
 
-      const saved = await updateDb(paymentRepo, payment);
+      const saved = await updateDb(paymentRepo, payment, { queryRunner: qr });
       await auditLogger.logDelete("PaymentTransaction", id, oldData, user);
       console.log(`Payment #${id} soft deleted`);
       return saved;
@@ -312,7 +312,7 @@ class PaymentTransactionService {
       payment.deletedAt = null;
       payment.updatedAt = new Date();
 
-      const saved = await updateDb(paymentRepo, payment);
+      const saved = await updateDb(paymentRepo, payment, { queryRunner: qr });
       await auditLogger.logUpdate(
         "PaymentTransaction",
         id,

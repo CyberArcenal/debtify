@@ -3,15 +3,13 @@ const Borrower = require("../entities/Borrower");
 const { logger } = require("../utils/logger");
 const auditLogger = require("../utils/auditLogger");
 const { emailEnabled, smsEnabled } = require("../utils/system");
-const { NotificationLogService } = require("../services/NotificationLog");
 const notificationService = require("../services/Notification");
-
+const { reminderLogService } = require("../services/ReminderLog");
 
 class BorrowerStateTransitionService {
   constructor(dataSource) {
     this.dataSource = dataSource;
     this.borrowerRepo = dataSource.getRepository(Borrower);
-    this.notificationLogService = new NotificationLogService();
   }
 
   /**
@@ -27,26 +25,26 @@ class BorrowerStateTransitionService {
     return this.dataSource.getRepository(entityClass);
   }
 
-  /**
-   * Helper to send an email via NotificationLogService
+    /**
+   * Send email via ReminderLogService (queues and logs automatically)
    */
   async _sendEmail(recipient, subject, message, user, queryRunner) {
-    const logService = this.notificationLogService;
-    const logResult = await logService.createLog(
-      { to: recipient, subject, html: message },
-      user,
-      queryRunner,
-    );
-    if (!logResult.status) {
-      logger.error(`Failed to create email log: ${logResult.message}`);
-      return false;
+    try {
+      await reminderLogService.createReminder(
+        {
+          to: recipient,
+          subject,
+          html: `<p>${message.replace(/\n/g, "<br/>")}</p>`,
+          text: message,
+        },
+        user,
+        queryRunner,
+      );
+      return true;
+    } catch (err) {
+      logger.error(`Failed to queue email to ${recipient}:`, err);
+      throw err;
     }
-    const sendResult = await logService.retryFailedNotification(
-      { id: logResult.data.id },
-      user,
-      queryRunner,
-    );
-    return sendResult.status;
   }
 
   /**
@@ -72,7 +70,7 @@ class BorrowerStateTransitionService {
     borrower.updatedAt = new Date();
 
     // Use updateDb – no extra args, just repo and entity
-    const saved = await updateDb(repo, borrower);
+    const saved = await updateDb(repo, borrower, { queryRunner: queryRunner });
 
     // Audit log (manually because updateDb does not log externally)
     await auditLogger.logUpdate(
@@ -130,7 +128,7 @@ class BorrowerStateTransitionService {
     borrower.updatedAt = new Date();
 
     // No extra arguments
-    const saved = await updateDb(repo, borrower);
+    const saved = await updateDb(repo, borrower, { queryRunner: queryRunner });
 
     await auditLogger.logDelete(
       "Borrower",
@@ -148,7 +146,7 @@ class BorrowerStateTransitionService {
     for (const debt of activeDebts) {
       debt.status = "defaulted";
       debt.updatedAt = new Date();
-      await updateDb(debtRepo, debt);
+      await updateDb(debtRepo, debt, { queryRunner: queryRunner });
     }
 
     logger.warn(
@@ -203,7 +201,7 @@ class BorrowerStateTransitionService {
     for (const debt of debtsToUpdate) {
       debt.borrower = targetBorrower;
       debt.updatedAt = new Date();
-      await updateDb(debtRepo, debt);
+      await updateDb(debtRepo, debt, { queryRunner: queryRunner });
     }
 
     // For payment transactions, we need to find those linked through debt
@@ -215,7 +213,7 @@ class BorrowerStateTransitionService {
       .getMany();
     for (const payment of paymentsToUpdate) {
       payment.updatedAt = new Date();
-      await updateDb(paymentRepo, payment);
+      await updateDb(paymentRepo, payment, { queryRunner: queryRunner });
     }
 
     const penaltyRepo = this._getRepo(queryRunner, PenaltyTransaction);
@@ -226,7 +224,7 @@ class BorrowerStateTransitionService {
       .getMany();
     for (const penalty of penaltiesToUpdate) {
       penalty.updatedAt = new Date();
-      await updateDb(penaltyRepo, penalty);
+      await updateDb(penaltyRepo, penalty, { queryRunner: queryRunner });
     }
 
     const agreementRepo = this._getRepo(queryRunner, LoanAgreement);
@@ -237,7 +235,7 @@ class BorrowerStateTransitionService {
       .getMany();
     for (const agreement of agreementsToUpdate) {
       agreement.updatedAt = new Date();
-      await updateDb(agreementRepo, agreement);
+      await updateDb(agreementRepo, agreement, { queryRunner: queryRunner });
     }
 
     const notifRepo = this._getRepo(queryRunner, Notification);
@@ -248,7 +246,7 @@ class BorrowerStateTransitionService {
       .getMany();
     for (const notif of notificationsToUpdate) {
       notif.updatedAt = new Date();
-      await updateDb(notifRepo, notif);
+      await updateDb(notifRepo, notif, { queryRunner: queryRunner });
     }
 
     // Audit logs
@@ -274,7 +272,7 @@ class BorrowerStateTransitionService {
       ? `${sourceBorrower.notes}\n[Merged into borrower #${targetBorrower.id} on ${new Date().toISOString()}]`
       : `[Merged into borrower #${targetBorrower.id} on ${new Date().toISOString()}]`;
     sourceBorrower.updatedAt = new Date();
-    await updateDb(sourceRepo, sourceBorrower);
+    await updateDb(sourceRepo, sourceBorrower, { queryRunner: queryRunner });
 
     // In-app notification
     await notificationService.create(

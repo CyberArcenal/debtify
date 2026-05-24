@@ -815,22 +815,14 @@ function registerIpcHandlers() {
   });
 
   // @ts-ignore
-  ipcMain.handle("printer:print", async (event, sale) => {
-    return await printerService.printReceipt(sale);
+  ipcMain.handle("printer:print", async (event, debtId) => {
+    return await printerService.printReceipt(debtId);
   });
 
   ipcMain.handle("printer:test-print", async () => {
     try {
-      const testSale = {
-        id: "TEST",
-        saleItems: [
-          { product: { name: "Test Item" }, quantity: 1, lineTotal: 0 },
-        ],
-        totalAmount: 0,
-        paymentMethod: "N/A",
-      };
       // @ts-ignore
-      return await printerService.printReceipt(testSale);
+      return await printerService.testPrinter(0);
     } catch (err) {
       // @ts-ignore
       console.error("[IPC] Test print failed:", err.message);

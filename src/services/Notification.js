@@ -1,5 +1,4 @@
 // services/NotificationService.js
-//@ts-check
 const auditLogger = require("../utils/auditLogger");
 const { paginateQueryBuilder } = require("../utils/dbUtils/pagination");
 const { validateNotificationData } = require("../utils/notificationUtils");
@@ -103,7 +102,7 @@ class NotificationService {
         debt,
       });
 
-      const saved = await saveDb(notificationRepo, notification);
+      const saved = await saveDb(notificationRepo, notification, { queryRunner: qr });
       await auditLogger.logCreate("Notification", saved.id, saved, user);
       return saved;
     } catch (error) {
@@ -159,7 +158,7 @@ class NotificationService {
       }
       Object.assign(existing, notificationData);
 
-      const saved = await updateDb(notificationRepo, existing);
+      const saved = await updateDb(notificationRepo, existing, { queryRunner: qr });
       await auditLogger.logUpdate("Notification", id, oldData, saved, user);
       return saved;
     } catch (error) {
@@ -191,7 +190,7 @@ class NotificationService {
       const oldData = { ...notification };
       notification.deletedAt = new Date();
 
-      const saved = await updateDb(notificationRepo, notification);
+      const saved = await updateDb(notificationRepo, notification, { queryRunner: qr });
       await auditLogger.logDelete("Notification", id, oldData, user);
       console.log(`Notification soft deleted: #${id}`);
       return saved;
@@ -226,7 +225,7 @@ class NotificationService {
 
       notification.deletedAt = null;
 
-      const saved = await updateDb(notificationRepo, notification);
+      const saved = await updateDb(notificationRepo, notification, { queryRunner: qr });
       await auditLogger.logUpdate(
         "Notification",
         id,
@@ -286,7 +285,7 @@ class NotificationService {
     }
 
     notification.isRead = true;
-    const saved = await updateDb(notificationRepo, notification);
+    const saved = await updateDb(notificationRepo, notification, { queryRunner: qr });
     await auditLogger.logUpdate(
       "Notification",
       id,
@@ -317,7 +316,7 @@ class NotificationService {
     }
 
     notification.isRead = false;
-    const saved = await updateDb(notificationRepo, notification);
+    const saved = await updateDb(notificationRepo, notification, { queryRunner: qr });
     await auditLogger.logUpdate(
       "Notification",
       id,

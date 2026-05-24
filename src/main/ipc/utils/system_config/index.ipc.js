@@ -20,6 +20,8 @@ class SystemConfigHandler {
     this.getValueByKey = this.importHandler("./get_value.ipc");
     this.getSettingsStats = this.importHandler("./get_stats.ipc");
     this.getSystemInfoForFrontend = this.importHandler("./get_frontend_info.ipc");
+      this.testSmtpConnection = this.importHandler("./test_smtp.ipc");
+  this.testSmsConnection = this.importHandler("./test_sms.ipc");
 
     // WRITE OPERATION HANDLERS (with transaction)
     this.updateGroupedConfig = this.importHandler("./update_grouped.ipc");
@@ -73,6 +75,10 @@ class SystemConfigHandler {
           return await this.getSettingsStats(params);
         case "getSystemInfoForFrontend":
           return await this.getSystemInfoForFrontend(params);
+          case "testSmtpConnection":
+      return await this.testSmtpConnection(params);
+    case "testSmsConnection":
+      return await this.testSmsConnection(params);
 
         // WRITE (with transaction)
         case "updateGroupedConfig":

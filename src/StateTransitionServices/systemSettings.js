@@ -156,7 +156,7 @@ class SystemSettingStateTransitionService {
     const oldValue = setting.value;
     setting.value = this._prepareValueForStorage(defaultValue);
     setting.updatedAt = new Date();
-    await updateDb(repo, setting);
+    await updateDb(repo, setting, { queryRunner: queryRunner });
 
     // 3. Invalidate cache and reload affected services
     delete settingsCache[setting.key];
