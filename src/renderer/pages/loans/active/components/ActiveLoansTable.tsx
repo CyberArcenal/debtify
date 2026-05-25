@@ -16,6 +16,7 @@ interface ActiveLoansTableProps {
   onRecordPayment: (loan: Debt) => void;
   onViewSchedule: (loan: Debt) => void;
   onForgiveness: (loan: Debt) => void;
+  onViewAgreement: (loan: Debt) => void;
 }
 
 const ActiveLoansTable: React.FC<ActiveLoansTableProps> = ({
@@ -29,6 +30,7 @@ const ActiveLoansTable: React.FC<ActiveLoansTableProps> = ({
   onRecordPayment,
   onViewSchedule,
   onForgiveness,
+  onViewAgreement,
 }) => {
   const getSortIcon = (key: string) => {
     if (sortConfig.key !== key) return null;
@@ -101,6 +103,7 @@ const ActiveLoansTable: React.FC<ActiveLoansTableProps> = ({
                     onRecordPayment={onRecordPayment}
                     onViewSchedule={onViewSchedule}
                     onForgiveness={onForgiveness}
+                    onViewAgreement={onViewAgreement}
                   />
                 </td>
               </tr>

@@ -1,5 +1,4 @@
 // src/main/ipc/core/loanagreement/index.ipc.js
-//@ts-check
 const { ipcMain } = require("electron");
 const { logger } = require("../../../../utils/logger");
 const { withErrorHandling } = require("../../../../middlewares/errorHandler");
@@ -22,7 +21,10 @@ class LoanAgreementHandler {
     this.updateAgreement = this.importHandler("./update.ipc");
     this.deleteAgreement = this.importHandler("./delete.ipc");
     this.restoreAgreement = this.importHandler("./restore.ipc");
-    this.permanentlyDeleteAgreement = this.importHandler("./permanent_delete.ipc");
+    this.signAgreement = this.importHandler("./sign.ipc");
+    this.permanentlyDeleteAgreement = this.importHandler(
+      "./permanent_delete.ipc",
+    );
 
     // 🔄 BATCH OPERATIONS
     this.bulkCreateAgreements = this.importHandler("./bulk_create.ipc");
@@ -36,8 +38,15 @@ class LoanAgreementHandler {
       const fullPath = require.resolve(`./${path}`, { paths: [__dirname] });
       return require(fullPath);
     } catch (error) {
-      console.warn(`[LoanAgreementHandler] Failed to load handler: ${path}`, error.message);
-      return async () => ({ status: false, message: `Handler not implemented: ${path}`, data: null });
+      console.warn(
+        `[LoanAgreementHandler] Failed to load handler: ${path}`,
+        error.message,
+      );
+      return async () => ({
+        status: false,
+        message: `Handler not implemented: ${path}`,
+        data: null,
+      });
     }
   }
 
@@ -64,32 +73,57 @@ class LoanAgreementHandler {
           return await this.handleWithTransaction(this.createAgreement, params);
         case "updateAgreement":
           return await this.handleWithTransaction(this.updateAgreement, params);
+        case "signAgreement":
+          return await this.handleWithTransaction(this.signAgreement, params);
         case "deleteAgreement":
           return await this.handleWithTransaction(this.deleteAgreement, params);
         case "restoreAgreement":
-          return await this.handleWithTransaction(this.restoreAgreement, params);
+          return await this.handleWithTransaction(
+            this.restoreAgreement,
+            params,
+          );
         case "permanentlyDeleteAgreement":
-          return await this.handleWithTransaction(this.permanentlyDeleteAgreement, params);
+          return await this.handleWithTransaction(
+            this.permanentlyDeleteAgreement,
+            params,
+          );
 
         // 🔄 BATCH (with transaction)
         case "bulkCreateAgreements":
-          return await this.handleWithTransaction(this.bulkCreateAgreements, params);
+          return await this.handleWithTransaction(
+            this.bulkCreateAgreements,
+            params,
+          );
         case "bulkUpdateAgreements":
-          return await this.handleWithTransaction(this.bulkUpdateAgreements, params);
+          return await this.handleWithTransaction(
+            this.bulkUpdateAgreements,
+            params,
+          );
         case "importAgreementsCSV":
-          return await this.handleWithTransaction(this.importAgreementsCSV, params);
+          return await this.handleWithTransaction(
+            this.importAgreementsCSV,
+            params,
+          );
 
         // 📄 EXPORT (read-only)
         case "exportAgreements":
           return await this.exportAgreements(params);
 
         default:
-          return { status: false, message: `Unknown loan agreement method: ${method}`, data: null };
+          return {
+            status: false,
+            message: `Unknown loan agreement method: ${method}`,
+            data: null,
+          };
       }
     } catch (error) {
       console.error("LoanAgreementHandler error:", error);
       logger?.error("LoanAgreementHandler error:", error);
-      return { status: false, message: error.message || "Internal server error", data: null };
+      return {
+        status: false,
+        message: error.message || "Internal server error",
+        data: null,
+      };
     }
   }
 
@@ -118,7 +152,10 @@ class LoanAgreementHandler {
 const loanAgreementHandler = new LoanAgreementHandler();
 ipcMain.handle(
   "loanAgreement",
-  withErrorHandling(loanAgreementHandler.handleRequest.bind(loanAgreementHandler), "IPC:loanAgreement")
+  withErrorHandling(
+    loanAgreementHandler.handleRequest.bind(loanAgreementHandler),
+    "IPC:loanAgreement",
+  ),
 );
 
 module.exports = { LoanAgreementHandler, loanAgreementHandler };

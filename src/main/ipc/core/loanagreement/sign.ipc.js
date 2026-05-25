@@ -3,21 +3,22 @@ const onlineClient = require("../../../../utils/onlineClient");
 const { syncMode, serverUrl } = require("../../../../utils/system");
 
 module.exports = async (params, queryRunner) => {
-  const { id, user = "system", allowDeleteSigned = false } = params;
+  const { id, user = "system" } = params;
   const mode = await syncMode();
 
   if (mode === "online") {
     const url = await serverUrl();
     if (!url) throw new Error("Server URL not configured");
     onlineClient.setBaseUrl(url);
-    const response = await onlineClient.delete(`/api/v1/loan-agreements/permanent/${id}?allowDeleteSigned=${allowDeleteSigned}`);
+    const response = await onlineClient.post(`/api/v1/loan-agreements/sign/${id}`, { user });
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`Server error: ${response.status} - ${errorText}`);
     }
-    return { status: true, message: "Loan agreement permanently deleted on server", data: null };
+    const result = await response.json();
+    return { status: true, message: "Loan agreement signed on server", data: result };
   } else {
-    await loanAgreementService.permanentlyDelete(id, user, queryRunner, allowDeleteSigned);
-    return { status: true, message: "Loan agreement permanently deleted locally", data: null };
+    const result = await loanAgreementService.signAgreement(id, user, queryRunner);
+    return { status: true, message: "Loan agreement signed locally", data: result };
   }
 };
