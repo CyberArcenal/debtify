@@ -411,7 +411,7 @@ async getAllPrinters(page = 1, limit = 10) {
    * @param {number} debtId
    * @returns {Promise<boolean>}
    */
-  async printReceipt(debtId) {
+  async printReceipt(debtId, qr=null) {
     const { updateDb, saveDb, removeDb } = require("../utils/dbUtils/dbActions");
     const { AppDataSource } = require("../main/db/data-source");
     const notificationService = require("../services/Notification");
