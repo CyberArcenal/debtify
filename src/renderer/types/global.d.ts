@@ -40,7 +40,10 @@ declare global {
       creditCheck: (payload: any) => Promise<any>;
 
       // ========== PRINTER CONVENIENCE METHODS ==========
-      printerGetStatus: () => Promise<{ driverLoaded: boolean; isReady: boolean }>;
+      printerGetStatus: () => Promise<{
+        driverLoaded: boolean;
+        isReady: boolean;
+      }>;
       printerIsAvailable: () => Promise<boolean>;
       printerReload: () => Promise<{ driverLoaded: boolean; isReady: boolean }>;
       printerPrint: (sale: any) => Promise<boolean>;
@@ -56,13 +59,17 @@ declare global {
         data?: any;
       }>;
       openExternal: (url: string) => Promise<void>;
+      openAgreementFile: (relativePath: string) => Promise<{
+        status: boolean;
+        message: string;
+      }>;
       notifyAppReady: () => void;
 
       // ========== EVENT LISTENERS (direct callbacks) ==========
       onAppReady: (callback: () => void) => () => void;
       on: (
         channel: string,
-        callback: (event: any, ...args: any[]) => void
+        callback: (event: any, ...args: any[]) => void,
       ) => () => void;
       off: (channel: string, callback: (...args: any[]) => void) => void;
 
@@ -73,6 +80,19 @@ declare global {
       onWindowClosed: (callback: () => void) => void;
       onWindowResized: (callback: (bounds: any) => void) => void;
       onWindowMoved: (callback: (position: any) => void) => void;
+
+      // ========== file handler =========
+
+      showItemInFolder: (fullPath) => Promise<any>;
+      openFile: (filePath) => Promise<any>;
+      showItemInFolder: (filePath) => Promise<any>;
+      getFileInfo: (filePath) => Promise<any>;
+      fileExists: (filePath) => Promise<any>;
+      openDirectory: (dirPath) => Promise<any>;
+      getFilesInDirectory: (dirPath, extensions) => Promise<any>;
+      getRecentExports: (exportDir, limit) => Promise<any>;
+      deleteFile: (filePath) => Promise<any>;
+      copyFileToClipboard: (filePath) => Promise<any>;
 
       // ========== LOGGING ==========
       log: {

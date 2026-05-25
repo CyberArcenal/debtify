@@ -34,6 +34,11 @@ const OverdueReminderScheduler = require("../scheduler/overdueReminderScheduler.
 const OverdueStatusUpdater = require("../scheduler/overdueStatusUpdater.js");
 const { logger } = require("../utils/logger.js");
 const OverdueStatusCorrector = require("../scheduler/overdueStatusCorrector.js");
+const InterestAccrualScheduler = require("../scheduler/interestAccrualScheduler.js");
+const {
+  registerFileStorage,
+  getAgreementFullPath,
+} = require("../utils/agreementFileStorage.js");
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -43,6 +48,15 @@ protocol.registerSchemesAsPrivileged([
       secure: true, // para i‑treat bilang secure (iwas mixed content)
       supportFetchAPI: true,
       bypassCSP: true, // optional, para iwas CORS sa images
+    },
+  },
+  {
+    scheme: "agreement-file",
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      bypassCSP: true,
     },
   },
 ]);
@@ -770,6 +784,19 @@ function registerIpcHandlers() {
     }
   });
 
+  ipcMain.handle("open-agreement-file", async (event, relativePath) => {
+    try {
+      const fullPath = getAgreementFullPath(relativePath);
+      if (!fullPath) throw new Error("Invalid file path");
+      await shell.openPath(fullPath);
+      return { status: true, message: "File opened" };
+    } catch (error) {
+      console.error("Open agreement file failed:", error);
+      // @ts-ignore
+      return { status: false, message: error.message };
+    }
+  });
+
   // Database Handlers
   ipcMain.handle("database:get-status", async () => {
     const { AppDataSource } = require("./db/data-source.js");
@@ -846,6 +873,7 @@ function registerIpcHandlers() {
       "./ipc/core/notification/index.ipc.js",
       "./ipc/utils/updater/index.ipc.js",
       "./ipc/utils/handshake/index.ipc.js",
+      "./ipc/utils/fileHandlers/index.ipc.js",
 
       // ========== DEBT MANAGEMENT IPC MODULES ==========
       "./ipc/core/audit/index.ipc.js",
@@ -935,6 +963,7 @@ async function startupSequence() {
 
     // 4. Register IPC handlers
     registerIpcHandlers();
+    registerFileStorage();
 
     // 5. Create main window
     log(LogLevel.INFO, "Creating main application window...");
@@ -964,6 +993,16 @@ async function startupSequence() {
       logger.error(
         LogLevel.ERROR,
         "Failed to start Overdue Status Corrector",
+        // @ts-ignore
+        err,
+      );
+    });
+
+    const interestAccrualScheduler = new InterestAccrualScheduler();
+    interestAccrualScheduler.start().catch((err) => {
+      logger.error(
+        LogLevel.ERROR,
+        "Failed to start Interest Accrual Scheduler",
         // @ts-ignore
         err,
       );

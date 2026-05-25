@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Loan Agreement</title>
+<style>
+  body { font-family: Arial, sans-serif; line-height: 1.6; margin: 0; padding: 20px; }
+  h1 { text-align: center; color: #2c3e50; }
+  h2 { color: #34495e; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+  .header { text-align: right; margin-bottom: 20px; }
+  .signature-line { margin-top: 30px; display: flex; justify-content: space-between; }
+  .signature { width: 45%; }
+  table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+  td, th { border: 1px solid #ddd; padding: 8px; text-align: left; }
+  th { background-color: #f2f2f2; }
+  .footer { margin-top: 40px; font-size: 12px; text-align: center; color: #7f8c8d; }
+</style>
+</head>
+<body>
+<div class="header">
+  <strong>Agreement ID:</strong> {{agreementId}}<br>
+  <strong>Date:</strong> {{agreementDate}}
+</div>
+
+<h1>LOAN AGREEMENT</h1>
+
+<h2>1. Parties</h2>
+<p><strong>Lender:</strong> {{lenderName}}<br>
+<strong>Borrower:</strong> {{borrowerName}}<br>
+<strong>Email:</strong> {{borrowerEmail}}<br>
+<strong>Contact:</strong> {{borrowerContact}}<br>
+<strong>Address:</strong> {{borrowerAddress}}</p>
+
+<h2>2. Loan Details</h2>
+<table>
+  <tr><th>Principal Amount</th><td>{{currency}} {{principalAmount}}</td></tr>
+  <tr><th>Annual Interest Rate</th><td>{{interestRate}}%</td></tr>
+  <tr><th>Penalty Rate (per annum)</th><td>{{penaltyRate}}%</td></tr>
+  <tr><th>Due Date</th><td>{{dueDate}}</td></tr>
+  <tr><th>Purpose</th><td>{{purpose}}</td></tr>
+</table>
+
+<h2>3. Interest Accrual (Monthly Anniversary)</h2>
+<p>Interest shall accrue on the outstanding principal balance <strong>every month on the same day as the loan start date</strong> (the "Anniversary Day").</p>
+<ul>
+  <li><strong>Example:</strong> If the loan start date is {{loanStartDate}}, interest will be added on the {{anniversaryDay}} of each subsequent month.</li>
+  <li>If the Anniversary Day does not exist in a given month (e.g., 31st in February), interest will be added on the <strong>last day</strong> of that month.</li>
+  <li>Interest is calculated using the simple interest formula: <code>Interest = Outstanding Principal × (Annual Rate / 12)</code> per full month.</li>
+  <li>No interest is charged during the first month after disbursement (grace period). First accrual occurs on the first Anniversary Day following the start date.</li>
+</ul>
+
+<h2>4. Repayment Terms</h2>
+<p>The Borrower agrees to repay the total outstanding balance (principal plus accrued interest) <strong>on or before the Due Date</strong> stated above. Partial payments are allowed at any time and will be applied first to any accrued interest, then to the principal.</p>
+
+<h2>5. Penalties for Late Payment</h2>
+<p>If the Borrower fails to pay the full outstanding balance by the Due Date, a <strong>penalty</strong> equal to {{penaltyRate}}% per annum of the overdue amount will be added daily from the day after the Due Date until full payment is received.</p>
+
+<h2>6. Prepayment</h2>
+<p>The Borrower may prepay part or all of the outstanding balance at any time without penalty. Prepayments reduce the principal and future interest accruals.</p>
+
+<h2>7. Default</h2>
+<p>The loan will be considered in default if any payment is overdue by more than 30 days, or the Borrower becomes bankrupt or provides false information. Upon default, the entire outstanding balance becomes immediately due.</p>
+
+<h2>8. Governing Law</h2>
+<p>This Agreement shall be governed by the laws of the Republic of the Philippines.</p>
+
+<div class="signature-line">
+  <div class="signature">
+    <strong>Lender:</strong><br>
+    Signature: ____________________<br>
+    Name: {{lenderName}}<br>
+    Date: {{signatureDate}}
+  </div>
+  <div class="signature">
+    <strong>Borrower:</strong><br>
+    Signature: ____________________<br>
+    Name: {{borrowerName}}<br>
+    Date: {{signatureDate}}
+  </div>
+</div>
+
+<div class="footer">
+  This agreement is generated electronically and is legally binding upon signing by both parties.
+</div>
+</body>
+</html>

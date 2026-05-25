@@ -1,7 +1,7 @@
 {
   "name": "debtify",
   "private": true,
-  "version": "v0.0.0-beta.8",
+  "version": "v0.0.0-beta.9",
   "main": "src/main/index.js",
   "author": {
     "name": "CyberArcenal",
@@ -75,9 +75,11 @@
     "electron-updater": "^6.8.3",
     "escpos": "^3.0.0-alpha.6",
     "escpos-usb": "^3.0.0-alpha.4",
+    "handlebars": "^4.7.9",
     "lucide-react": "^0.562.0",
     "nodemailer": "^8.0.1",
     "p-queue": "^9.1.0",
+    "puppeteer": "^25.0.4",
     "react": "^19.2.0",
     "react-chartjs-2": "^5.3.1",
     "react-dom": "^19.2.0",

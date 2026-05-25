@@ -45,6 +45,7 @@ contextBridge.exposeInMainWorld("backendAPI", {
 
   // ========== UTILITIES ==========
   openExternal: (url) => ipcRenderer.invoke("open-external", url),
+  openAgreementFile: (relativePath) => ipcRenderer.invoke('open-agreement-file', relativePath),
   notifyAppReady: () => ipcRenderer.send("app:renderer-ready"),
 
   // ========== EVENT LISTENERS ==========
@@ -71,6 +72,21 @@ contextBridge.exposeInMainWorld("backendAPI", {
     ipcRenderer.on("window:resized", (event, bounds) => callback(bounds)),
   onWindowMoved: (callback) =>
     ipcRenderer.on("window:moved", (event, position) => callback(position)),
+
+  // File ops
+  openFile: (filePath) => ipcRenderer.invoke("openFile", filePath),
+  showItemInFolder: (filePath) =>
+    ipcRenderer.invoke("showItemInFolder", filePath),
+  getFileInfo: (filePath) => ipcRenderer.invoke("getFileInfo", filePath),
+  fileExists: (filePath) => ipcRenderer.invoke("fileExists", filePath),
+  openDirectory: (dirPath) => ipcRenderer.invoke("openDirectory", dirPath),
+  getFilesInDirectory: (dirPath, extensions) =>
+    ipcRenderer.invoke("getFilesInDirectory", dirPath, extensions),
+  getRecentExports: (exportDir, limit) =>
+    ipcRenderer.invoke("getRecentExports", exportDir, limit),
+  deleteFile: (filePath) => ipcRenderer.invoke("deleteFile", filePath),
+  copyFileToClipboard: (filePath) =>
+    ipcRenderer.invoke("copyFileToClipboard", filePath),
 
   // ========== LOGGING ==========
   log: {

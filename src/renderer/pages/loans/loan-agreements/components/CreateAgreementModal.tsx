@@ -1,9 +1,12 @@
+// src/renderer/pages/loan-agreements/components/CreateAgreementModal.tsx
 import React, { useState, useEffect } from "react";
 import { dialogs } from "../../../../utils/dialogs";
 import loanAgreementsAPI from "../../../../api/core/loan_agreement";
 import Modal from "../../../../components/UI/Modal";
 import DebtSelect from "../../../../components/Selects/Debt";
 import Button from "../../../../components/UI/Button";
+import type { Debt } from "../../../../api/core/debt";
+import FileDropzone from "../../../../components/UI/FileDropzone";
 
 interface CreateAgreementModalProps {
   isOpen: boolean;
@@ -11,10 +14,17 @@ interface CreateAgreementModalProps {
   onSuccess: () => void;
 }
 
-const CreateAgreementModal: React.FC<CreateAgreementModalProps> = ({ isOpen, onClose, onSuccess }) => {
+const CreateAgreementModal: React.FC<CreateAgreementModalProps> = ({
+  isOpen,
+  onClose,
+  onSuccess,
+}) => {
   const [debtId, setDebtId] = useState<number | null>(null);
+  const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null);
   const [lenderName, setLenderName] = useState("");
-  const [agreementDate, setAgreementDate] = useState(new Date().toISOString().slice(0, 10));
+  const [agreementDate, setAgreementDate] = useState(
+    new Date().toISOString().slice(0, 10),
+  );
   const [termsText, setTermsText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -22,12 +32,18 @@ const CreateAgreementModal: React.FC<CreateAgreementModalProps> = ({ isOpen, onC
   useEffect(() => {
     if (!isOpen) {
       setDebtId(null);
+      setSelectedDebt(null);
       setLenderName("");
       setAgreementDate(new Date().toISOString().slice(0, 10));
       setTermsText("");
       setFile(null);
     }
   }, [isOpen]);
+
+  const handleDebtChange = (id: number | null, debt?: Debt) => {
+    setDebtId(id);
+    setSelectedDebt(debt || null);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,60 +84,102 @@ const CreateAgreementModal: React.FC<CreateAgreementModalProps> = ({ isOpen, onC
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Create Loan Agreement" size="lg">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Create Loan Agreement"
+      size="lg"
+    >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium mb-1 text-[var(--text-secondary)]">Debt *</label>
+          <label className="block text-sm font-medium mb-1 text-[var(--text-secondary)]">
+            Debt *
+          </label>
           <DebtSelect
             value={debtId}
-            onChange={(id) => setDebtId(id)}
+            onChange={handleDebtChange}
             statusFilter="active"
             placeholder="Select active loan..."
           />
+          {selectedDebt && (
+            <div className="mt-2 p-2 rounded-md bg-[var(--card-secondary-bg)] text-xs">
+              <div>
+                <strong>Principal:</strong>{" "}
+                {selectedDebt.totalAmount.toFixed(2)}
+              </div>
+              <div>
+                <strong>Interest Rate:</strong> {selectedDebt.interestRate || 0}
+                % p.a.
+              </div>
+              <div>
+                <strong>Due Date:</strong>{" "}
+                {new Date(selectedDebt.dueDate).toLocaleDateString()}
+              </div>
+            </div>
+          )}
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1 text-[var(--text-secondary)]">Lender Name *</label>
+          <label className="block text-sm font-medium mb-1 text-[var(--text-secondary)]">
+            Lender Name *
+          </label>
           <input
             type="text"
             value={lenderName}
             onChange={(e) => setLenderName(e.target.value)}
             className="w-full px-3 py-2 border rounded-md"
-            style={{ backgroundColor: "var(--input-bg)", borderColor: "var(--border-color)" }}
+            style={{
+              backgroundColor: "var(--input-bg)",
+              borderColor: "var(--border-color)",
+            }}
             required
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1 text-[var(--text-secondary)]">Agreement Date</label>
+          <label className="block text-sm font-medium mb-1 text-[var(--text-secondary)]">
+            Agreement Date
+          </label>
           <input
             type="date"
             value={agreementDate}
             onChange={(e) => setAgreementDate(e.target.value)}
             className="w-full px-3 py-2 border rounded-md"
-            style={{ backgroundColor: "var(--input-bg)", borderColor: "var(--border-color)" }}
+            style={{
+              backgroundColor: "var(--input-bg)",
+              borderColor: "var(--border-color)",
+            }}
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1 text-[var(--text-secondary)]">Terms (optional)</label>
+          <label className="block text-sm font-medium mb-1 text-[var(--text-secondary)]">
+            Terms (optional)
+          </label>
           <textarea
             rows={3}
             value={termsText}
             onChange={(e) => setTermsText(e.target.value)}
             className="w-full px-3 py-2 border rounded-md"
-            style={{ backgroundColor: "var(--input-bg)", borderColor: "var(--border-color)" }}
+            style={{
+              backgroundColor: "var(--input-bg)",
+              borderColor: "var(--border-color)",
+            }}
           />
         </div>
-        <div>
-          <label className="block text-sm font-medium mb-1 text-[var(--text-secondary)]">Upload File (PDF, optional)</label>
-          <input
-            type="file"
-            accept=".pdf,.doc,.docx"
-            onChange={(e) => setFile(e.target.files?.[0] || null)}
-            className="w-full"
-          />
-        </div>
+        <label className="block text-sm font-medium mb-1 text-[var(--text-secondary)]">
+          Upload Agreement File (optional)
+        </label>
+        <FileDropzone
+          onFileSelect={setFile}
+          currentFile={file}
+          accept=".pdf,.doc,.docx"
+          maxSizeMB={10}
+        />
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button type="submit" variant="success" disabled={submitting}>Create Draft</Button>
+          <Button type="button" variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" variant="success" disabled={submitting}>
+            Create Draft
+          </Button>
         </div>
       </form>
     </Modal>
