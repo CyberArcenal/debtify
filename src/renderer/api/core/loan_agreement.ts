@@ -8,7 +8,10 @@ import type { PaginatedResult } from "./common";
 
 export interface LoanAgreement {
   id: number;
-  agreementDate: string | null;   // ISO date string
+  status: "draft" | "signed"; // ✅ bagong field
+  signedAt: string | null; // ✅ kailan nilagdaan
+  signedBy: string | null; // ✅ sino lumagda
+  agreementDate: string | null; // ISO date string
   lenderName: string | null;
   termsText: string | null;
   filePath: string | null;
@@ -35,7 +38,7 @@ export interface LoanAgreementStatistics {
 }
 
 export interface LoanAgreementCreateData {
-  agreementDate?: string;         // YYYY-MM-DD or ISO string
+  agreementDate?: string; // YYYY-MM-DD or ISO string
   lenderName?: string | null;
   termsText?: string | null;
   debtId: number;
@@ -86,7 +89,6 @@ export interface LoanAgreementResponse {
   data: LoanAgreement;
 }
 
-// ✅ Changed: data is now an array of LoanAgreements (no pagination metadata)
 export interface LoanAgreementsResponse {
   status: boolean;
   message: string;
@@ -144,10 +146,10 @@ class LoanAgreementsAPI {
   // 🔎 READ-ONLY METHODS
   // --------------------------------------------------------------------
 
-  /**
-   * Get a single loan agreement by ID
-   */
-  async getById(id: number, includeDeleted = false): Promise<LoanAgreementResponse> {
+  async getById(
+    id: number,
+    includeDeleted = false,
+  ): Promise<LoanAgreementResponse> {
     if (!window.backendAPI?.loanAgreement) {
       throw new Error("Electron API (loanAgreement) not available");
     }
@@ -159,10 +161,6 @@ class LoanAgreementsAPI {
     throw new Error(response.message || "Failed to fetch loan agreement");
   }
 
-  /**
-   * Get all loan agreements with optional filters and pagination
-   * @returns LoanAgreementsResponse where data is an array of LoanAgreements (no pagination metadata)
-   */
   async getAll(params?: {
     page?: number;
     limit?: number;
@@ -187,9 +185,6 @@ class LoanAgreementsAPI {
     throw new Error(response.message || "Failed to fetch loan agreements");
   }
 
-  /**
-   * Get loan agreement statistics
-   */
   async getStatistics(): Promise<LoanAgreementStatisticsResponse> {
     if (!window.backendAPI?.loanAgreement) {
       throw new Error("Electron API (loanAgreement) not available");
@@ -199,19 +194,17 @@ class LoanAgreementsAPI {
       params: {},
     });
     if (response.status) return response;
-    throw new Error(response.message || "Failed to fetch loan agreement statistics");
+    throw new Error(
+      response.message || "Failed to fetch loan agreement statistics",
+    );
   }
 
-  /**
-   * Search loan agreements by lender name, terms, borrower, etc.
-   * @returns LoanAgreementsResponse where data is an array of LoanAgreements
-   */
   async search(
     searchTerm: string,
     page?: number,
     limit?: number,
     debtId?: number,
-    lenderName?: string
+    lenderName?: string,
   ): Promise<LoanAgreementsResponse> {
     if (!window.backendAPI?.loanAgreement) {
       throw new Error("Electron API (loanAgreement) not available");
@@ -225,14 +218,13 @@ class LoanAgreementsAPI {
   }
 
   // --------------------------------------------------------------------
-  // ✏️ WRITE OPERATIONS (CRUD)
+  // ✏️ WRITE OPERATIONS (CRUD + sign)
   // --------------------------------------------------------------------
 
-  /**
-   * Create a new loan agreement
-   * @param data - Agreement data (may include fileBuffer/fileName)
-   */
-  async create(data: LoanAgreementCreateData, user = "system"): Promise<LoanAgreementResponse> {
+  async create(
+    data: LoanAgreementCreateData,
+    user = "system",
+  ): Promise<LoanAgreementResponse> {
     if (!window.backendAPI?.loanAgreement) {
       throw new Error("Electron API (loanAgreement) not available");
     }
@@ -244,12 +236,11 @@ class LoanAgreementsAPI {
     throw new Error(response.message || "Failed to create loan agreement");
   }
 
-  /**
-   * Update an existing loan agreement
-   * @param id - Agreement ID
-   * @param data - Fields to update (may include fileBuffer/fileName/removeFile)
-   */
-  async update(id: number, data: LoanAgreementUpdateData, user = "system"): Promise<LoanAgreementResponse> {
+  async update(
+    id: number,
+    data: LoanAgreementUpdateData,
+    user = "system",
+  ): Promise<LoanAgreementResponse> {
     if (!window.backendAPI?.loanAgreement) {
       throw new Error("Electron API (loanAgreement) not available");
     }
@@ -262,24 +253,44 @@ class LoanAgreementsAPI {
   }
 
   /**
-   * Soft delete a loan agreement (set deletedAt)
+   * Sign a loan agreement (draft → signed). Irreversible.
    */
-  async delete(id: number, user = "system"): Promise<DeleteAgreementResponse> {
+  async sign(id: number, user = "system"): Promise<LoanAgreementResponse> {
+    if (!window.backendAPI?.loanAgreement) {
+      throw new Error("Electron API (loanAgreement) not available");
+    }
+    const response = await window.backendAPI.loanAgreement({
+      method: "signAgreement",
+      params: { id, user },
+    });
+    if (response.status) return response;
+    throw new Error(response.message || "Failed to sign loan agreement");
+  }
+
+  /**
+   * Soft delete a loan agreement (set deletedAt)
+   * @param allowDeleteSigned - If true, allow deletion of signed agreements (default false)
+   */
+  async delete(
+    id: number,
+    user = "system",
+    allowDeleteSigned = false,
+  ): Promise<DeleteAgreementResponse> {
     if (!window.backendAPI?.loanAgreement) {
       throw new Error("Electron API (loanAgreement) not available");
     }
     const response = await window.backendAPI.loanAgreement({
       method: "deleteAgreement",
-      params: { id, user },
+      params: { id, user, allowDeleteSigned },
     });
     if (response.status) return response;
     throw new Error(response.message || "Failed to delete loan agreement");
   }
 
-  /**
-   * Restore a soft-deleted loan agreement
-   */
-  async restore(id: number, user = "system"): Promise<RestoreAgreementResponse> {
+  async restore(
+    id: number,
+    user = "system",
+  ): Promise<RestoreAgreementResponse> {
     if (!window.backendAPI?.loanAgreement) {
       throw new Error("Electron API (loanAgreement) not available");
     }
@@ -293,27 +304,34 @@ class LoanAgreementsAPI {
 
   /**
    * Permanently delete a loan agreement (hard delete)
+   * @param allowDeleteSigned - If true, allow permanent deletion of signed agreements (default false)
    */
-  async permanentlyDelete(id: number, user = "system"): Promise<{ status: boolean; message: string }> {
+  async permanentlyDelete(
+    id: number,
+    user = "system",
+    allowDeleteSigned = false,
+  ): Promise<{ status: boolean; message: string }> {
     if (!window.backendAPI?.loanAgreement) {
       throw new Error("Electron API (loanAgreement) not available");
     }
     const response = await window.backendAPI.loanAgreement({
       method: "permanentlyDeleteAgreement",
-      params: { id, user },
+      params: { id, user, allowDeleteSigned },
     });
     if (response.status) return response;
-    throw new Error(response.message || "Failed to permanently delete loan agreement");
+    throw new Error(
+      response.message || "Failed to permanently delete loan agreement",
+    );
   }
 
   // --------------------------------------------------------------------
   // 🔄 BATCH OPERATIONS
   // --------------------------------------------------------------------
 
-  /**
-   * Bulk create multiple loan agreements
-   */
-  async bulkCreate(agreementsArray: LoanAgreementCreateData[], user = "system"): Promise<BulkCreateAgreementResponse> {
+  async bulkCreate(
+    agreementsArray: LoanAgreementCreateData[],
+    user = "system",
+  ): Promise<BulkCreateAgreementResponse> {
     if (!window.backendAPI?.loanAgreement) {
       throw new Error("Electron API (loanAgreement) not available");
     }
@@ -322,13 +340,15 @@ class LoanAgreementsAPI {
       params: { agreementsArray, user },
     });
     if (response.status) return response;
-    throw new Error(response.message || "Failed to bulk create loan agreements");
+    throw new Error(
+      response.message || "Failed to bulk create loan agreements",
+    );
   }
 
-  /**
-   * Bulk update multiple loan agreements
-   */
-  async bulkUpdate(updatesArray: Array<{ id: number; updates: LoanAgreementUpdateData }>, user = "system"): Promise<BulkUpdateAgreementResponse> {
+  async bulkUpdate(
+    updatesArray: Array<{ id: number; updates: LoanAgreementUpdateData }>,
+    user = "system",
+  ): Promise<BulkUpdateAgreementResponse> {
     if (!window.backendAPI?.loanAgreement) {
       throw new Error("Electron API (loanAgreement) not available");
     }
@@ -337,13 +357,15 @@ class LoanAgreementsAPI {
       params: { updatesArray, user },
     });
     if (response.status) return response;
-    throw new Error(response.message || "Failed to bulk update loan agreements");
+    throw new Error(
+      response.message || "Failed to bulk update loan agreements",
+    );
   }
 
-  /**
-   * Import loan agreements from a CSV file
-   */
-  async importFromCSV(filePath: string, user = "system"): Promise<ImportAgreementCsvResponse> {
+  async importFromCSV(
+    filePath: string,
+    user = "system",
+  ): Promise<ImportAgreementCsvResponse> {
     if (!window.backendAPI?.loanAgreement) {
       throw new Error("Electron API (loanAgreement) not available");
     }
@@ -352,13 +374,16 @@ class LoanAgreementsAPI {
       params: { filePath, user },
     });
     if (response.status) return response;
-    throw new Error(response.message || "Failed to import loan agreements from CSV");
+    throw new Error(
+      response.message || "Failed to import loan agreements from CSV",
+    );
   }
 
-  /**
-   * Export loan agreements to CSV or JSON
-   */
-  async export(format: "csv" | "json" = "json", filters: any = {}, user = "system"): Promise<ExportAgreementResponse> {
+  async export(
+    format: "csv" | "json" = "json",
+    filters: any = {},
+    user = "system",
+  ): Promise<ExportAgreementResponse> {
     if (!window.backendAPI?.loanAgreement) {
       throw new Error("Electron API (loanAgreement) not available");
     }
@@ -374,32 +399,26 @@ class LoanAgreementsAPI {
   // 🧰 UTILITY METHODS
   // --------------------------------------------------------------------
 
-  /**
-   * Get all agreements for a specific debt
-   */
-  async getByDebtId(debtId: number, includeDeleted = false): Promise<LoanAgreement[]> {
+  async getByDebtId(
+    debtId: number,
+    includeDeleted = false,
+  ): Promise<LoanAgreement[]> {
     const response = await this.getAll({ debtId, includeDeleted, limit: 1000 });
-    return response.data.data;   // ✅ changed: .data is array directly
+    return response.data.data;
   }
 
-  /**
-   * Check if a debt has any agreements
-   */
   async hasAgreements(debtId: number): Promise<boolean> {
     try {
       const response = await this.getAll({ debtId, limit: 1 });
-      return response.data.data.length > 0;   // ✅ changed: .data is array
+      return response.data.data.length > 0;
     } catch (error) {
       console.error("Error checking agreements:", error);
       return false;
     }
   }
 
-  /**
-   * Validate if the backend API is available
-   */
   async isAvailable(): Promise<boolean> {
-    return !!(window.backendAPI?.loanAgreement);
+    return !!window.backendAPI?.loanAgreement;
   }
 }
 

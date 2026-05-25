@@ -113,6 +113,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen }) => {
           name: "Loan Applications",
           icon: FileSignature,
         },
+        {
+          path: "/loans/agreements",
+          name: "Loan Agreements",
+          icon: FileText,
+        }
       ],
     },
     {
