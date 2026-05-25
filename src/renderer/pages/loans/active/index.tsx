@@ -13,6 +13,7 @@ import debtsAPI from "../../../api/core/debt";
 import { dialogs } from "../../../utils/dialogs";
 import { ForgivenessDialog } from "./components/ForgivenessDialog";
 import ViewLoanAgreementModal from "./components/ViewLoanAgreementModal";
+import PaymentScheduleModal from "./components/PaymentScheduleModal";
 
 const ActiveLoansPage: React.FC = () => {
   const {
@@ -49,6 +50,9 @@ const ActiveLoansPage: React.FC = () => {
   const [selectedDebtForAgreement, setSelectedDebtForAgreement] =
     useState<Debt | null>(null);
 
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [scheduleLoan, setScheduleLoan] = useState<Debt | null>(null);
+
   const handleForgiveness = (loan: Debt) => {
     setForgivenessLoan(loan);
     setForgivenessDialogOpen(true);
@@ -57,6 +61,11 @@ const ActiveLoansPage: React.FC = () => {
   const handleViewAgreement = (loan: Debt) => {
     setSelectedDebtForAgreement(loan);
     setAgreementModalOpen(true);
+  };
+
+  const handleSchedule = (loan: Debt) => {
+    setScheduleLoan(loan);
+    setScheduleModalOpen(true);
   };
 
   const handleForgivenessConfirm = async (amount: number, reason?: string) => {
@@ -91,9 +100,6 @@ const ActiveLoansPage: React.FC = () => {
   const openEditModal = (loan: any) => {
     setSelectedLoan(loan);
     setEditModalOpen(true);
-  };
-  const handleSchedule = (loan: any) => {
-    console.log("View schedule for", loan);
   };
 
   const getDisplayRange = () => {
@@ -322,6 +328,15 @@ const ActiveLoansPage: React.FC = () => {
         onClose={() => {
           setAgreementModalOpen(false);
           setSelectedDebtForAgreement(null);
+        }}
+      />
+
+      <PaymentScheduleModal
+        isOpen={scheduleModalOpen}
+        debt={scheduleLoan}
+        onClose={() => {
+          setScheduleModalOpen(false);
+          setScheduleLoan(null);
         }}
       />
     </div>
