@@ -13,6 +13,10 @@ const {
 const notificationService = require("../services/Notification");
 const debtService = require("../services/Debt");
 const { reminderLogService } = require("../services/ReminderLog");
+const loanAgreementService = require("../services/LoanAgreement");
+const pdfGenerator = require("../services/PDFGenerator");
+const fs = require("fs").promises;
+const path = require("path");
 
 class LoanApplicationStateTransitionService {
   /**
@@ -69,6 +73,7 @@ class LoanApplicationStateTransitionService {
    * @param {string} user
    * @param {null} queryRunner
    */
+  // @ts-ignore
   // @ts-ignore
   async _sendSms(phoneNumber, message, user, queryRunner) {
     // Placeholder – integrate with actual SMS channel via NotificationLogService
@@ -185,6 +190,55 @@ class LoanApplicationStateTransitionService {
       );
       // TODO: actual PDF generation and storage (could call another service)
     }
+
+    if (await requireLoanAgreement()) {
+  try {
+    const uploadDir = path.join(__dirname, "../uploads/agreements");
+    await fs.mkdir(uploadDir, { recursive: true });
+    const pdfPath = path.join(uploadDir, `agreement_${createdDebt.id}_${Date.now()}.pdf`);
+    
+    // I-prepare ang data para sa template
+    const agreementData = {
+      agreementId: `LA-${createdDebt.id}`,
+      agreementDate: new Date().toLocaleDateString(),
+      lenderName: "Debtify Lending Corp", // o galing sa settings
+      borrowerName: application.debtorName,
+      borrowerEmail: application.debtorEmail || "",
+      borrowerContact: application.debtorContact || "",
+      // @ts-ignore
+      borrowerAddress: application.debtorAddress || "",
+      currency: "₱",
+      principalAmount: application.requestedAmount.toFixed(2),
+      interestRate: application.interestRate,
+      penaltyRate: await defaultPenaltyRate(),
+      // @ts-ignore
+      dueDate: new Date(application.proposedDueDate).toLocaleDateString(),
+      purpose: application.purpose,
+      loanStartDate: new Date(createdDebt.createdAt).toLocaleDateString(),
+      anniversaryDay: new Date(createdDebt.createdAt).getDate(),
+      signatureDate: new Date().toLocaleDateString(),
+    };
+    
+    await pdfGenerator.generateLoanAgreement(agreementData, pdfPath);
+    
+    // I-save ang loan agreement record
+    await loanAgreementService.create({
+      debtId: createdDebt.id,
+      agreementDate: new Date(),
+      lenderName: agreementData.lenderName,
+      termsText: "Standard loan agreement with monthly interest accrual.",
+      fileBuffer: null, // hindi na kailangan, file path na mismo
+      fileName: path.basename(pdfPath),
+      filePath: pdfPath, // kailangan i-update ang create method para tumanggap ng filePath
+    }, user, queryRunner);
+    
+    logger.info(`Loan agreement PDF generated: ${pdfPath}`);
+  } catch (err) {
+    // @ts-ignore
+    logger.error("Failed to generate PDF agreement:", err);
+    // Hindi na mag-fail ang buong approval dahil lang sa PDF
+  }
+}
 
     // 5. Audit log already recorded by subscriber, but we add an extra log for the created debt
     await auditLogger.logCreate("Debt", createdDebt.id, createdDebt, user);

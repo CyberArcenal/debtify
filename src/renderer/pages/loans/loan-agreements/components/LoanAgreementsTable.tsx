@@ -1,7 +1,8 @@
+// src/renderer/pages/loan-agreements/components/LoanAgreementsTable.tsx
 import React from "react";
 import { ChevronUp, ChevronDown, Eye, Edit, Trash2, FileSignature, Download } from "lucide-react";
 import type { LoanAgreement } from "../../../../api/core/loan_agreement";
-import { formatDate } from "../../../../utils/formatters";
+import { formatDate, formatCurrency } from "../../../../utils/formatters";
 
 interface LoanAgreementsTableProps {
   agreements: LoanAgreement[];
@@ -48,6 +49,8 @@ const LoanAgreementsTable: React.FC<LoanAgreementsTableProps> = ({
               <div className="flex items-center gap-1">Lender {getSortIcon("lenderName")}</div>
             </th>
             <th className="px-4 py-3 text-left text-xs font-medium uppercase">Debt / Borrower</th>
+            <th className="px-4 py-3 text-left text-xs font-medium uppercase">Principal</th>
+            <th className="px-4 py-3 text-left text-xs font-medium uppercase">Interest Rate</th>
             <th className="px-4 py-3 text-left text-xs font-medium uppercase cursor-pointer" onClick={() => onSort("status")}>
               <div className="flex items-center gap-1">Status {getSortIcon("status")}</div>
             </th>
@@ -64,6 +67,8 @@ const LoanAgreementsTable: React.FC<LoanAgreementsTableProps> = ({
                 <div className="font-medium">{agreement.debt?.name || "—"}</div>
                 <div className="text-xs text-[var(--text-secondary)]">{agreement.debt?.borrower?.name || ""}</div>
               </td>
+              <td className="px-4 py-3">{agreement.principalAmount ? formatCurrency(agreement.principalAmount) : "—"}</td>
+              <td className="px-4 py-3">{agreement.interestRate ? `${agreement.interestRate}%` : "—"}</td>
               <td className="px-4 py-3">{getStatusBadge(agreement.status)}</td>
               <td className="px-4 py-3">
                 {agreement.signedBy ? (

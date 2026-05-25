@@ -34,6 +34,8 @@ const OverdueReminderScheduler = require("../scheduler/overdueReminderScheduler.
 const OverdueStatusUpdater = require("../scheduler/overdueStatusUpdater.js");
 const { logger } = require("../utils/logger.js");
 const OverdueStatusCorrector = require("../scheduler/overdueStatusCorrector.js");
+const InterestAccrualScheduler = require("../scheduler/interestAccrualScheduler.js");
+const { registerFileStorage } = require("../utils/agreementFileStorage.js");
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -935,6 +937,7 @@ async function startupSequence() {
 
     // 4. Register IPC handlers
     registerIpcHandlers();
+    registerFileStorage()
 
     // 5. Create main window
     log(LogLevel.INFO, "Creating main application window...");
@@ -964,6 +967,16 @@ async function startupSequence() {
       logger.error(
         LogLevel.ERROR,
         "Failed to start Overdue Status Corrector",
+        // @ts-ignore
+        err,
+      );
+    });
+
+    const interestAccrualScheduler = new InterestAccrualScheduler();
+    interestAccrualScheduler.start().catch((err) => {
+      logger.error(
+        LogLevel.ERROR,
+        "Failed to start Interest Accrual Scheduler",
         // @ts-ignore
         err,
       );

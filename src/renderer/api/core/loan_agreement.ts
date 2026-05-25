@@ -8,16 +8,24 @@ import type { PaginatedResult } from "./common";
 
 export interface LoanAgreement {
   id: number;
-  status: "draft" | "signed"; // ✅ bagong field
-  signedAt: string | null; // ✅ kailan nilagdaan
-  signedBy: string | null; // ✅ sino lumagda
-  agreementDate: string | null; // ISO date string
+  status: "draft" | "signed";
+  signedAt: string | null;
+  signedBy: string | null;
+  agreementDate: string | null;
   lenderName: string | null;
   termsText: string | null;
   filePath: string | null;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
+  // Snapshot fields
+  principalAmount?: number | null;
+  interestRate?: number | null;
+  penaltyRate?: number | null;
+  dueDate?: string | null;
+  purpose?: string | null;
+  loanStartDate?: string | null;
+  anniversaryDay?: number | null;
   debt?: {
     id: number;
     name: string;
@@ -30,6 +38,7 @@ export interface LoanAgreement {
   };
 }
 
+
 export interface LoanAgreementStatistics {
   totalAgreements: number;
   withFiles: number;
@@ -38,10 +47,18 @@ export interface LoanAgreementStatistics {
 }
 
 export interface LoanAgreementCreateData {
-  agreementDate?: string; // YYYY-MM-DD or ISO string
+  agreementDate?: string;
   lenderName?: string | null;
   termsText?: string | null;
   debtId: number;
+  // Optional snapshot fields (if you want to override)
+  principalAmount?: number;
+  interestRate?: number;
+  penaltyRate?: number;
+  dueDate?: string;
+  purpose?: string;
+  loanStartDate?: string;
+  anniversaryDay?: number;
   // File upload (optional)
   fileBuffer?: Uint8Array;
   fileName?: string;
@@ -56,7 +73,16 @@ export interface LoanAgreementUpdateData {
   fileBuffer?: Uint8Array;
   fileName?: string;
   removeFile?: boolean;
+  // Snapshot fields (usually not updated after creation, but included for completeness)
+  principalAmount?: number;
+  interestRate?: number;
+  penaltyRate?: number;
+  dueDate?: string;
+  purpose?: string;
+  loanStartDate?: string;
+  anniversaryDay?: number;
 }
+
 
 export interface BulkCreateAgreementResult {
   created: LoanAgreement[];

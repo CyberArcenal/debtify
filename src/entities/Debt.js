@@ -16,6 +16,7 @@ const Debt = new EntitySchema({
     deletedAt: { type: Date, nullable: true },
     createdAt: { type: Date, createDate: true },
     updatedAt: { type: Date, updateDate: true },
+    lastInterestAccrualDate: { type: Date, nullable: true },
   },
   relations: {
     borrower: {

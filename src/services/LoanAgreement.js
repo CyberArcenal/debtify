@@ -1,9 +1,12 @@
 // services/LoanAgreementService.js
+//@ts-check
 const { paginateQueryBuilder } = require("../utils/dbUtils/pagination");
 const auditLogger = require("../utils/auditLogger");
 const { validateLoanAgreementData } = require("../utils/loanAgreementUtils");
-const fs = require("fs").promises;
-const path = require("path");
+const {
+  saveAgreementFile,
+  deleteAgreementFile,
+} = require("../utils/agreementFileStorage");
 
 class LoanAgreementService {
   constructor() {
@@ -57,120 +60,85 @@ class LoanAgreementService {
   }
 
   /**
-   * Save uploaded agreement file to disk
-   */
-  async _saveAgreementFile(fileBuffer, originalName, agreementId) {
-    const uploadDir = path.join(__dirname, "../uploads/agreements");
-    try {
-      await fs.access(uploadDir);
-    } catch {
-      await fs.mkdir(uploadDir, { recursive: true });
-    }
-    const ext = path.extname(originalName);
-    const filename = `agreement_${agreementId}_${Date.now()}${ext}`;
-    const filePath = path.join(uploadDir, filename);
-    await fs.writeFile(filePath, fileBuffer);
-    return filePath;
-  }
-
-  async _deleteAgreementFile(filePath) {
-    if (filePath) {
-      try {
-        await fs.access(filePath);
-        await fs.unlink(filePath);
-      } catch (err) {
-        console.warn(
-          `Could not delete agreement file: ${filePath}`,
-          err.message,
-        );
-      }
-    }
-  }
-
-  /**
    * Create a new loan agreement (status = 'draft')
+   * @param {{ agreementDate: any; lenderName: any; termsText: any; debtId: any; fileBuffer?: any; fileName?: any; filePath?: any; principalAmount?: any; interestRate?: any; penaltyRate?: any; dueDate?: any; purpose?: any; loanStartDate?: any; anniversaryDay?: any; }} agreementData
    */
   async create(agreementData, user = "system", qr = null) {
     const { saveDb } = require("../utils/dbUtils/dbActions");
     const LoanAgreement = require("../entities/LoanAgreement");
+    // @ts-ignore
     const agreementRepo = this._getRepo(qr, LoanAgreement);
+    // @ts-ignore
     const debtRepo = this._getRepo(qr, require("../entities/Debt"));
 
-    try {
-      const validation = validateLoanAgreementData(agreementData);
-      if (!validation.valid) {
-        throw new Error(validation.errors.join(", "));
-      }
+    const validation = validateLoanAgreementData(agreementData);
+    if (!validation.valid) throw new Error(validation.errors.join(", "));
 
-      const existing = await agreementRepo.findOne({
-        where: { debt: { id: agreementData.debtId }, deletedAt: null },
-      });
-      if (existing && existing.status === "signed") {
-        throw new Error(
-          `Debt #${agreementData.debtId} already has a signed agreement. Cannot create another.`,
-        );
-      }
+    const {
+      agreementDate,
+      lenderName,
+      termsText,
+      fileBuffer,
+      fileName,
+      filePath,
+      debtId,
+      principalAmount,
+      interestRate,
+      penaltyRate,
+      dueDate,
+      purpose,
+      loanStartDate,
+      anniversaryDay,
+    } = agreementData;
 
-      if (existing && existing.status === "draft") {
-        // Puwede mong i‑update ang draft o mag-throw ng error depende sa business rule
-        throw new Error(
-          `Debt #${debtId} already has a draft agreement. Please edit that instead.`,
-        );
-      }
+    const debt = await debtRepo.findOne({ where: { id: debtId } });
+    if (!debt) throw new Error(`Debt with ID ${debtId} not found`);
 
-      const {
-        agreementDate,
-        lenderName,
-        termsText,
-        fileBuffer,
-        fileName,
-        debtId,
-      } = agreementData;
+    const agreement = agreementRepo.create({
+      agreementDate: agreementDate ? new Date(agreementDate) : new Date(),
+      lenderName: lenderName || null,
+      termsText: termsText || null,
+      filePath: filePath || null,
+      debt,
+      status: "draft",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      // snapshot fields
+      principalAmount: principalAmount ?? debt.totalAmount,
+      interestRate: interestRate ?? debt.interestRate,
+      penaltyRate: penaltyRate ?? debt.penaltyRate,
+      dueDate: dueDate ? new Date(dueDate) : debt.dueDate,
+      purpose: purpose || null,
+      loanStartDate: loanStartDate ? new Date(loanStartDate) : debt.createdAt,
+      anniversaryDay: anniversaryDay ?? new Date(debt.createdAt).getDate(),
+    });
 
-      const debt = await debtRepo.findOne({ where: { id: debtId } });
-      if (!debt) throw new Error(`Debt with ID ${debtId} not found`);
+    // @ts-ignore
+    const saved = await saveDb(agreementRepo, agreement, { queryRunner: qr });
 
-      // ✅ Draft by default
-      const agreement = agreementRepo.create({
-        agreementDate: agreementDate ? new Date(agreementDate) : new Date(),
-        lenderName: lenderName || null,
-        termsText: termsText || null,
-        filePath: null,
-        status: "draft",
-        signedAt: null,
-        signedBy: null,
-        debt,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-
-      const saved = await saveDb(agreementRepo, agreement, { queryRunner: qr });
-
-      if (fileBuffer && fileName) {
-        const savedFilePath = await this._saveAgreementFile(
-          fileBuffer,
-          fileName,
-          saved.id,
-        );
-        saved.filePath = savedFilePath;
-        await saveDb(agreementRepo, saved, { queryRunner: qr });
-      }
-
-      await auditLogger.logCreate("LoanAgreement", saved.id, saved, user);
-      return saved;
-    } catch (error) {
-      console.error("Failed to create loan agreement:", error.message);
-      throw error;
+    // Save uploaded file (if any) using secure storage
+    if (fileBuffer && fileName && !filePath) {
+      const savedRelativePath = await saveAgreementFile(fileBuffer, fileName);
+      saved.filePath = savedRelativePath; // store relative path
+      // @ts-ignore
+      await saveDb(agreementRepo, saved, { queryRunner: qr });
     }
+
+    await auditLogger.logCreate("LoanAgreement", saved.id, saved, user);
+    return saved;
   }
 
   /**
    * Update a loan agreement – only allowed if status === 'draft'
+   * @param {any} id
+   * @param {{ debtId: any; fileBuffer: Buffer<ArrayBufferLike>; fileName: string; removeFile: boolean; agreementDate: string | number | Date; }} agreementData
    */
   async update(id, agreementData, user = "system", qr = null) {
     const { updateDb } = require("../utils/dbUtils/dbActions");
     const LoanAgreement = require("../entities/LoanAgreement");
+    // @ts-ignore
     const agreementRepo = this._getRepo(qr, LoanAgreement);
+    // @ts-ignore
     const debtRepo = this._getRepo(qr, require("../entities/Debt"));
 
     const existing = await agreementRepo.findOne({
@@ -178,8 +146,6 @@ class LoanAgreementService {
       relations: ["debt"],
     });
     if (!existing) throw new Error(`Loan agreement with ID ${id} not found`);
-
-    // ✅ Prevent updates if already signed
     if (existing.status === "signed") {
       throw new Error(
         "Cannot update a signed loan agreement for legal integrity.",
@@ -199,31 +165,36 @@ class LoanAgreementService {
       delete agreementData.debtId;
     }
 
-    // Handle file replacement
+    // Handle file replacement: save new file first, then delete old
     if (agreementData.fileBuffer && agreementData.fileName) {
-      if (existing.filePath) await this._deleteAgreementFile(existing.filePath);
-      const newFilePath = await this._saveAgreementFile(
+      const newRelativePath = await saveAgreementFile(
         agreementData.fileBuffer,
         agreementData.fileName,
-        existing.id,
       );
-      existing.filePath = newFilePath;
+      // Delete old file only after new file saved successfully
+      if (existing.filePath) await deleteAgreementFile(existing.filePath);
+      existing.filePath = newRelativePath;
+      // @ts-ignore
       delete agreementData.fileBuffer;
+      // @ts-ignore
       delete agreementData.fileName;
     } else if (agreementData.removeFile === true) {
       if (existing.filePath) {
-        await this._deleteAgreementFile(existing.filePath);
+        await deleteAgreementFile(existing.filePath);
         existing.filePath = null;
       }
+      // @ts-ignore
       delete agreementData.removeFile;
     }
 
+    // Apply other updates
     if (agreementData.agreementDate) {
       agreementData.agreementDate = new Date(agreementData.agreementDate);
     }
     Object.assign(existing, agreementData);
     existing.updatedAt = new Date();
 
+    // @ts-ignore
     const saved = await updateDb(agreementRepo, existing, {
       queryRunner: qr,
       skipSignal: true,
@@ -234,13 +205,14 @@ class LoanAgreementService {
 
   /**
    * Sign a loan agreement (draft → signed). Irreversible.
+   * @param {any} id
    */
   async signAgreement(id, user = "system", qr = null) {
     const { updateDb } = require("../utils/dbUtils/dbActions");
     const LoanAgreement = require("../entities/LoanAgreement");
+    // @ts-ignore
     const agreementRepo = this._getRepo(qr, LoanAgreement);
 
-    // ✅ Siguraduhing i-load ang debt relation
     const existing = await agreementRepo.findOne({
       where: { id },
       relations: ["debt"],
@@ -251,7 +223,7 @@ class LoanAgreementService {
     if (existing.status === "signed")
       throw new Error("Loan agreement is already signed.");
 
-    // ✅ Check kung may ibang signed agreement para sa same debt
+    // Check if another signed agreement exists for the same debt
     const otherSigned = await agreementRepo.findOne({
       where: {
         debt: { id: existing.debt.id },
@@ -270,6 +242,7 @@ class LoanAgreementService {
     existing.signedBy = user;
     existing.updatedAt = new Date();
 
+    // @ts-ignore
     const saved = await updateDb(agreementRepo, existing, {
       queryRunner: qr,
       skipSignal: false,
@@ -286,12 +259,14 @@ class LoanAgreementService {
   }
 
   /**
-   * Soft delete – optionally restrict for signed agreements (optional, but recommended)
-   * @param {boolean} [allowDeleteSigned=false] - If true, allow delete even if signed (default false)
+   * Soft delete a loan agreement (set deletedAt)
+   * @param {boolean} [allowDeleteSigned] - If true, allow deletion of signed agreements
+   * @param {any} id
    */
   async delete(id, user = "system", qr = null, allowDeleteSigned = false) {
     const { updateDb } = require("../utils/dbUtils/dbActions");
     const LoanAgreement = require("../entities/LoanAgreement");
+    // @ts-ignore
     const agreementRepo = this._getRepo(qr, LoanAgreement);
 
     const agreement = await agreementRepo.findOne({ where: { id } });
@@ -299,17 +274,22 @@ class LoanAgreementService {
     if (agreement.deletedAt)
       throw new Error(`Loan agreement #${id} is already deleted`);
 
-    // ✅ Prevent soft delete of signed agreements unless explicitly allowed
     if (agreement.status === "signed" && !allowDeleteSigned) {
       throw new Error(
         "Cannot delete a signed loan agreement. Set allowDeleteSigned=true to override.",
       );
     }
 
+    // Delete associated file before soft-deleting record
+    if (agreement.filePath) {
+      await deleteAgreementFile(agreement.filePath);
+    }
+
     const oldData = { ...agreement };
     agreement.deletedAt = new Date();
     agreement.updatedAt = new Date();
 
+    // @ts-ignore
     const saved = await updateDb(agreementRepo, agreement, {
       queryRunner: qr,
       skipSignal: true,
@@ -320,11 +300,13 @@ class LoanAgreementService {
   }
 
   /**
-   * Restore a soft-deleted agreement (no extra restriction)
+   * Restore a soft-deleted loan agreement
+   * @param {any} id
    */
   async restore(id, user = "system", qr = null) {
     const { updateDb } = require("../utils/dbUtils/dbActions");
     const LoanAgreement = require("../entities/LoanAgreement");
+    // @ts-ignore
     const agreementRepo = this._getRepo(qr, LoanAgreement);
 
     const agreement = await agreementRepo.findOne({
@@ -338,6 +320,7 @@ class LoanAgreementService {
     agreement.deletedAt = null;
     agreement.updatedAt = new Date();
 
+    // @ts-ignore
     const saved = await updateDb(agreementRepo, agreement, {
       queryRunner: qr,
       skipSignal: true,
@@ -354,7 +337,9 @@ class LoanAgreementService {
   }
 
   /**
-   * Permanently delete – same rule as soft delete (signed can't be permanently deleted unless allowed)
+   * Permanently delete a loan agreement (hard delete)
+   * @param {boolean} [allowDeleteSigned] - If true, allow permanent deletion of signed agreements
+   * @param {any} id
    */
   async permanentlyDelete(
     id,
@@ -364,6 +349,7 @@ class LoanAgreementService {
   ) {
     const { removeDb } = require("../utils/dbUtils/dbActions");
     const LoanAgreement = require("../entities/LoanAgreement");
+    // @ts-ignore
     const agreementRepo = this._getRepo(qr, LoanAgreement);
 
     const agreement = await agreementRepo.findOne({
@@ -378,22 +364,27 @@ class LoanAgreementService {
       );
     }
 
+    // Delete associated file
     if (agreement.filePath) {
-      await this._deleteAgreementFile(agreement.filePath);
+      await deleteAgreementFile(agreement.filePath);
     }
 
+    // @ts-ignore
     await removeDb(agreementRepo, agreement);
     await auditLogger.logDelete("LoanAgreement", id, agreement, user);
     console.log(`Loan agreement #${id} permanently deleted`);
   }
 
   /**
-   * Find by ID (no change)
+   * Find by ID (excludes soft-deleted by default)
+   * @param {null | undefined} id
    */
   async findById(id, includeDeleted = false) {
     const { agreement: agreementRepo } = await this.getRepositories();
     const options = { where: { id }, relations: ["debt"] };
+    // @ts-ignore
     if (!includeDeleted) options.where.deletedAt = null;
+    // @ts-ignore
     const agreement = await agreementRepo.findOne(options);
     if (!agreement) throw new Error(`Loan agreement with ID ${id} not found`);
     await auditLogger.logView("LoanAgreement", id, "system");
@@ -401,59 +392,79 @@ class LoanAgreementService {
   }
 
   /**
-   * Find all (no change)
+   * Find all loan agreements with filters, pagination, sorting
    */
   async findAll(options = {}) {
     const { agreement: agreementRepo } = await this.getRepositories();
+    // @ts-ignore
     const qb = agreementRepo
       .createQueryBuilder("agreement")
       .leftJoinAndSelect("agreement.debt", "debt")
       .leftJoinAndSelect("debt.borrower", "borrower");
 
+    // @ts-ignore
     if (!options.includeDeleted) qb.andWhere("agreement.deletedAt IS NULL");
 
+    // @ts-ignore
     if (options.debtId)
+      // @ts-ignore
       qb.andWhere("debt.id = :debtId", { debtId: options.debtId });
+    // @ts-ignore
     if (options.borrowerId)
       qb.andWhere("borrower.id = :borrowerId", {
+        // @ts-ignore
         borrowerId: options.borrowerId,
       });
+    // @ts-ignore
     if (options.lenderName)
       qb.andWhere("agreement.lenderName LIKE :lenderName", {
+        // @ts-ignore
         lenderName: `%${options.lenderName}%`,
       });
+    // @ts-ignore
     if (options.agreementDateFrom)
       qb.andWhere("agreement.agreementDate >= :agreementDateFrom", {
+        // @ts-ignore
         agreementDateFrom: new Date(options.agreementDateFrom),
       });
+    // @ts-ignore
     if (options.agreementDateTo)
       qb.andWhere("agreement.agreementDate <= :agreementDateTo", {
+        // @ts-ignore
         agreementDateTo: new Date(options.agreementDateTo),
       });
+    // @ts-ignore
     if (options.search) {
       qb.andWhere(
         "(agreement.lenderName LIKE :search OR agreement.termsText LIKE :search OR debtor.name LIKE :search)",
-        {
-          search: `%${options.search}%`,
-        },
+        // @ts-ignore
+        { search: `%${options.search}%` },
       );
     }
 
+    // @ts-ignore
     const sortBy = options.sortBy || "agreementDate";
+    // @ts-ignore
     const sortOrder = options.sortOrder === "ASC" ? "ASC" : "DESC";
     qb.orderBy(`agreement.${sortBy}`, sortOrder);
 
     const result = await paginateQueryBuilder(qb, {
+      // @ts-ignore
       page: options.page,
+      // @ts-ignore
       limit: options.limit,
     });
     await auditLogger.logView("LoanAgreement", null, "system");
     return result;
   }
 
-  // Statistics, export, bulk operations (unchanged but kept for completeness)
+  // ----------------------------------------------------------------------
+  // Statistics, export, bulk operations (unchanged)
+  // ----------------------------------------------------------------------
+
   async getStatistics() {
     const { agreement: agreementRepo } = await this.getRepositories();
+    // @ts-ignore
     const qb = agreementRepo
       .createQueryBuilder("agreement")
       .where("agreement.deletedAt IS NULL");
@@ -525,6 +536,7 @@ class LoanAgreementService {
         filename: `loan_agreements_export_${new Date().toISOString().split("T")[0]}.json`,
       };
     }
+    // @ts-ignore
     await auditLogger.logExport("LoanAgreement", format, filters, user);
     console.log(
       `Exported ${agreements.length} loan agreements in ${format} format`,
@@ -532,30 +544,43 @@ class LoanAgreementService {
     return exportData;
   }
 
+  /**
+   * @param {any} agreementsArray
+   */
   async bulkCreate(agreementsArray, user = "system", qr = null) {
     const results = { created: [], errors: [] };
     for (const data of agreementsArray) {
       try {
+        // @ts-ignore
         results.created.push(await this.create(data, user, qr));
       } catch (err) {
+        // @ts-ignore
         results.errors.push({ agreement: data, error: err.message });
       }
     }
     return results;
   }
 
+  /**
+   * @param {any} updatesArray
+   */
   async bulkUpdate(updatesArray, user = "system", qr = null) {
     const results = { updated: [], errors: [] };
     for (const { id, updates } of updatesArray) {
       try {
+        // @ts-ignore
         results.updated.push(await this.update(id, updates, user, qr));
       } catch (err) {
+        // @ts-ignore
         results.errors.push({ id, updates, error: err.message });
       }
     }
     return results;
   }
 
+  /**
+   * @param {import("node:fs").PathLike | fs.FileHandle} filePath
+   */
   async importFromCSV(filePath, user = "system", qr = null) {
     const fs = require("fs").promises;
     const csv = require("csv-parse/sync");
@@ -569,17 +594,24 @@ class LoanAgreementService {
     for (const record of records) {
       try {
         const agreementData = {
+          // @ts-ignore
           agreementDate: record.agreementDate
+            // @ts-ignore
             ? new Date(record.agreementDate)
             : new Date(),
+          // @ts-ignore
           lenderName: record.lenderName || null,
+          // @ts-ignore
           termsText: record.termsText || null,
+          // @ts-ignore
           debtId: parseInt(record.debtId, 10),
         };
         const validation = validateLoanAgreementData(agreementData);
         if (!validation.valid) throw new Error(validation.errors.join(", "));
+        // @ts-ignore
         results.imported.push(await this.create(agreementData, user, qr));
       } catch (err) {
+        // @ts-ignore
         results.errors.push({ row: record, error: err.message });
       }
     }

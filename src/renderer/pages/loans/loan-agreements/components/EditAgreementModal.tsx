@@ -1,3 +1,4 @@
+// src/renderer/pages/loan-agreements/components/EditAgreementModal.tsx
 import React, { useState, useEffect } from "react";
 import type { LoanAgreement } from "../../../../api/core/loan_agreement";
 import { dialogs } from "../../../../utils/dialogs";
@@ -23,7 +24,15 @@ const EditAgreementModal: React.FC<EditAgreementModalProps> = ({ isOpen, agreeme
   useEffect(() => {
     if (agreement && isOpen) {
       setLenderName(agreement.lenderName || "");
-      setAgreementDate(agreement.agreementDate ? agreement.agreementDate.slice(0, 10) : "");
+      // ✅ Safe conversion: kung Date object, i-convert sa YYYY-MM-DD string
+      let dateStr = "";
+      if (agreement.agreementDate) {
+        const date = new Date(agreement.agreementDate);
+        if (!isNaN(date.getTime())) {
+          dateStr = date.toISOString().slice(0, 10);
+        }
+      }
+      setAgreementDate(dateStr);
       setTermsText(agreement.termsText || "");
       setFile(null);
       setRemoveFile(false);
