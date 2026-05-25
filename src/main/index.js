@@ -31,6 +31,9 @@ const { registerImageProtocol } = require("./protocols/imageProtocol.js");
 const printerService = require("../services/Printer.js");
 const AuditTrailCleanupScheduler = require("../scheduler/auditTrailCleanupScheduler.js");
 const OverdueReminderScheduler = require("../scheduler/overdueReminderScheduler.js");
+const OverdueStatusUpdater = require("../scheduler/overdueStatusUpdater.js");
+const { logger } = require("../utils/logger.js");
+const OverdueStatusCorrector = require("../scheduler/overdueStatusCorrector.js");
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -815,22 +818,14 @@ function registerIpcHandlers() {
   });
 
   // @ts-ignore
-  ipcMain.handle("printer:print", async (event, sale) => {
-    return await printerService.printReceipt(sale);
+  ipcMain.handle("printer:print", async (event, debtId) => {
+    return await printerService.printReceipt(debtId);
   });
 
   ipcMain.handle("printer:test-print", async () => {
     try {
-      const testSale = {
-        id: "TEST",
-        saleItems: [
-          { product: { name: "Test Item" }, quantity: 1, lineTotal: 0 },
-        ],
-        totalAmount: 0,
-        paymentMethod: "N/A",
-      };
       // @ts-ignore
-      return await printerService.printReceipt(testSale);
+      return await printerService.testPrinter(0);
     } catch (err) {
       // @ts-ignore
       console.error("[IPC] Test print failed:", err.message);
@@ -954,7 +949,25 @@ async function startupSequence() {
     reminderScheduler.start().catch((err) => {
       log(LogLevel.ERROR, "Failed to start Overdue Reminder Scheduler", err);
     });
-    
+
+    const overdueStatusUpdater = new OverdueStatusUpdater();
+    overdueStatusUpdater.start().catch((err) => {
+      logger.error(
+        LogLevel.ERROR,
+        "Failed to start Overdue Status Updater",
+        // @ts-ignore
+        err,
+      );
+    });
+    const statusCorrector = new OverdueStatusCorrector();
+    statusCorrector.start().catch((err) => {
+      logger.error(
+        LogLevel.ERROR,
+        "Failed to start Overdue Status Corrector",
+        // @ts-ignore
+        err,
+      );
+    });
   } catch (error) {
     log(LogLevel.ERROR, "Startup sequence failed:", error);
 

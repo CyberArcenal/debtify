@@ -12,6 +12,7 @@ import type { Debt } from "../../../api/core/debt";
 import debtsAPI from "../../../api/core/debt";
 import { dialogs } from "../../../utils/dialogs";
 import { ForgivenessDialog } from "./components/ForgivenessDialog";
+import ViewLoanAgreementModal from "./components/ViewLoanAgreementModal";
 
 const ActiveLoansPage: React.FC = () => {
   const {
@@ -44,9 +45,18 @@ const ActiveLoansPage: React.FC = () => {
   const [forgivenessLoan, setForgivenessLoan] = useState<Debt | null>(null);
   const [forgivenessLoading, setForgivenessLoading] = useState(false);
 
+  const [agreementModalOpen, setAgreementModalOpen] = useState(false);
+  const [selectedDebtForAgreement, setSelectedDebtForAgreement] =
+    useState<Debt | null>(null);
+
   const handleForgiveness = (loan: Debt) => {
     setForgivenessLoan(loan);
     setForgivenessDialogOpen(true);
+  };
+
+  const handleViewAgreement = (loan: Debt) => {
+    setSelectedDebtForAgreement(loan);
+    setAgreementModalOpen(true);
   };
 
   const handleForgivenessConfirm = async (amount: number, reason?: string) => {
@@ -94,7 +104,7 @@ const ActiveLoansPage: React.FC = () => {
   const { start, end } = getDisplayRange();
 
   return (
-    <div className="p-4" style={{ backgroundColor: "var(--background-color)" }}>
+    <div className="m-1" style={{ backgroundColor: "var(--background-color)" }}>
       <div
         className="rounded-md shadow-md border p-4"
         style={{
@@ -244,6 +254,7 @@ const ActiveLoansPage: React.FC = () => {
               onForgiveness={handleForgiveness}
               onRecordPayment={openPaymentModal}
               onViewSchedule={handleSchedule}
+              onViewAgreement={handleViewAgreement}
             />
             {loans.length === 0 && (
               <div
@@ -303,6 +314,16 @@ const ActiveLoansPage: React.FC = () => {
           isLoading={forgivenessLoading}
         />
       )}
+
+      <ViewLoanAgreementModal
+        isOpen={agreementModalOpen}
+        debtId={selectedDebtForAgreement?.id ?? null}
+        debtName={selectedDebtForAgreement?.name ?? ""}
+        onClose={() => {
+          setAgreementModalOpen(false);
+          setSelectedDebtForAgreement(null);
+        }}
+      />
     </div>
   );
 };

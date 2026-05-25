@@ -1,7 +1,6 @@
 // src/renderer/pages/loans/overdue/hooks/useOverdueLoans.ts
 import { useState, useEffect, useCallback, useRef } from "react";
 import debtsAPI from "../../../../api/core/debt";
-import penaltiesAPI from "../../../../api/core/pernalty_transaction";
 import type { Debt } from "../../../../api/core/debt";
 
 export interface OverdueFilter {
@@ -9,9 +8,9 @@ export interface OverdueFilter {
   daysOverdue: string; // "all", "30", "60", "90"
 }
 
+// Extended type: ang stats ay palaging present para sa overdue page
 export interface OverdueLoan extends Debt {
-  daysOverdue: number;
-  penaltyAmount?: number;
+  stats: NonNullable<Debt["stats"]>; // siguraduhing may stats
 }
 
 interface UseOverdueLoansReturn {
@@ -57,25 +56,15 @@ const useOverdueLoans = (): UseOverdueLoansReturn => {
     return () => { mountedRef.current = false; };
   }, []);
 
-  const calculateDaysOverdue = (dueDate: string): number => {
-    const due = new Date(dueDate);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const diff = today.getTime() - due.getTime();
-    return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
-  };
-
   const fetchOverdueLoans = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      // Map sort key to backend field
-      let sortBy = sortConfig.key;
-      if (sortBy === "borrower") sortBy = "borrowerName";
-      if (sortBy === "daysOverdue") sortBy = "dueDate"; // server sorts by dueDate to get most overdue first? Actually we'll use dueDate for server sort, then client will sort by daysOverdue if requested.
-      // For simplicity, if sorting by daysOverdue, we'll fetch unsorted from server and sort client-side.
-      // Better: send sortBy = "dueDate" when daysOverdue is requested, because days overdue is derived from dueDate.
-      const effectiveSortBy = sortConfig.key === "daysOverdue" ? "dueDate" : sortBy;
+      // Gamitin ang `sortBy` na "dueDate" para sa daysOverdue sorting (dahil ang daysOverdue ay derived sa dueDate)
+      let effectiveSortBy = sortConfig.key;
+      if (sortConfig.key === "daysOverdue") effectiveSortBy = "dueDate";
+      if (sortConfig.key === "borrower") effectiveSortBy = "borrowerName";
+
       const response = await debtsAPI.getAll({
         status: "overdue",
         includeDeleted: false,
@@ -85,49 +74,39 @@ const useOverdueLoans = (): UseOverdueLoansReturn => {
         sortBy: effectiveSortBy,
         sortOrder: sortConfig.direction.toUpperCase() as "ASC" | "DESC",
       });
+
       if (!response.status) throw new Error(response.message || "Failed to fetch overdue loans");
+
       const debtsData = response.data.data;
       const pagination = response.data.pagination;
 
-      // Compute daysOverdue for each debt
-      let loansWithDays = debtsData.map(debt => ({
-        ...debt,
-        daysOverdue: calculateDaysOverdue(debt.dueDate),
-      }));
+      // ✅ Direktang gamitin ang stats mula sa backend (kasama na ang totalPenalty at daysOverdue)
+      let loansWithStats = debtsData
+        .filter(debt => debt.stats) // i-filter kung walang stats (safety)
+        .map(debt => ({
+          ...debt,
+          stats: debt.stats!,
+        })) as OverdueLoan[];
 
-      // Apply daysOverdue filter (client-side)
+      // I‑filter ayon sa `daysOverdue` (gamit ang stats.daysOverdue)
       if (filters.daysOverdue !== "all") {
         const minDays = parseInt(filters.daysOverdue);
-        loansWithDays = loansWithDays.filter(loan => loan.daysOverdue >= minDays);
+        loansWithStats = loansWithStats.filter(loan => loan.stats.daysOverdue >= minDays);
       }
 
-      // If sorting by daysOverdue, re-sort client-side
+      // Kung ang sorting ay "daysOverdue", kailangan pang i‑sort ulit (dahil ang backend sort ay ayon sa dueDate)
       if (sortConfig.key === "daysOverdue") {
-        loansWithDays.sort((a, b) => {
-          const aVal = a.daysOverdue;
-          const bVal = b.daysOverdue;
+        loansWithStats.sort((a, b) => {
+          const aVal = a.stats.daysOverdue;
+          const bVal = b.stats.daysOverdue;
           if (aVal < bVal) return sortConfig.direction === "asc" ? -1 : 1;
           if (aVal > bVal) return sortConfig.direction === "asc" ? 1 : -1;
           return 0;
         });
       }
 
-      // Fetch penalty amounts for these loans (only once per page)
-      const loansWithPenalty = await Promise.all(
-        loansWithDays.map(async (loan) => {
-          let penaltyAmount = 0;
-          try {
-            const penaltyRes = await penaltiesAPI.getTotalPenaltyForDebt(loan.id);
-            if (penaltyRes.status) penaltyAmount = penaltyRes.data.totalPenalty;
-          } catch (e) {
-            console.error(`Failed to fetch penalty for debt ${loan.id}`, e);
-          }
-          return { ...loan, penaltyAmount };
-        })
-      );
-
       if (mountedRef.current) {
-        setLoans(loansWithPenalty);
+        setLoans(loansWithStats);
         setPaginationMeta({
           page: pagination.page,
           totalPages: pagination.pages,

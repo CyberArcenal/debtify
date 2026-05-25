@@ -23,6 +23,7 @@ import ExpectedPaymentsPage from "../pages/reports/expected";
 import DevicesPage from "../pages/devices";
 import NotificationLogPage from "../pages/reminder";
 import SyncPage from "../pages/sync";
+import LoanAgreementsPage from "../pages/loans/loan-agreements";
 // import DebtDashboard from "../pages/dashboard";
 
 function App() {
@@ -79,6 +80,7 @@ function App() {
         <Route path="debtors/credit-check" element={<CreditCheckPage />} />
         <Route path="debtors/group" element={<DebtorGroupsPage />} />
         <Route path="loans/active" element={<ActiveLoansPage />} />
+        <Route path="/loans/agreements" element={<LoanAgreementsPage />} />
         <Route path="loans/overdue" element={<OverdueLoansPage />} />
         <Route path="loans/closed" element={<ClosedLoansPage />} />
         <Route path="loans/applications" element={<LoanApplicationsPage />} />

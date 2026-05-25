@@ -98,7 +98,7 @@ class BorrowerService {
         updatedAt: new Date(),
       });
 
-      const saved = await saveDb(repo, borrower);
+      const saved = await saveDb(repo, borrower, { queryRunner: qr });
       await auditLogger.logCreate("Borrower", saved.id, saved, user);
       return saved;
     } catch (error) {
@@ -146,7 +146,7 @@ class BorrowerService {
       Object.assign(existing, borrowerData);
       existing.updatedAt = new Date();
 
-      const saved = await updateDb(repo, existing);
+      const saved = await updateDb(repo, existing, { queryRunner: qr });
       await auditLogger.logUpdate("Borrower", id, oldData, saved, user);
       return saved;
     } catch (error) {
@@ -178,7 +178,7 @@ class BorrowerService {
       borrower.deletedAt = new Date();
       borrower.updatedAt = new Date();
 
-      const saved = await updateDb(repo, borrower);
+      const saved = await updateDb(repo, borrower, { queryRunner: qr });
       await auditLogger.logDelete("Borrower", id, oldData, user);
       console.log(`Borrower soft deleted: #${id}`);
       return saved;
@@ -210,7 +210,7 @@ class BorrowerService {
       borrower.deletedAt = null;
       borrower.updatedAt = new Date();
 
-      const saved = await updateDb(repo, borrower);
+      const saved = await updateDb(repo, borrower, { queryRunner: qr });
       await auditLogger.logUpdate(
         "Borrower",
         id,

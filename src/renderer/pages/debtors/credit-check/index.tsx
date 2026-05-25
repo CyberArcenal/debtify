@@ -23,7 +23,7 @@ const CreditCheckPage: React.FC = () => {
   } = useCreditCheck();
 
   return (
-    <div className="p-4" style={{ backgroundColor: "var(--background-color)" }}>
+    <div className="m-1" style={{ backgroundColor: "var(--background-color)" }}>
       <div className="flex items-center gap-2 mb-4">
         <CreditCard className="w-6 h-6" style={{ color: "var(--primary-color)" }} />
         <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>Credit Check</h1>

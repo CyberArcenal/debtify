@@ -7,7 +7,7 @@ const Debt = require("../entities/Debt");
 const PaymentTransaction = require("../entities/PaymentTransaction");
 const { companyName, receiptFooterMessage } = require("../utils/system");
 const { logger } = require("../utils/logger");
-const { updateDb, saveDb, removeDb } = require("../utils/dbUtils/dbActions");
+
 const { paginateQueryBuilder } = require("../utils/dbUtils/pagination");
 class PrinterService {
   constructor() {
@@ -91,6 +91,7 @@ class PrinterService {
   }
 
   async _ensureSingleDefault(excludeId = null, qr = null) {
+    const { updateDb, saveDb, removeDb } = require("../utils/dbUtils/dbActions");
     const Printer = require("../entities/Printer");
     const printerRepo = this._getRepo(qr, Printer);
     const defaultPrinters = await printerRepo.find({
@@ -100,7 +101,7 @@ class PrinterService {
       if (printer.id !== excludeId) {
         printer.isDefault = false;
         printer.updatedAt = new Date();
-        await updateDb(printerRepo, printer);
+        await updateDb(printerRepo, printer, { queryRunner: qr });
       }
     }
   }
@@ -132,6 +133,7 @@ async getAllPrinters(page = 1, limit = 10) {
   }
 
   async createPrinter(data, user = "system", qr = null) {
+    const { updateDb, saveDb, removeDb } = require("../utils/dbUtils/dbActions");
     const Printer = require("../entities/Printer");
     const printerRepo = this._getRepo(qr, Printer);
 
@@ -166,6 +168,7 @@ async getAllPrinters(page = 1, limit = 10) {
   }
 
   async updatePrinter(id, data, user = "system", qr = null) {
+    const { updateDb, saveDb, removeDb } = require("../utils/dbUtils/dbActions");
     const Printer = require("../entities/Printer");
     const printerRepo = this._getRepo(qr, Printer);
 
@@ -181,13 +184,14 @@ async getAllPrinters(page = 1, limit = 10) {
     if (data.isDefault !== undefined) existing.isDefault = data.isDefault;
     existing.updatedAt = new Date();
 
-    const saved = await updateDb(printerRepo, existing);
+    const saved = await updateDb(printerRepo, existing, { queryRunner: qr });
     if (saved.isDefault) await this._ensureSingleDefault(saved.id, qr);
     await auditLogger.logUpdate("Printer", id, oldData, saved, user);
     return saved;
   }
 
   async setDefaultPrinter(id, user = "system", qr = null) {
+    const { updateDb, saveDb, removeDb } = require("../utils/dbUtils/dbActions");
     const Printer = require("../entities/Printer");
     const printerRepo = this._getRepo(qr, Printer);
 
@@ -196,7 +200,7 @@ async getAllPrinters(page = 1, limit = 10) {
     await this._ensureSingleDefault(id, qr);
     printer.isDefault = true;
     printer.updatedAt = new Date();
-    const saved = await updateDb(printerRepo, printer);
+    const saved = await updateDb(printerRepo, printer, { queryRunner: qr });
     await auditLogger.logUpdate(
       "Printer",
       id,
@@ -220,6 +224,7 @@ async getAllPrinters(page = 1, limit = 10) {
   }
 
   async refreshPrinterStatus(id, user = "system", qr = null) {
+    const { updateDb, saveDb, removeDb } = require("../utils/dbUtils/dbActions");
     const Printer = require("../entities/Printer");
     const printerRepo = this._getRepo(qr, Printer);
 
@@ -258,7 +263,7 @@ async getAllPrinters(page = 1, limit = 10) {
       printer.status = "offline";
     }
     printer.updatedAt = new Date();
-    const saved = await updateDb(printerRepo, printer);
+    const saved = await updateDb(printerRepo, printer, { queryRunner: qr });
     await auditLogger.logUpdate(
       "Printer",
       id,
@@ -361,6 +366,7 @@ async getAllPrinters(page = 1, limit = 10) {
   // ----------------------------------------------------------------------
 
   async testPrinter(id, user = "system", qr = null) {
+    const { updateDb, saveDb, removeDb } = require("../utils/dbUtils/dbActions");
     const Printer = require("../entities/Printer");
     const printerRepo = this._getRepo(qr, Printer);
 
@@ -376,7 +382,7 @@ async getAllPrinters(page = 1, limit = 10) {
       printer.status = "online";
       printer.lastTested = new Date();
       printer.updatedAt = new Date();
-      await updateDb(printerRepo, printer);
+      await updateDb(printerRepo, printer, { queryRunner: qr });
       await auditLogger.logUpdate(
         "Printer",
         id,
@@ -390,7 +396,7 @@ async getAllPrinters(page = 1, limit = 10) {
       printer.status = "error";
       printer.lastTested = new Date();
       printer.updatedAt = new Date();
-      await updateDb(printerRepo, printer);
+      await updateDb(printerRepo, printer, { queryRunner: qr });
       console.error(`Test print failed for ${printer.name}: ${err.message}`);
       throw new Error(`Test print failed: ${err.message}`);
     }
@@ -405,7 +411,8 @@ async getAllPrinters(page = 1, limit = 10) {
    * @param {number} debtId
    * @returns {Promise<boolean>}
    */
-  async printReceipt(debtId) {
+  async printReceipt(debtId, qr=null) {
+    const { updateDb, saveDb, removeDb } = require("../utils/dbUtils/dbActions");
     const { AppDataSource } = require("../main/db/data-source");
     const notificationService = require("../services/Notification");
 
@@ -448,7 +455,7 @@ async getAllPrinters(page = 1, limit = 10) {
         defaultPrinter.lastTested = new Date();
         defaultPrinter.updatedAt = new Date();
         const printerRepo = this._getRepo(null, require("../entities/Printer"));
-        await updateDb(printerRepo, defaultPrinter);
+        await updateDb(printerRepo, defaultPrinter, { queryRunner: qr });
       }
       await auditLogger.logCreate(
         "PrinterEvent",
@@ -467,7 +474,7 @@ async getAllPrinters(page = 1, limit = 10) {
       defaultPrinter.lastTested = new Date();
       defaultPrinter.updatedAt = new Date();
       const printerRepo = this._getRepo(null, require("../entities/Printer"));
-      await updateDb(printerRepo, defaultPrinter);
+      await updateDb(printerRepo, defaultPrinter, { queryRunner: qr });
       // Notify user
       try {
         await notificationService.create(

@@ -9,7 +9,7 @@ class DebtorGroupMemberSubscriber {
     return DebtorGroupMember;
   }
 
-  async beforeInsert(entity) {
+  async beforeInsert(entity, { manager, queryRunner }) {
     try {
       logger.info("[DebtorGroupMemberSubscriber] beforeInsert", {
         id: entity.id,
@@ -18,10 +18,11 @@ class DebtorGroupMemberSubscriber {
       });
     } catch (err) {
       logger.error("[DebtorGroupMemberSubscriber] beforeInsert error", err);
+      throw err;
     }
   }
 
-  async afterInsert(entity) {
+  async afterInsert(entity, { manager, queryRunner }) {
     try {
       logger.info("[DebtorGroupMemberSubscriber] afterInsert", {
         id: entity.id,
@@ -30,39 +31,44 @@ class DebtorGroupMemberSubscriber {
       });
     } catch (err) {
       logger.error("[DebtorGroupMemberSubscriber] afterInsert error", err);
+      throw err;
     }
   }
 
-  async beforeUpdate(entity) {
+  async beforeUpdate(entity, { manager, queryRunner }) {
     try {
       logger.info("[DebtorGroupMemberSubscriber] beforeUpdate", { id: entity.id });
     } catch (err) {
       logger.error("[DebtorGroupMemberSubscriber] beforeUpdate error", err);
+      throw err;
     }
   }
 
-  async afterUpdate(event) {
+  async afterUpdate(event, { manager, queryRunner }) {
     try {
       const { entity } = event;
       logger.info("[DebtorGroupMemberSubscriber] afterUpdate", { id: entity.id });
     } catch (err) {
       logger.error("[DebtorGroupMemberSubscriber] afterUpdate error", err);
+      throw err;
     }
   }
 
-  async beforeRemove(entity) {
+  async beforeRemove(entity, { manager, queryRunner }) {
     try {
       logger.info("[DebtorGroupMemberSubscriber] beforeRemove", { id: entity.id });
     } catch (err) {
       logger.error("[DebtorGroupMemberSubscriber] beforeRemove error", err);
+      throw err;
     }
   }
 
-  async afterRemove(event) {
+  async afterRemove(event, { manager, queryRunner }) {
     try {
       logger.info("[DebtorGroupMemberSubscriber] afterRemove", { id: event.entityId });
     } catch (err) {
       logger.error("[DebtorGroupMemberSubscriber] afterRemove error", err);
+      throw err;
     }
   }
 }

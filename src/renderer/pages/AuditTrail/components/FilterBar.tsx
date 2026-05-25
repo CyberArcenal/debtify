@@ -18,10 +18,7 @@ const ACTION_OPTIONS = [
   { value: "EXPORT", label: "Export" },
   { value: "LOGIN", label: "Login" },
   { value: "LOGOUT", label: "Logout" },
-  { value: "SETTINGS_CHANGE", label: "Settings Change" },
-  { value: "INVENTORY_MOVEMENT", label: "Inventory Movement" },
-  { value: "SALE", label: "Sale" },
-  { value: "REFUND", label: "Refund" },
+  { value: "AUDIT_CLEANUP", label: "Audit Cleanup" },
 ];
 
 export const FilterBar: React.FC<FilterBarProps> = ({

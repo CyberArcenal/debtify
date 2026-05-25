@@ -205,7 +205,7 @@ class LoanApplicationService {
       const Borrower = require("../entities/Borrower");
       const borrowerRepo = this._getRepo(qr, Borrower);
       const borrower = borrowerRepo.create(borrowerData);
-      const savedBorrower = await saveDb(borrowerRepo, borrower);
+      const savedBorrower = await saveDb(borrowerRepo, borrower, { queryRunner: qr });
       debtorId = savedBorrower.id;
       debtorName = savedBorrower.name;
       debtorContact = savedBorrower.contact;
@@ -240,7 +240,7 @@ class LoanApplicationService {
       updatedAt: new Date(),
     });
 
-    const saved = await saveDb(appRepo, application);
+    const saved = await saveDb(appRepo, application, { queryRunner: qr });
     await auditLogger.logCreate("LoanApplication", saved.id, saved, user);
     console.log(
       `Loan application created: ID ${saved.id} for debtor ${debtorName}`,
@@ -277,7 +277,7 @@ class LoanApplicationService {
     if (data.interestRate !== undefined) app.interestRate = data.interestRate;
     app.updatedAt = new Date();
 
-    const saved = await updateDb(appRepo, app);
+    const saved = await updateDb(appRepo, app, { queryRunner: qr });
     await auditLogger.logUpdate("LoanApplication", id, oldData, saved, user);
     return saved;
   }
@@ -349,7 +349,7 @@ class LoanApplicationService {
     app.approvedBy = user;
     app.updatedAt = new Date();
 
-    const saved = await updateDb(appRepo, app);
+    const saved = await updateDb(appRepo, app, { queryRunner: qr });
     await auditLogger.logUpdate(
       "LoanApplication",
       id,
@@ -387,7 +387,7 @@ class LoanApplicationService {
     app.rejectionReason = reason;
     app.updatedAt = new Date();
 
-    const saved = await updateDb(appRepo, app);
+    const saved = await updateDb(appRepo, app, { queryRunner: qr });
     await auditLogger.logUpdate(
       "LoanApplication",
       id,
@@ -422,7 +422,7 @@ class LoanApplicationService {
     app.deletedAt = new Date();
     app.updatedAt = new Date();
 
-    const saved = await updateDb(appRepo, app);
+    const saved = await updateDb(appRepo, app, { queryRunner: qr });
     await auditLogger.logDelete("LoanApplication", id, oldData, user);
     return saved;
   }
@@ -449,7 +449,7 @@ class LoanApplicationService {
     app.deletedAt = null;
     app.updatedAt = new Date();
 
-    const saved = await updateDb(appRepo, app);
+    const saved = await updateDb(appRepo, app, { queryRunner: qr });
     await auditLogger.logUpdate(
       "LoanApplication",
       id,

@@ -1,6 +1,5 @@
 // src/subscribers/InterestRateChangeLogSubscriber.js
 const { logger } = require("../utils/logger");
-const { AppDataSource } = require("../main/db/data-source");
 const InterestRateChangeLog = require("../entities/InterestRateChangeLog");
 const { InterestRateChangeLogStateTransitionService } = require("../StateTransitionServices/InterestRateChangeLog");
 
@@ -11,9 +10,9 @@ class InterestRateChangeLogSubscriber {
     this.transitionService = null;
   }
 
-  async getTransitionService() {
+  async getTransitionService(dataSource) {
     if (!this.transitionService) {
-      this.transitionService = new InterestRateChangeLogStateTransitionService(AppDataSource);
+      this.transitionService = new InterestRateChangeLogStateTransitionService(dataSource);
     }
     return this.transitionService;
   }
@@ -22,7 +21,7 @@ class InterestRateChangeLogSubscriber {
     return InterestRateChangeLog;
   }
 
-  async beforeInsert(entity) {
+  async beforeInsert(entity, { manager, queryRunner }) {
     try {
       logger.info("[InterestRateChangeLogSubscriber] beforeInsert", {
         id: entity.id,
@@ -33,10 +32,11 @@ class InterestRateChangeLogSubscriber {
       });
     } catch (err) {
       logger.error("[InterestRateChangeLogSubscriber] beforeInsert error", err);
+      throw err;
     }
   }
 
-  async afterInsert(entity) {
+  async afterInsert(entity, { manager, queryRunner }) {
     try {
       logger.info("[InterestRateChangeLogSubscriber] afterInsert", {
         id: entity.id,
@@ -45,16 +45,17 @@ class InterestRateChangeLogSubscriber {
         new_value: entity.new_value,
         changed_by: entity.changed_by,
       });
-      const service = await this.getTransitionService();
+      const service = await this.getTransitionService(manager.connection);
       if (service.onInterestRateChanged) {
-        await service.onInterestRateChanged(entity, entity.changed_by || "system");
+        await service.onInterestRateChanged(entity, entity.changed_by || "system", queryRunner);
       }
     } catch (err) {
       logger.error("[InterestRateChangeLogSubscriber] afterInsert error", err);
+      throw err;
     }
   }
 
-  async beforeUpdate(entity) {
+  async beforeUpdate(entity, { manager, queryRunner }) {
     try {
       logger.info("[InterestRateChangeLogSubscriber] beforeUpdate", {
         id: entity.id,
@@ -62,10 +63,11 @@ class InterestRateChangeLogSubscriber {
       });
     } catch (err) {
       logger.error("[InterestRateChangeLogSubscriber] beforeUpdate error", err);
+      throw err;
     }
   }
 
-  async afterUpdate(event) {
+  async afterUpdate(event, { manager, queryRunner }) {
     try {
       const { entity, databaseEntity } = event;
       logger.info("[InterestRateChangeLogSubscriber] afterUpdate", {
@@ -76,10 +78,11 @@ class InterestRateChangeLogSubscriber {
       });
     } catch (err) {
       logger.error("[InterestRateChangeLogSubscriber] afterUpdate error", err);
+      throw err;
     }
   }
 
-  async beforeRemove(entity) {
+  async beforeRemove(entity, { manager, queryRunner }) {
     try {
       logger.info("[InterestRateChangeLogSubscriber] beforeRemove", {
         id: entity.id,
@@ -87,16 +90,18 @@ class InterestRateChangeLogSubscriber {
       });
     } catch (err) {
       logger.error("[InterestRateChangeLogSubscriber] beforeRemove error", err);
+      throw err;
     }
   }
 
-  async afterRemove(event) {
+  async afterRemove(event, { manager, queryRunner }) {
     try {
       logger.info("[InterestRateChangeLogSubscriber] afterRemove", {
         id: event.entityId,
       });
     } catch (err) {
       logger.error("[InterestRateChangeLogSubscriber] afterRemove error", err);
+      throw err;
     }
   }
 }

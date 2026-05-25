@@ -47,7 +47,7 @@ const ClosedLoansPage: React.FC = () => {
   const { start, end } = getDisplayRange();
 
   return (
-    <div className="p-4" style={{ backgroundColor: "var(--background-color)" }}>
+    <div className="m-1" style={{ backgroundColor: "var(--background-color)" }}>
       <div className="rounded-md shadow-md border p-4" style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--border-color)" }}>
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
           <div className="flex items-center gap-2">

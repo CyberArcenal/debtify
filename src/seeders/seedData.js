@@ -166,38 +166,46 @@ class DebtManagerXSeeder {
   }
 
   async clearData() {
-    console.log("🧹 Clearing all debt management data...");
-    await this.queryRunner.query("PRAGMA foreign_keys = OFF;");
-    try {
-      const tables = [
-        "debtor_group_members",
-        "debtor_groups",
-        "credit_check_logs",
-        "loan_applications",
-        "interest_rate_change_logs",
-        "payment_method_stats",
-        "payment_methods",
-        "printers",
-        "audit_logs",
-        "notification_logs",
-        "notifications",
-        "penalty_transactions",
-        "payment_transactions",
-        "loan_agreements",
-        "debts",
-        "borrowers",
-      ];
-      for (const table of tables) {
+  console.log("🧹 Clearing all debt management data...");
+  await this.queryRunner.query("PRAGMA foreign_keys = OFF;");
+  try {
+    // ✅ Correct order: child tables first, then parents
+    const tables = [
+      "debtor_group_members",        // child of debtor_groups, borrowers
+      "debtor_groups",               // parent
+      "credit_check_logs",           // child of borrowers
+      "loan_applications",           // child of borrowers
+      "interest_rate_change_logs",   // child of debts
+      "notification_logs",           // independent (no FK)
+      "notifications",               // child of debts
+      "penalty_transactions",        // child of debts
+      "payment_transactions",        // child of debts AND payment_methods (important)
+      "payment_method_stats",        // child of payment_methods
+      "payment_methods",             // parent
+      "printers",                    // independent
+      "audit_logs",                  // independent (may reference but no enforced FK)
+      "loan_agreements",             // child of debts
+      "debts",                       // child of borrowers
+      "borrowers",                   // parent
+    ];
+    for (const table of tables) {
+      // Check if table exists
+      const exists = await this.queryRunner.query(
+        `SELECT name FROM sqlite_master WHERE type='table' AND name='${table}';`
+      );
+      if (exists.length > 0) {
         await this.queryRunner.query(`DELETE FROM ${table};`);
         await this.queryRunner.query(`DELETE FROM sqlite_sequence WHERE name='${table}';`);
       }
-    } catch (error) {
-      console.warn("Some tables may not exist yet:", error.message);
-    } finally {
-      await this.queryRunner.query("PRAGMA foreign_keys = ON;");
     }
-    console.log("✅ All tables cleared");
+  } catch (error) {
+    console.error("Error during clearing:", error.message);
+    throw error;
+  } finally {
+    await this.queryRunner.query("PRAGMA foreign_keys = ON;");
   }
+  console.log("✅ All tables cleared");
+}
 
   // ------------------------------------------------------------
   // SEED METHODS

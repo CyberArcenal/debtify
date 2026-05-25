@@ -91,7 +91,7 @@ class PenaltyTransactionService {
         debt,
       });
 
-      const saved = await saveDb(penaltyRepo, penalty);
+      const saved = await saveDb(penaltyRepo, penalty, { queryRunner: qr });
       await auditLogger.logCreate("PenaltyTransaction", saved.id, saved, user);
       return saved;
     } catch (error) {
@@ -144,7 +144,7 @@ class PenaltyTransactionService {
       }
       Object.assign(existing, penaltyData);
 
-      const saved = await updateDb(penaltyRepo, existing);
+      const saved = await updateDb(penaltyRepo, existing, { queryRunner: qr });
       await auditLogger.logUpdate(
         "PenaltyTransaction",
         id,
@@ -182,7 +182,7 @@ class PenaltyTransactionService {
       const oldData = { ...penalty };
       penalty.deletedAt = new Date();
 
-      const saved = await updateDb(penaltyRepo, penalty);
+      const saved = await updateDb(penaltyRepo, penalty, { queryRunner: qr });
       await auditLogger.logDelete("PenaltyTransaction", id, oldData, user);
       console.log(`Penalty transaction soft deleted: #${id}`);
       return saved;
@@ -217,7 +217,7 @@ class PenaltyTransactionService {
 
       penalty.deletedAt = null;
 
-      const saved = await updateDb(penaltyRepo, penalty);
+      const saved = await updateDb(penaltyRepo, penalty, { queryRunner: qr });
       await auditLogger.logUpdate(
         "PenaltyTransaction",
         id,

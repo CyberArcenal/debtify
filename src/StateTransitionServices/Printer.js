@@ -39,7 +39,7 @@ class PrinterStateTransitionService {
       printer.lastTested = new Date();
       logger.error(`Printer test failed: ${err.message}`);
     }
-    await updateDb(repo, printer, { skipSignal: true });
+    await updateDb(repo, printer, { queryRunner: queryRunner, skipSignal: true });
     return printer.status;
   }
 
@@ -66,12 +66,12 @@ class PrinterStateTransitionService {
       for (const p of allPrinters) {
         if (p.id !== newPrinter.id && p.isDefault) {
           p.isDefault = false;
-          await updateDb(repo, p, { skipSignal: true });
+          await updateDb(repo, p, { queryRunner: queryRunner, skipSignal: true });
         }
       }
       // Ensure newPrinter is still default (might have been changed in loop? no)
       newPrinter.isDefault = true;
-      await updateDb(repo, newPrinter);
+      await updateDb(repo, newPrinter, { queryRunner: queryRunner });
       logger.info(`[Printer] Enforced single default for printer #${newPrinter.id}`);
     } else {
       // No default change, just save the updated printer
@@ -91,7 +91,7 @@ class PrinterStateTransitionService {
       const another = await repo.findOne({ where: {}, order: { id: "ASC" } });
       if (another && another.id !== printer.id) {
         another.isDefault = true;
-        await updateDb(repo, another);
+        await updateDb(repo, another, { queryRunner: queryRunner });
         logger.info(`[Printer] Set printer #${another.id} as new default.`);
       }
     }
@@ -108,7 +108,7 @@ class PrinterStateTransitionService {
     const oldStatus = printer.status;
     printer.status = success ? "online" : "error";
     printer.lastTested = new Date();
-    await updateDb(repo, printer);
+    await updateDb(repo, printer, { queryRunner: queryRunner });
 
     await auditLogger.logUpdate(
       "Printer",

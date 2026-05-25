@@ -10,9 +10,9 @@ const {
   loanAgreementTemplate,
   defaultPenaltyRate,
 } = require("../utils/system");
-const { NotificationLogService } = require("../services/NotificationLog");
 const notificationService = require("../services/Notification");
 const debtService = require("../services/Debt");
+const { reminderLogService } = require("../services/ReminderLog");
 
 class LoanApplicationStateTransitionService {
   /**
@@ -23,36 +23,53 @@ class LoanApplicationStateTransitionService {
     this.appRepo = dataSource.getRepository(
       require("../entities/LoanApplication"),
     );
-    this.notificationLogService = new NotificationLogService();
   }
 
   /**
    * Helper: get repository (transactional)
+   * @param {any} entity
+   * @param {{ manager: { getRepository: (arg0: any) => any; }; }} queryRunner
    */
   _getRepo(entity, queryRunner) {
     if (queryRunner) return queryRunner.manager.getRepository(entity);
     return this.dataSource.getRepository(entity);
   }
 
+  /**
+   * Send email via ReminderLogService (queues and logs automatically)
+   * @param {any} recipient
+   * @param {string} subject
+   * @param {string} message
+   * @param {string | undefined} user
+   * @param {import("typeorm").QueryRunner | null | undefined} queryRunner
+   */
   async _sendEmail(recipient, subject, message, user, queryRunner) {
-    const logService = this.notificationLogService;
-    const logResult = await logService.createLog(
-      { to: recipient, subject, html: message },
-      user,
-      queryRunner,
-    );
-    if (!logResult.status) {
-      logger.error(`Failed to create email log: ${logResult.message}`);
-      return false;
+    try {
+      await reminderLogService.createReminder(
+        {
+          to: recipient,
+          subject,
+          html: `<p>${message.replace(/\n/g, "<br/>")}</p>`,
+          text: message,
+        },
+        user,
+        queryRunner,
+      );
+      return true;
+    } catch (err) {
+      // @ts-ignore
+      logger.error(`Failed to queue email to ${recipient}:`, err);
+     throw err;
     }
-    const sendResult = await logService.retryFailedNotification(
-      { id: logResult.data.id },
-      user,
-      queryRunner,
-    );
-    return sendResult.status;
   }
 
+  /**
+   * @param {any} phoneNumber
+   * @param {string} message
+   * @param {string} user
+   * @param {null} queryRunner
+   */
+  // @ts-ignore
   async _sendSms(phoneNumber, message, user, queryRunner) {
     // Placeholder – integrate with actual SMS channel via NotificationLogService
     logger.info(`[SMS] Would send to ${phoneNumber}: ${message}`);
@@ -61,6 +78,7 @@ class LoanApplicationStateTransitionService {
 
   /**
    * Called when a loan application is submitted (afterInsert)
+   * @param {{ id: any; debtorName: any; requestedAmount: any; debtorId: number; }} application
    */
   async onSubmit(application, user = "system", queryRunner = null) {
     logger.info(
@@ -93,6 +111,7 @@ class LoanApplicationStateTransitionService {
           `Credit check triggered for debtor #${application.debtorId}`,
         );
       } catch (err) {
+        // @ts-ignore
         logger.error("Failed to trigger credit check on submission:", err);
       }
     }
@@ -101,6 +120,7 @@ class LoanApplicationStateTransitionService {
   /**
    * Called when an application is approved (afterUpdate status → approved)
    * This is where the active debt is created (side effect).
+   * @param {{ id: any; purpose: any; requestedAmount: any; proposedDueDate: { toISOString: () => string; }; interestRate: any; debtorId: any; debtorEmail: any; debtorName: any; debtorContact: any; }} application
    */
   async onApprove(application, user = "system", queryRunner = null) {
     logger.info(
@@ -108,7 +128,7 @@ class LoanApplicationStateTransitionService {
     );
 
     // 1. Create active debt using debtService (within same transaction if queryRunner provided)
-    const penaltyRate = await defaultPenaltyRate()
+    const penaltyRate = await defaultPenaltyRate();
     const debtData = {
       name: `Loan: ${application.purpose}`,
       totalAmount: application.requestedAmount,
@@ -120,7 +140,9 @@ class LoanApplicationStateTransitionService {
       borrowerId: application.debtorId,
     };
     const createdDebt = await debtService.create(debtData, user, queryRunner);
-    logger.info(`Created active debt #${createdDebt.id} for application #${application.id}`);
+    logger.info(
+      `Created active debt #${createdDebt.id} for application #${application.id}`,
+    );
 
     // 2. In‑app notification to debtor
     await notificationService.create(
@@ -170,8 +192,14 @@ class LoanApplicationStateTransitionService {
 
   /**
    * Called when an application is rejected (afterUpdate status → rejected)
+   * @param {{ id: any; debtorEmail: any; debtorName: any; debtorContact: any; }} application
    */
-  async onReject(application, reason = null, user = "system", queryRunner = null) {
+  async onReject(
+    application,
+    reason = null,
+    user = "system",
+    queryRunner = null,
+  ) {
     logger.info(
       `[LoanApplication] Application #${application.id} rejected by ${user} (reason: ${reason || "none"})`,
     );
@@ -221,6 +249,7 @@ class LoanApplicationStateTransitionService {
 
   /**
    * Called when a rejected application is reopened (status back to pending)
+   * @param {{ id: any; debtorName: any; }} application
    */
   async onReopen(application, user = "system", queryRunner = null) {
     logger.info(

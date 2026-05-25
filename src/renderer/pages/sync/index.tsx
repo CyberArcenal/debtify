@@ -35,7 +35,7 @@ const SyncPage: React.FC = () => {
   }
 
   return (
-    <div className="p-4">
+    <div className="m-1">
       <div className="rounded-md shadow-md border p-4" style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--border-color)" }}>
         <h1 className="text-xl font-bold mb-4 flex items-center gap-2">
           <Upload className="w-5 h-5" /> Data Sync

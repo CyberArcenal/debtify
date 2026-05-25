@@ -196,16 +196,18 @@ const OverdueLoansTable: React.FC<OverdueLoansTableProps> = ({
               </td>
               <td className="px-4 py-3">
                 <span
-                  className={`px-2 py-1 rounded-full text-xs font-bold ${getDaysOverdueClass(loan.daysOverdue)}`}
+                  className={`px-2 py-1 rounded-full text-xs font-bold ${getDaysOverdueClass(loan.stats.daysOverdue)}`}
                 >
-                  {loan.daysOverdue} days
+                  {loan.stats.daysOverdue} days
                 </span>
               </td>
               <td
                 className="px-4 py-3"
                 style={{ color: "var(--text-primary)" }}
               >
-                {loan.penaltyAmount ? formatCurrency(loan.penaltyAmount) : "—"}
+                {loan.stats.totalPenalty
+                  ? formatCurrency(loan.stats.totalPenalty)
+                  : "—"}
               </td>
               <td className="px-4 py-3 text-right">
                 <div className="flex justify-end gap-2">

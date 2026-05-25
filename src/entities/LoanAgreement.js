@@ -5,11 +5,24 @@ const LoanAgreement = new EntitySchema({
   tableName: "loan_agreements",
   columns: {
     id: { type: Number, primary: true, generated: true },
+    status: {
+      type: "varchar",
+      default: "draft",
+      enum: ["draft", "signed"],
+    },
     agreementDate: { type: Date, nullable: true },
     lenderName: { type: String, nullable: true },
     termsText: { type: "text", nullable: true },
     filePath: { type: String, nullable: true },
     deletedAt: { type: Date, nullable: true },
+    signedAt: {
+      type: "datetime",
+      nullable: true,
+    },
+    signedBy: {
+      type: "varchar",
+      nullable: true,
+    },
   },
   relations: {
     debt: {

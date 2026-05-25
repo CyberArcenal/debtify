@@ -18,10 +18,10 @@ const DebtorStatementPage: React.FC = () => {
     documentTitle: `Statement_${selectedDebtor?.name || "Debtor"}_${new Date().toISOString().slice(0, 10)}`,
   });
 
-  if (error) return <div className="p-4" style={{ color: "var(--danger-color)" }}>Error: {error}</div>;
+  if (error) return <div className="m-1" style={{ color: "var(--danger-color)" }}>Error: {error}</div>;
 
   return (
-    <div className="p-4" style={{ backgroundColor: "var(--background-color)" }}>
+    <div className="m-1" style={{ backgroundColor: "var(--background-color)" }}>
       <div className="rounded-md shadow-md border p-4" style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--border-color)" }}>
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-2">

@@ -1,10 +1,25 @@
 // src/main/ipc/borrower/bulk_create.ipc.js
-//@ts-check
-
 const borrowerService = require("../../../../services/Borrower");
+const { syncMode, serverUrl } = require("../../../../utils/system");
+const onlineClient = require("../../../../utils/onlineClient");
 
 module.exports = async (params, queryRunner) => {
   const { borrowersArray, user = "system" } = params;
-  const result = await borrowerService.bulkCreate(borrowersArray, user, queryRunner);
-  return { status: true, message: "Bulk create completed", data: result };
+  const mode = await syncMode();
+
+  if (mode === "online") {
+    const url = await serverUrl();
+    if (!url) throw new Error("Server URL not configured");
+    onlineClient.setBaseUrl(url);
+    const response = await onlineClient.post('/api/v1/borrowers/bulkCreate', { borrowersArray, user });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Server error: ${response.status} - ${errorText}`);
+    }
+    const result = await response.json();
+    return { status: true, message: "Bulk create completed on server", data: result };
+  } else {
+    const result = await borrowerService.bulkCreate(borrowersArray, user, queryRunner);
+    return { status: true, message: "Bulk create completed locally", data: result };
+  }
 };
