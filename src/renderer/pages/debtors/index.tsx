@@ -126,7 +126,7 @@ const DebtorDirectory: React.FC = () => {
 
   return (
     <div
-      className="rounded-md shadow-md border p-4"
+      className="rounded-md shadow-md border p-4 m-1"
       style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--border-color)" }}
     >
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">

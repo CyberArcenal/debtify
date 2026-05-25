@@ -31,6 +31,9 @@ const { registerImageProtocol } = require("./protocols/imageProtocol.js");
 const printerService = require("../services/Printer.js");
 const AuditTrailCleanupScheduler = require("../scheduler/auditTrailCleanupScheduler.js");
 const OverdueReminderScheduler = require("../scheduler/overdueReminderScheduler.js");
+const OverdueStatusUpdater = require("../scheduler/overdueStatusUpdater.js");
+const { logger } = require("../utils/logger.js");
+const OverdueStatusCorrector = require("../scheduler/overdueStatusCorrector.js");
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -946,7 +949,25 @@ async function startupSequence() {
     reminderScheduler.start().catch((err) => {
       log(LogLevel.ERROR, "Failed to start Overdue Reminder Scheduler", err);
     });
-    
+
+    const overdueStatusUpdater = new OverdueStatusUpdater();
+    overdueStatusUpdater.start().catch((err) => {
+      logger.error(
+        LogLevel.ERROR,
+        "Failed to start Overdue Status Updater",
+        // @ts-ignore
+        err,
+      );
+    });
+    const statusCorrector = new OverdueStatusCorrector();
+    statusCorrector.start().catch((err) => {
+      logger.error(
+        LogLevel.ERROR,
+        "Failed to start Overdue Status Corrector",
+        // @ts-ignore
+        err,
+      );
+    });
   } catch (error) {
     log(LogLevel.ERROR, "Startup sequence failed:", error);
 

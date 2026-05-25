@@ -50,7 +50,7 @@ const DebtorGroupsPage: React.FC = () => {
     setViewOpen(true);
   };
   return (
-    <div className="p-4 h-full flex flex-col">
+    <div className="m-1 h-full flex flex-col">
       <div className="flex items-center gap-2 mb-4">
         <Layers className="w-6 h-6 text-[var(--primary-color)]" />
         <h1

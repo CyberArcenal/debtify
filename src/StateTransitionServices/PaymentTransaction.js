@@ -289,7 +289,7 @@ class PaymentTransactionStateTransitionService {
       debtWithBorrower.updatedAt = new Date();
       await updateDb(debtRepo, debtWithBorrower, {
         queryRunner,
-        skipSignal: true,
+        skipSignal: false,
       });
       logger.info(
         `[Transition] Debt #${debtWithBorrower.id} fully paid, status updated to 'paid'`,

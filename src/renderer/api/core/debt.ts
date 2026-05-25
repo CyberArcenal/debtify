@@ -5,6 +5,17 @@ import type { PaginatedResult } from "./common";
 // ----------------------------------------------------------------------
 // 📦 Types & Interfaces
 // ----------------------------------------------------------------------
+export interface DebtStats {
+  totalPaid: number;
+  totalPenalty: number;
+  remainingBalance: number;
+  daysOverdue: number;
+  paymentCount: number;
+  penaltyCount: number;
+  lastPaymentDate: string | null;
+  isFullyPaid: boolean;
+}
+
 
 export interface Debt {
   id: number;
@@ -25,6 +36,7 @@ export interface Debt {
     contact: string | null;
     email: string | null;
   };
+  stats?: DebtStats;
 }
 
 export interface BorrowerFilters {

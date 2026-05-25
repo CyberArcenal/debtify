@@ -362,17 +362,87 @@ class DebtService {
    */
   async findById(id, includeDeleted = false) {
     const { debt: debtRepo } = await this.getRepositories();
-    const options = { where: { id }, relations: ["borrower"] };
+
+    const qb = debtRepo
+      .createQueryBuilder("debt")
+      .leftJoinAndSelect("debt.borrower", "borrower")
+      .where("debt.id = :id", { id });
+
     if (!includeDeleted) {
-      // @ts-ignore
-      options.where.deletedAt = null;
+      qb.andWhere("debt.deletedAt IS NULL");
     }
-    // @ts-ignore
-    const debt = await debtRepo.findOne(options);
+
+    // Same subqueries as findAll
+    qb.addSelect((subQ) => {
+      return subQ
+        .select("COALESCE(SUM(payment.amount), 0)")
+        .from("payment_transactions", "payment")
+        .where("payment.debtId = debt.id")
+        .andWhere("payment.deletedAt IS NULL");
+    }, "totalPaid");
+
+    qb.addSelect((subQ) => {
+      return subQ
+        .select("COUNT(payment.id)")
+        .from("payment_transactions", "payment")
+        .where("payment.debtId = debt.id")
+        .andWhere("payment.deletedAt IS NULL");
+    }, "paymentCount");
+
+    qb.addSelect((subQ) => {
+      return subQ
+        .select("MAX(payment.paymentDate)")
+        .from("payment_transactions", "payment")
+        .where("payment.debtId = debt.id")
+        .andWhere("payment.deletedAt IS NULL");
+    }, "lastPaymentDate");
+
+    qb.addSelect((subQ) => {
+      return subQ
+        .select("COALESCE(SUM(penalty.amount), 0)")
+        .from("penalty_transactions", "penalty")
+        .where("penalty.debtId = debt.id")
+        .andWhere("penalty.deletedAt IS NULL");
+    }, "totalPenalty");
+
+    qb.addSelect((subQ) => {
+      return subQ
+        .select("COUNT(penalty.id)")
+        .from("penalty_transactions", "penalty")
+        .where("penalty.debtId = debt.id")
+        .andWhere("penalty.deletedAt IS NULL");
+    }, "penaltyCount");
+
+    const debt = await qb.getOne();
     if (!debt) {
       throw new Error(`Debt with ID ${id} not found`);
     }
-    // @ts-ignore
+
+    // Compute stats
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const totalPaid = parseFloat(debt.totalPaid || 0);
+    const totalPenalty = parseFloat(debt.totalPenalty || 0);
+    const remainingBalance = debt.totalAmount - totalPaid;
+    let daysOverdue = 0;
+    const dueDate = debt.dueDate ? new Date(debt.dueDate) : null;
+    if (dueDate && dueDate < now && remainingBalance > 0) {
+      const diffTime = now.getTime() - dueDate.getTime();
+      daysOverdue = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    }
+    const isFullyPaid = remainingBalance <= 0.01;
+
+    debt.stats = {
+      totalPaid,
+      totalPenalty,
+      remainingBalance,
+      daysOverdue,
+      paymentCount: parseInt(debt.paymentCount || 0),
+      penaltyCount: parseInt(debt.penaltyCount || 0),
+      lastPaymentDate: debt.lastPaymentDate || null,
+      isFullyPaid,
+    };
+
     await auditLogger.logView("Debt", id, "system");
     return debt;
   }
@@ -383,80 +453,131 @@ class DebtService {
    */
   async findAll(options = {}) {
     const { debt: debtRepo } = await this.getRepositories();
-    // @ts-ignore
+
     const qb = debtRepo
       .createQueryBuilder("debt")
       .leftJoinAndSelect("debt.borrower", "borrower");
 
     // Exclude soft-deleted unless requested
-    // @ts-ignore
     if (!options.includeDeleted) {
       qb.andWhere("debt.deletedAt IS NULL");
     }
 
     // Filters
-    // @ts-ignore
     if (options.status) {
-      // @ts-ignore
       qb.andWhere("debt.status = :status", { status: options.status });
     }
-    // @ts-ignore
     if (options.borrowerId) {
       qb.andWhere("borrower.id = :borrowerId", {
-        // @ts-ignore
         borrowerId: options.borrowerId,
       });
     }
-    // @ts-ignore
     if (options.dueDateFrom) {
       qb.andWhere("debt.dueDate >= :dueDateFrom", {
-        // @ts-ignore
         dueDateFrom: new Date(options.dueDateFrom),
       });
     }
-    // @ts-ignore
     if (options.dueDateTo) {
       qb.andWhere("debt.dueDate <= :dueDateTo", {
-        // @ts-ignore
         dueDateTo: new Date(options.dueDateTo),
       });
     }
-    // @ts-ignore
     if (options.minTotalAmount) {
       qb.andWhere("debt.totalAmount >= :minTotalAmount", {
-        // @ts-ignore
         minTotalAmount: options.minTotalAmount,
       });
     }
-    // @ts-ignore
     if (options.maxTotalAmount) {
       qb.andWhere("debt.totalAmount <= :maxTotalAmount", {
-        // @ts-ignore
         maxTotalAmount: options.maxTotalAmount,
       });
     }
-    // @ts-ignore
     if (options.search) {
       qb.andWhere("(debt.name LIKE :search OR borrower.name LIKE :search)", {
-        // @ts-ignore
         search: `%${options.search}%`,
       });
     }
 
+    // ✅ Subqueries for stats
+    qb.addSelect((subQ) => {
+      return subQ
+        .select("COALESCE(SUM(payment.amount), 0)")
+        .from("payment_transactions", "payment")
+        .where("payment.debtId = debt.id")
+        .andWhere("payment.deletedAt IS NULL");
+    }, "totalPaid");
+
+    qb.addSelect((subQ) => {
+      return subQ
+        .select("COUNT(payment.id)")
+        .from("payment_transactions", "payment")
+        .where("payment.debtId = debt.id")
+        .andWhere("payment.deletedAt IS NULL");
+    }, "paymentCount");
+
+    qb.addSelect((subQ) => {
+      return subQ
+        .select("MAX(payment.paymentDate)")
+        .from("payment_transactions", "payment")
+        .where("payment.debtId = debt.id")
+        .andWhere("payment.deletedAt IS NULL");
+    }, "lastPaymentDate");
+
+    qb.addSelect((subQ) => {
+      return subQ
+        .select("COALESCE(SUM(penalty.amount), 0)")
+        .from("penalty_transactions", "penalty")
+        .where("penalty.debtId = debt.id")
+        .andWhere("penalty.deletedAt IS NULL");
+    }, "totalPenalty");
+
+    qb.addSelect((subQ) => {
+      return subQ
+        .select("COUNT(penalty.id)")
+        .from("penalty_transactions", "penalty")
+        .where("penalty.debtId = debt.id")
+        .andWhere("penalty.deletedAt IS NULL");
+    }, "penaltyCount");
+
     // Sorting
-    // @ts-ignore
     const sortBy = options.sortBy || "dueDate";
-    // @ts-ignore
     const sortOrder = options.sortOrder === "ASC" ? "ASC" : "DESC";
     qb.orderBy(`debt.${sortBy}`, sortOrder);
 
     // Pagination
     const result = await paginateQueryBuilder(qb, {
-      // @ts-ignore
       page: options.page,
-      // @ts-ignore
       limit: options.limit,
     });
+
+    // ✅ Attach stats object to each debt
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    result.data = result.data.map((debt) => {
+      const totalPaid = parseFloat(debt.totalPaid || 0);
+      const totalPenalty = parseFloat(debt.totalPenalty || 0);
+      const remainingBalance = debt.totalAmount - totalPaid;
+      let daysOverdue = 0;
+      const dueDate = debt.dueDate ? new Date(debt.dueDate) : null;
+      if (dueDate && dueDate < now && remainingBalance > 0) {
+        const diffTime = now.getTime() - dueDate.getTime();
+        daysOverdue = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      }
+      const isFullyPaid = remainingBalance <= 0.01;
+
+      debt.stats = {
+        totalPaid,
+        totalPenalty,
+        remainingBalance,
+        daysOverdue,
+        paymentCount: parseInt(debt.paymentCount || 0),
+        penaltyCount: parseInt(debt.penaltyCount || 0),
+        lastPaymentDate: debt.lastPaymentDate || null,
+        isFullyPaid,
+      };
+      return debt;
+    });
+
     await auditLogger.logView("Debt", null, "system");
     return result;
   }
@@ -474,7 +595,10 @@ class DebtService {
     // @ts-ignore
     const repo = this._getRepo(qr, require("../entities/Debt"));
     // @ts-ignore
-    return await updateDb(repo, existing, { queryRunner: qr, skipSignal: true });
+    return await updateDb(repo, existing, {
+      queryRunner: qr,
+      skipSignal: true,
+    });
   }
 
   // services/DebtService.js – inside applyForgiveness
@@ -720,13 +844,13 @@ class DebtService {
           status: record.status || "active",
           // @ts-ignore
           interestRate: record.interestRate
-            // @ts-ignore
-            ? parseFloat(record.interestRate)
+            ? // @ts-ignore
+              parseFloat(record.interestRate)
             : null,
           // @ts-ignore
           penaltyRate: record.penaltyRate
-            // @ts-ignore
-            ? parseFloat(record.penaltyRate)
+            ? // @ts-ignore
+              parseFloat(record.penaltyRate)
             : null,
           // @ts-ignore
           borrowerId: parseInt(record.borrowerId, 10),
@@ -921,6 +1045,30 @@ class DebtService {
     } finally {
       await queryRunner.release();
     }
+  }
+
+  async markOverdueDebts() {
+    const { debt: debtRepo } = await this.getRepositories();
+    const { updateDb } = require("../utils/dbUtils/dbActions");
+    const now = new Date();
+    // Kunin ang lahat ng active debts na dueDate < ngayon
+    const overdueDebts = await debtRepo
+      .createQueryBuilder("debt")
+      .where("debt.status = :status", { status: "active" })
+      .andWhere("debt.dueDate < :now", { now })
+      .andWhere("debt.remainingAmount > 0")
+      .getMany();
+
+    let count = 0;
+    for (const debt of overdueDebts) {
+      // I‑update ang status nang hindi nagti‑trigger ng subscriber (para iwas recursion)
+      debt.status = "overdue";
+      debt.updatedAt = new Date();
+
+      await updateDb(debtRepo, debt, { skipSignal: false });
+      count++;
+    }
+    return { count };
   }
 }
 
