@@ -94,21 +94,18 @@ const LoanAgreementsPage: React.FC = () => {
     }
   };
 
-  const handleDownload = async (agreement: LoanAgreement) => {
-    if (!agreement.filePath) {
-      dialogs.error("No file attached to this agreement");
-      return;
-    }
-    // For security, we need to fetch the file from backend. But in offline mode, filePath is local path.
-    // For simplicity, we can open the file using electron shell or download it.
-    // Here we'll just open the file (assuming it's accessible)
-    try {
-      
-      window.backendAPI.openExternal(agreement.filePath);
-    } catch (err) {
-      dialogs.error("Could not open file");
-    }
-  };
+const handleDownload = async (agreement: LoanAgreement) => {
+  if (!agreement.filePath) {
+    dialogs.error("No file attached to this agreement");
+    return;
+  }
+  try {
+    const result = await window.backendAPI.openAgreementFile(agreement.filePath);
+    if (!result.status) throw new Error(result.message);
+  } catch (err: any) {
+    dialogs.error("Could not open file: " + err.message);
+  }
+};
 
   const getDisplayRange = () => {
     const start = (currentPage - 1) * pageSize + 1;
