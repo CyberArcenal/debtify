@@ -12,12 +12,6 @@ class PenaltyTransactionStateTransitionService {
     this.debtRepo = dataSource.getRepository(Debt);
   }
 
-  /**
-   * Helper: get repository (transactional if queryRunner provided)
-   * @param {import("typeorm").QueryRunner|null} qr
-   * @param {Function} entityClass
-   * @returns {import("typeorm").Repository}
-   */
   _getRepo(qr, entityClass) {
     if (qr) {
       return qr.manager.getRepository(entityClass);
@@ -26,8 +20,18 @@ class PenaltyTransactionStateTransitionService {
   }
 
   /**
-   * Waive a penalty (remove it)
+   * Helper: reload debt with borrower relation (transactional)
    */
+  async _getDebtWithBorrower(debtId, queryRunner) {
+    const debtRepo = this._getRepo(queryRunner, Debt);
+    const debt = await debtRepo.findOne({
+      where: { id: debtId },
+      relations: ["borrower"],
+    });
+    if (!debt) throw new Error(`Debt #${debtId} not found`);
+    return debt;
+  }
+
   async onWaive(penalty, reason = "", user = "system", queryRunner = null) {
     const { updateDb } = require("../utils/dbUtils/dbActions");
     logger.info(
@@ -35,23 +39,19 @@ class PenaltyTransactionStateTransitionService {
     );
 
     const penaltyRepo = this._getRepo(queryRunner, PenaltyTransaction);
+    // Reload debt with borrower for notification
+    const debtWithBorrower = await this._getDebtWithBorrower(
+      penalty.debt.id,
+      queryRunner,
+    );
     const debtRepo = this._getRepo(queryRunner, Debt);
-    const debt = penalty.debt;
 
-    if (!debt) throw new Error("Penalty has no associated debt");
-
-    // 1. Mark penalty as waived (status)
+    // Mark penalty as waived
     penalty.status = "waived";
     penalty.updatedAt = new Date();
-    await updateDb(penaltyRepo, penalty, { queryRunner: queryRunner });
+    await updateDb(penaltyRepo, penalty, { queryRunner, skipSignal: true });
 
-    // 2. Optionally remove the penalty amount from debt total (if it was previously added)
-    // Usually when a penalty is created, it may not have been applied to the debt yet.
-    // If the penalty was already collected, we need to reverse it.
-    // We'll assume that waived penalties are not collected, so no debt adjustment needed.
-    // If you need to reverse an already collected penalty, call onReverse instead.
-
-    // 3. Create a waiver log (audit)
+    // Audit log
     await auditLogger.logUpdate(
       "PenaltyTransaction",
       penalty.id,
@@ -60,15 +60,15 @@ class PenaltyTransactionStateTransitionService {
       user,
     );
 
-    // 4. Notify debtor (in‑app)
-    if (debt.borrower) {
+    // Notify debtor (in‑app)
+    if (debtWithBorrower.borrower) {
       await notificationService.create(
         {
           userId: 1,
           title: "Penalty Waived",
-          message: `The penalty of ${penalty.amount} on debt "${debt.name}" has been waived. Reason: ${reason || "N/A"}.`,
+          message: `The penalty of ${penalty.amount} on debt "${debtWithBorrower.name}" has been waived. Reason: ${reason || "N/A"}.`,
           type: "info",
-          metadata: { penaltyId: penalty.id, debtId: debt.id },
+          metadata: { penaltyId: penalty.id, debtId: debtWithBorrower.id },
         },
         user,
         queryRunner,
@@ -76,62 +76,60 @@ class PenaltyTransactionStateTransitionService {
     }
   }
 
-  /**
-   * Collect penalty (apply to debt)
-   */
   async onCollect(penalty, user = "system", queryRunner = null) {
     const { updateDb } = require("../utils/dbUtils/dbActions");
     logger.info(`[Transition] Collecting penalty #${penalty.id} by ${user}`);
 
     const penaltyRepo = this._getRepo(queryRunner, PenaltyTransaction);
     const debtRepo = this._getRepo(queryRunner, Debt);
-    const debt = penalty.debt;
+    const debtWithBorrower = await this._getDebtWithBorrower(
+      penalty.debt.id,
+      queryRunner,
+    );
 
-    if (!debt) throw new Error("Penalty has no associated debt");
+    // Add penalty amount to debt remainingAmount
+    debtWithBorrower.remainingAmount += penalty.amount;
+    debtWithBorrower.updatedAt = new Date();
+    await updateDb(debtRepo, debtWithBorrower, {
+      queryRunner,
+      skipSignal: true,
+    });
 
-    // 1. Add penalty amount to debt remainingAmount
-    debt.remainingAmount += penalty.amount;
-    debt.updatedAt = new Date();
-    await updateDb(debtRepo, debt, { queryRunner: queryRunner });
-
-    // 2. Mark penalty as collected
+    // Mark penalty as collected
     penalty.status = "collected";
     penalty.updatedAt = new Date();
-    await updateDb(penaltyRepo, penalty, { queryRunner: queryRunner });
+    await updateDb(penaltyRepo, penalty, { queryRunner, skipSignal: true });
 
-    // 3. Generate a penalty receipt (optional – use PrinterService)
+    // Print receipt (non-critical, use setTimeout)
     try {
       const printerService = require("../services/Printer");
-      // You could create a receipt method specifically for penalties, or reuse printReceipt.
-      // await printerService.printReceipt(debt.id); // or a custom penalty receipt
-
-      queryRunner.afterCommit(async () => {
+      setTimeout(async () => {
         try {
-          await printerService.printReceipt(debt.id);
+          await printerService.printReceipt(debtWithBorrower.id, queryRunner);
         } catch (err) {
-          logger.warn(`Failed to print penalty receipt after commit:`, err);
+          logger.warn(`Failed to print penalty receipt:`, err);
         }
-      });
+      }, 0);
     } catch (err) {
-      logger.warn(`Failed to print penalty receipt:`, err);
+      logger.warn(`Failed to schedule penalty receipt printing:`, err);
     }
 
-    // 4. Notify debtor (in‑app)
-    if (debt.borrower) {
+    // Notify debtor (in‑app)
+    if (debtWithBorrower.borrower) {
       await notificationService.create(
         {
           userId: 1,
           title: "Penalty Applied",
-          message: `A penalty of ${penalty.amount} has been added to your debt "${debt.name}". New balance: ${debt.remainingAmount}.`,
+          message: `A penalty of ${penalty.amount} has been added to your debt "${debtWithBorrower.name}". New balance: ${debtWithBorrower.remainingAmount}.`,
           type: "info",
-          metadata: { penaltyId: penalty.id, debtId: debt.id },
+          metadata: { penaltyId: penalty.id, debtId: debtWithBorrower.id },
         },
         user,
         queryRunner,
       );
     }
 
-    // 5. Audit log
+    // Audit logs
     await auditLogger.logUpdate(
       "PenaltyTransaction",
       penalty.id,
@@ -141,66 +139,69 @@ class PenaltyTransactionStateTransitionService {
     );
     await auditLogger.logUpdate(
       "Debt",
-      debt.id,
-      { remainingAmount: debt.remainingAmount - penalty.amount },
-      { remainingAmount: debt.remainingAmount },
+      debtWithBorrower.id,
+      { remainingAmount: debtWithBorrower.remainingAmount - penalty.amount },
+      { remainingAmount: debtWithBorrower.remainingAmount },
       user,
     );
   }
 
-  /**
-   * Reverse a penalty (if applied by mistake)
-   */
   async onReverse(penalty, user = "system", queryRunner = null) {
     const { updateDb } = require("../utils/dbUtils/dbActions");
     logger.info(`[Transition] Reversing penalty #${penalty.id} by ${user}`);
 
     const penaltyRepo = this._getRepo(queryRunner, PenaltyTransaction);
     const debtRepo = this._getRepo(queryRunner, Debt);
-    const debt = penalty.debt;
+    const debtWithBorrower = await this._getDebtWithBorrower(
+      penalty.debt.id,
+      queryRunner,
+    );
+    const oldStatus = penalty.status;
 
-    if (!debt) throw new Error("Penalty has no associated debt");
-
-    // 1. Subtract penalty amount from debt remainingAmount (if it was collected)
-    if (penalty.status === "collected") {
-      debt.remainingAmount -= penalty.amount;
-      if (debt.remainingAmount < 0) debt.remainingAmount = 0;
-      debt.updatedAt = new Date();
-      await updateDb(debtRepo, debt, { queryRunner: queryRunner });
+    // If penalty was collected, reverse its effect on debt
+    if (oldStatus === "collected") {
+      debtWithBorrower.remainingAmount -= penalty.amount;
+      if (debtWithBorrower.remainingAmount < 0)
+        debtWithBorrower.remainingAmount = 0;
+      debtWithBorrower.updatedAt = new Date();
+      await updateDb(debtRepo, debtWithBorrower, {
+        queryRunner,
+        skipSignal: true,
+      });
     }
 
-    // 2. Mark penalty as reversed
+    // Mark penalty as reversed
     penalty.status = "reversed";
     penalty.updatedAt = new Date();
-    await updateDb(penaltyRepo, penalty, { queryRunner: queryRunner });
+    await updateDb(penaltyRepo, penalty, { queryRunner, skipSignal: true });
 
-    // 3. Create a reversal note (audit log)
+    // Audit logs
     await auditLogger.logUpdate(
       "PenaltyTransaction",
       penalty.id,
-      { status: penalty.status === "collected" ? "collected" : "pending" },
+      { status: oldStatus === "collected" ? "collected" : "pending" },
       { status: "reversed" },
       user,
     );
-    if (penalty.status === "collected") {
+    if (oldStatus === "collected") {
       await auditLogger.logUpdate(
         "Debt",
-        debt.id,
-        { remainingAmount: debt.remainingAmount + penalty.amount },
-        { remainingAmount: debt.remainingAmount },
+        debtWithBorrower.id,
+        { remainingAmount: debtWithBorrower.remainingAmount + penalty.amount },
+        { remainingAmount: debtWithBorrower.remainingAmount },
         user,
       );
     }
 
-    // 4. Notify debtor
-    if (debt.borrower) {
+    // Notify debtor
+    if (debtWithBorrower.borrower) {
       await notificationService.create(
         {
           userId: 1,
           title: "Penalty Reversed",
-          message: `The penalty of ${penalty.amount} on debt "${debt.name}" has been reversed.`,
+          message: `The penalty of ${penalty.amount} on debt "${debtWithBorrower.name}" has been reversed.`,
           type: "info",
-          metadata: { penaltyId: penalty.id, debtId: debt.id },
+          metadata: { penaltyId: penalty.id, debtId: debtWithBorrower.id },
         },
         user,
         queryRunner,
