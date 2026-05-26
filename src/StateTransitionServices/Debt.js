@@ -1,4 +1,5 @@
 // src/services/DebtStateTransitionService.js
+//@ts-check
 const Debt = require("../entities/Debt");
 const PenaltyTransaction = require("../entities/PenaltyTransaction");
 const Notification = require("../entities/Notification");
@@ -11,16 +12,24 @@ const {
   penaltyGraceDays,
   emailEnabled,
   smsEnabled,
+  allowedLoanStatuses,
 } = require("../utils/system");
 const notificationService = require("../services/Notification");
 const { reminderLogService } = require("../services/ReminderLog");
 
 class DebtStateTransitionService {
+  /**
+   * @param {{ getRepository: (arg0: import("typeorm").EntitySchema<{ id: unknown; name: unknown; totalAmount: unknown; paidAmount: unknown; remainingAmount: unknown; dueDate: unknown; status: unknown; interestRate: unknown; penaltyRate: unknown; deletedAt: unknown; createdAt: unknown; updatedAt: unknown; lastInterestAccrualDate: unknown; }>) => any; }} dataSource
+   */
   constructor(dataSource) {
     this.dataSource = dataSource;
     this.debtRepo = dataSource.getRepository(Debt);
   }
 
+  /**
+   * @param {{ manager: { getRepository: (arg0: any) => any; }; } | null} qr
+   * @param {import("typeorm").EntitySchema<{ id: unknown; name: unknown; totalAmount: unknown; paidAmount: unknown; remainingAmount: unknown; dueDate: unknown; status: unknown; interestRate: unknown; penaltyRate: unknown; deletedAt: unknown; createdAt: unknown; updatedAt: unknown; lastInterestAccrualDate: unknown; }> | import("typeorm").EntitySchema<{ id: unknown; amount: unknown; penaltyDate: unknown; reason: unknown; deletedAt: unknown; createdAt: unknown; }> | import("typeorm").EntitySchema<{ id: unknown; title: unknown; message: unknown; type: unknown; isRead: unknown; scheduledFor: unknown; deletedAt: unknown; createdAt: unknown; }>} entityClass
+   */
   _getRepo(qr, entityClass) {
     if (qr) return qr.manager.getRepository(entityClass);
     return this.dataSource.getRepository(entityClass);
@@ -28,6 +37,8 @@ class DebtStateTransitionService {
 
   /**
    * Helper: reload debt with borrower relation (transactional)
+   * @param {any} debtId
+   * @param {null} queryRunner
    */
   async _getDebtWithBorrower(debtId, queryRunner) {
     const debtRepo = this._getRepo(queryRunner, Debt);
@@ -41,6 +52,11 @@ class DebtStateTransitionService {
 
   /**
    * Send email via ReminderLogService (queues and logs automatically)
+   * @param {any} recipient
+   * @param {string} subject
+   * @param {string} message
+   * @param {string | undefined} user
+   * @param {import("typeorm").QueryRunner | null | undefined} queryRunner
    */
   async _sendEmail(recipient, subject, message, user, queryRunner) {
     try {
@@ -56,23 +72,41 @@ class DebtStateTransitionService {
       );
       return true;
     } catch (err) {
+      // @ts-ignore
       logger.error(`Failed to queue email to ${recipient}:`, err);
       throw err;
     }
   }
 
+  /**
+   * @param {any} phoneNumber
+   * @param {string} message
+   * @param {string} user
+   * @param {null} queryRunner
+   */
+  // @ts-ignore
   async _sendSms(phoneNumber, message, user, queryRunner) {
     // Placeholder – actual SMS sending would go through a similar ReminderSmsService
     logger.info(`[SMS] Would send to ${phoneNumber}: ${message}`);
     return true;
   }
 
+
+  /**
+   * @param {{ id: number; status: any; }} debt
+   */
   async onPaid(debt, user = "system", queryRunner = null) {
     const { updateDb } = require("../utils/dbUtils/dbActions");
     logger.info(`[Transition] Marking debt #${debt.id} as paid by ${user}`);
+    const isAllowed = await this.isStatusAllowed(debt.status);
+    if (!isAllowed)
+      throw new Error(`Status ${debt.status} is not allowed by system settings.`);
 
     // ✅ Reload debt with borrower
-    const debtWithBorrower = await this._getDebtWithBorrower(debt.id, queryRunner);
+    const debtWithBorrower = await this._getDebtWithBorrower(
+      debt.id,
+      queryRunner,
+    );
     const debtRepo = this._getRepo(queryRunner, Debt);
     const notifRepo = this._getRepo(queryRunner, Notification);
 
@@ -80,6 +114,7 @@ class DebtStateTransitionService {
     debtWithBorrower.status = "paid";
     debtWithBorrower.updatedAt = new Date();
     const savedDebt = await updateDb(debtRepo, debtWithBorrower, {
+      // @ts-ignore
       queryRunner: queryRunner,
       skipSignal: true,
     });
@@ -91,6 +126,7 @@ class DebtStateTransitionService {
     for (const notif of unreadNotifs) {
       notif.isRead = true;
       notif.updatedAt = new Date();
+      // @ts-ignore
       await updateDb(notifRepo, notif, { queryRunner, skipSignal: true });
     }
 
@@ -101,10 +137,12 @@ class DebtStateTransitionService {
         try {
           await printerService.printReceipt(debt.id, queryRunner);
         } catch (err) {
+          // @ts-ignore
           logger.warn(`Failed to print receipt after commit:`, err);
         }
       }, 0);
     } catch (err) {
+      // @ts-ignore
       logger.warn(`Failed to schedule receipt printing:`, err);
     }
 
@@ -118,11 +156,14 @@ class DebtStateTransitionService {
           queryRunner,
         );
       } else {
-        logger.warn(`Cannot update credit score: debtor ID missing for debt #${debt.id}`);
+        logger.warn(
+          `Cannot update credit score: debtor ID missing for debt #${debt.id}`,
+        );
       }
     } catch (err) {
       logger.warn(
         `Failed to update credit score for borrower #${debtWithBorrower.borrower?.id}:`,
+        // @ts-ignore
         err,
       );
     }
@@ -171,18 +212,28 @@ class DebtStateTransitionService {
     return savedDebt;
   }
 
+  /**
+   * @param {{ id: any; name?: any; totalAmount?: any; paidAmount?: any; remainingAmount?: any; dueDate?: any; status?: any; interestRate?: any; penaltyRate?: any; deletedAt?: any; createdAt?: any; updatedAt?: any; lastInterestAccrualDate?: any; }} debt
+   */
   async onOverdue(debt, user = "system", queryRunner = null) {
     const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
     logger.info(`[Transition] Marking debt #${debt.id} as overdue by ${user}`);
+    const isAllowed = await this.isStatusAllowed(debt.status);
+    if (!isAllowed)
+      throw new Error(`Status ${debt.status} is not allowed by system settings.`);
 
     // ✅ Reload debt with borrower
-    const debtWithBorrower = await this._getDebtWithBorrower(debt.id, queryRunner);
+    const debtWithBorrower = await this._getDebtWithBorrower(
+      debt.id,
+      queryRunner,
+    );
     const debtRepo = this._getRepo(queryRunner, Debt);
     const penaltyRepo = this._getRepo(queryRunner, PenaltyTransaction);
 
     debtWithBorrower.status = "overdue";
     debtWithBorrower.updatedAt = new Date();
     const savedDebt = await updateDb(debtRepo, debtWithBorrower, {
+      // @ts-ignore
       queryRunner: queryRunner,
       skipSignal: true,
     });
@@ -193,13 +244,15 @@ class DebtStateTransitionService {
       const graceDays = await penaltyGraceDays();
       const dueDate = new Date(debtWithBorrower.dueDate);
       const today = new Date();
+      // @ts-ignore
       const daysOverdue = Math.floor((today - dueDate) / (1000 * 60 * 60 * 24));
       if (daysOverdue > graceDays) {
         const penaltyRate = await defaultPenaltyRate();
         let penaltyAmount = 0;
         const calcMethod = await penaltyCalculationMethod();
         if (calcMethod === "percentage") {
-          penaltyAmount = debtWithBorrower.remainingAmount * (penaltyRate / 100);
+          penaltyAmount =
+            debtWithBorrower.remainingAmount * (penaltyRate / 100);
         } else {
           penaltyAmount = penaltyRate;
         }
@@ -210,8 +263,11 @@ class DebtStateTransitionService {
             reason: `Auto‑penalty for overdue (${daysOverdue} days)`,
             debt: debtWithBorrower,
           });
+          // @ts-ignore
           await saveDb(penaltyRepo, penalty, { queryRunner, skipSignal: true });
-          logger.info(`Applied penalty of ${penaltyAmount} to debt #${debt.id}`);
+          logger.info(
+            `Applied penalty of ${penaltyAmount} to debt #${debt.id}`,
+          );
         }
       }
     }
@@ -261,17 +317,30 @@ class DebtStateTransitionService {
     return savedDebt;
   }
 
+
+  /**
+   * @param {{ id: any; status: any; }} debt
+   */
   async onDefaulted(debt, user = "system", queryRunner = null) {
     const { updateDb } = require("../utils/dbUtils/dbActions");
-    logger.info(`[Transition] Marking debt #${debt.id} as defaulted by ${user}`);
+    logger.info(
+      `[Transition] Marking debt #${debt.id} as defaulted by ${user}`,
+    );
+    const isAllowed = await this.isStatusAllowed(debt.status);
+    if (!isAllowed)
+      throw new Error(`Status ${debt.status} is not allowed by system settings.`);
 
     // ✅ Reload debt with borrower
-    const debtWithBorrower = await this._getDebtWithBorrower(debt.id, queryRunner);
+    const debtWithBorrower = await this._getDebtWithBorrower(
+      debt.id,
+      queryRunner,
+    );
     const debtRepo = this._getRepo(queryRunner, Debt);
 
     debtWithBorrower.status = "defaulted";
     debtWithBorrower.updatedAt = new Date();
     const savedDebt = await updateDb(debtRepo, debtWithBorrower, {
+      // @ts-ignore
       queryRunner: queryRunner,
       skipSignal: true,
     });
@@ -333,27 +402,40 @@ class DebtStateTransitionService {
     return savedDebt;
   }
 
+
+  /**
+   * @param {{ id: any; status: any; }} debt
+   */
   async onRestoreToActive(debt, user = "system", queryRunner = null) {
     const { updateDb } = require("../utils/dbUtils/dbActions");
     logger.info(`[Transition] Restoring debt #${debt.id} to active by ${user}`);
+    const isAllowed = await this.isStatusAllowed(debt.status);
+    if (!isAllowed)
+      throw new Error(`Status ${debt.status} is not allowed by system settings.`);
 
     // ✅ Reload debt with borrower
-    const debtWithBorrower = await this._getDebtWithBorrower(debt.id, queryRunner);
+    const debtWithBorrower = await this._getDebtWithBorrower(
+      debt.id,
+      queryRunner,
+    );
     const debtRepo = this._getRepo(queryRunner, Debt);
 
     debtWithBorrower.status = "active";
     debtWithBorrower.updatedAt = new Date();
     let savedDebt = await updateDb(debtRepo, debtWithBorrower, {
+      // @ts-ignore
       queryRunner: queryRunner,
       skipSignal: true,
     });
 
     // Recalculate remaining amount if needed
-    const remaining = debtWithBorrower.totalAmount - debtWithBorrower.paidAmount;
+    const remaining =
+      debtWithBorrower.totalAmount - debtWithBorrower.paidAmount;
     if (remaining !== debtWithBorrower.remainingAmount) {
       debtWithBorrower.remainingAmount = remaining;
       debtWithBorrower.updatedAt = new Date();
       savedDebt = await updateDb(debtRepo, debtWithBorrower, {
+        // @ts-ignore
         queryRunner: queryRunner,
         skipSignal: true,
       });
@@ -401,6 +483,10 @@ class DebtStateTransitionService {
     return savedDebt;
   }
 
+  /**
+   * @param {{ id: any; name?: any; totalAmount?: any; paidAmount?: any; remainingAmount?: any; dueDate?: any; status?: any; interestRate?: any; penaltyRate?: any; deletedAt?: any; createdAt?: any; updatedAt?: any; lastInterestAccrualDate?: any; }} debt
+   * @param {any} amountForgiven
+   */
   async onForgiveness(
     debt,
     amountForgiven,
@@ -409,10 +495,18 @@ class DebtStateTransitionService {
     reason = null,
   ) {
     // No debt update here – already done by DebtService.applyForgiveness
-    logger.info(`[Transition] Forgiving ${amountForgiven} from debt #${debt.id} by ${user}`);
+    logger.info(
+      `[Transition] Forgiving ${amountForgiven} from debt #${debt.id} by ${user}`,
+    );
+    const isAllowed = await this.isStatusAllowed(debt.status);
+    if (!isAllowed)
+      throw new Error(`Status ${debt.status} is not allowed by system settings.`);
 
     // ✅ Reload debt with borrower (para sa email at notification)
-    const debtWithBorrower = await this._getDebtWithBorrower(debt.id, queryRunner);
+    const debtWithBorrower = await this._getDebtWithBorrower(
+      debt.id,
+      queryRunner,
+    );
 
     const note = reason || "Debt forgiveness applied";
     await auditLogger.logUpdate(
@@ -443,7 +537,9 @@ class DebtStateTransitionService {
     );
 
     if (debtWithBorrower.borrower?.email && canSendEmail) {
-      logger.info(`[Forgiveness] Attempting to send email to ${debtWithBorrower.borrower.email}`);
+      logger.info(
+        `[Forgiveness] Attempting to send email to ${debtWithBorrower.borrower.email}`,
+      );
       await this._sendEmail(
         debtWithBorrower.borrower.email,
         "Debt Forgiveness Applied",
@@ -465,6 +561,14 @@ class DebtStateTransitionService {
         queryRunner,
       );
     }
+  }
+
+  /**
+   * @param {any} newStatus
+   */
+  async isStatusAllowed(newStatus) {
+    const allowed = await allowedLoanStatuses();
+    return allowed.includes(newStatus);
   }
 }
 

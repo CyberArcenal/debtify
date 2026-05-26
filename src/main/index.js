@@ -39,6 +39,7 @@ const {
   registerFileStorage,
   getAgreementFullPath,
 } = require("../utils/agreementFileStorage.js");
+const PenaltyApplicationScheduler = require("../scheduler/penaltyApplicationScheduler.js");
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -1006,6 +1007,15 @@ async function startupSequence() {
         // @ts-ignore
         err,
       );
+    });
+
+    const penaltyScheduler = new PenaltyApplicationScheduler();
+    penaltyScheduler.start().catch((err) => {
+      console.error("Failed to start penalty scheduler", err);
+    });
+    
+    ipcMain.handle("scheduler:penalty:force", async () => {
+      return await penaltyScheduler.forceRun();
     });
   } catch (error) {
     log(LogLevel.ERROR, "Startup sequence failed:", error);

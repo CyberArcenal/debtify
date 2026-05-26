@@ -1,4 +1,5 @@
 // src/services/PaymentTransactionStateTransitionService.js
+//@ts-check
 const PaymentTransaction = require("../entities/PaymentTransaction");
 const Debt = require("../entities/Debt");
 const { logger } = require("../utils/logger");
@@ -6,12 +7,19 @@ const auditLogger = require("../utils/auditLogger");
 const notificationService = require("../services/Notification");
 
 class PaymentTransactionStateTransitionService {
+  /**
+   * @param {{ getRepository: (arg0: import("typeorm").EntitySchema<{ id: unknown; methodId: unknown; amount: unknown; paymentDate: unknown; reference: unknown; notes: unknown; deletedAt: unknown; recordedAt: unknown; }> | import("typeorm").EntitySchema<{ id: unknown; name: unknown; totalAmount: unknown; paidAmount: unknown; remainingAmount: unknown; dueDate: unknown; status: unknown; interestRate: unknown; penaltyRate: unknown; deletedAt: unknown; createdAt: unknown; updatedAt: unknown; lastInterestAccrualDate: unknown; }>) => any; }} dataSource
+   */
   constructor(dataSource) {
     this.dataSource = dataSource;
     this.paymentRepo = dataSource.getRepository(PaymentTransaction);
     this.debtRepo = dataSource.getRepository(Debt);
   }
 
+  /**
+   * @param {{ manager: { getRepository: (arg0: any) => any; }; } | null} qr
+   * @param {import("typeorm").EntitySchema<{ id: unknown; methodId: unknown; amount: unknown; paymentDate: unknown; reference: unknown; notes: unknown; deletedAt: unknown; recordedAt: unknown; }> | import("typeorm").EntitySchema<{ id: unknown; name: unknown; totalAmount: unknown; paidAmount: unknown; remainingAmount: unknown; dueDate: unknown; status: unknown; interestRate: unknown; penaltyRate: unknown; deletedAt: unknown; createdAt: unknown; updatedAt: unknown; lastInterestAccrualDate: unknown; }>} entityClass
+   */
   _getRepo(qr, entityClass) {
     if (qr) return qr.manager.getRepository(entityClass);
     return this.dataSource.getRepository(entityClass);
@@ -19,6 +27,8 @@ class PaymentTransactionStateTransitionService {
 
   /**
    * Helper: reload debt with borrower relation (transactional)
+   * @param {any} debtId
+   * @param {null} queryRunner
    */
   async _getDebtWithBorrower(debtId, queryRunner) {
     const debtRepo = this._getRepo(queryRunner, Debt);
@@ -30,6 +40,9 @@ class PaymentTransactionStateTransitionService {
     return debt;
   }
 
+  /**
+   * @param {{ id: any; amount: number; debt: { id: any; }; }} payment
+   */
   async applyPayment(payment, user = "system", queryRunner = null) {
     const { updateDb } = require("../utils/dbUtils/dbActions");
     logger.info(
@@ -44,6 +57,7 @@ class PaymentTransactionStateTransitionService {
     debt.remainingAmount = debt.totalAmount - debt.paidAmount;
     if (debt.remainingAmount < 0) debt.remainingAmount = 0;
     debt.updatedAt = new Date();
+    // @ts-ignore
     await updateDb(debtRepo, debt, { queryRunner, skipSignal: true });
 
     await auditLogger.logUpdate(
@@ -58,6 +72,9 @@ class PaymentTransactionStateTransitionService {
     );
   }
 
+  /**
+   * @param {{ id: any; amount: number; debt: { id: any; }; }} payment
+   */
   async reversePayment(payment, user = "system", queryRunner = null) {
     const { updateDb } = require("../utils/dbUtils/dbActions");
     logger.info(
@@ -72,6 +89,7 @@ class PaymentTransactionStateTransitionService {
     debt.remainingAmount = debt.totalAmount - debt.paidAmount;
     if (debt.remainingAmount < 0) debt.remainingAmount = 0;
     debt.updatedAt = new Date();
+    // @ts-ignore
     await updateDb(debtRepo, debt, { queryRunner, skipSignal: true });
 
     await auditLogger.logUpdate(
@@ -86,6 +104,11 @@ class PaymentTransactionStateTransitionService {
     );
   }
 
+  /**
+   * @param {{ id: any; debt: { id: any; }; }} payment
+   * @param {number} oldAmount
+   * @param {number} newAmount
+   */
   async updatePaymentAmount(
     payment,
     oldAmount,
@@ -108,6 +131,7 @@ class PaymentTransactionStateTransitionService {
     debt.remainingAmount = debt.totalAmount - debt.paidAmount;
     if (debt.remainingAmount < 0) debt.remainingAmount = 0;
     debt.updatedAt = new Date();
+    // @ts-ignore
     await updateDb(debtRepo, debt, { queryRunner, skipSignal: true });
 
     await auditLogger.logUpdate(
@@ -122,6 +146,11 @@ class PaymentTransactionStateTransitionService {
     );
   }
 
+  /**
+   * @param {{ id: any; amount: number; }} payment
+   * @param {any} oldDebtId
+   * @param {any} newDebtId
+   */
   async transferPayment(
     payment,
     oldDebtId,
@@ -143,12 +172,14 @@ class PaymentTransactionStateTransitionService {
     oldDebt.remainingAmount = oldDebt.totalAmount - oldDebt.paidAmount;
     if (oldDebt.remainingAmount < 0) oldDebt.remainingAmount = 0;
     oldDebt.updatedAt = new Date();
+    // @ts-ignore
     await updateDb(debtRepo, oldDebt, { queryRunner, skipSignal: true });
 
     newDebt.paidAmount = (newDebt.paidAmount || 0) + payment.amount;
     newDebt.remainingAmount = newDebt.totalAmount - newDebt.paidAmount;
     if (newDebt.remainingAmount < 0) newDebt.remainingAmount = 0;
     newDebt.updatedAt = new Date();
+    // @ts-ignore
     await updateDb(debtRepo, newDebt, { queryRunner, skipSignal: true });
 
     await auditLogger.logUpdate(
@@ -170,6 +201,9 @@ class PaymentTransactionStateTransitionService {
     );
   }
 
+  /**
+   * @param {{ id: any; voided: boolean; updatedAt: Date; debt: { id: any; }; amount: any; }} payment
+   */
   async onVoid(payment, user = "system", queryRunner = null) {
     const { updateDb } = require("../utils/dbUtils/dbActions");
     logger.info(`[Transition] Voiding payment #${payment.id} by ${user}`);
@@ -179,6 +213,7 @@ class PaymentTransactionStateTransitionService {
     const paymentRepo = this._getRepo(queryRunner, PaymentTransaction);
     payment.voided = true;
     payment.updatedAt = new Date();
+    // @ts-ignore
     await updateDb(paymentRepo, payment, { queryRunner, skipSignal: true });
 
     // Reload debt with borrower for notification
@@ -209,6 +244,10 @@ class PaymentTransactionStateTransitionService {
     );
   }
 
+  /**
+   * @param {{ id: any; debt: { id: any; }; amount: any; }} payment
+   * @param {number} refundAmount
+   */
   async onRefund(payment, refundAmount, user = "system", queryRunner = null) {
     const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
     logger.info(
@@ -228,6 +267,7 @@ class PaymentTransactionStateTransitionService {
       notes: `Refund processed by ${user}`,
       debt: debt,
     });
+    // @ts-ignore
     await saveDb(paymentRepo, refund, { queryRunner, skipSignal: true });
 
     // Update debt (subtract refund amount from paidAmount)
@@ -235,6 +275,7 @@ class PaymentTransactionStateTransitionService {
     debt.remainingAmount = debt.totalAmount - debt.paidAmount;
     if (debt.remainingAmount < 0) debt.remainingAmount = 0;
     debt.updatedAt = new Date();
+    // @ts-ignore
     await updateDb(debtRepo, debt, { queryRunner, skipSignal: true });
 
     // Reload debt with borrower for notification
@@ -266,8 +307,12 @@ class PaymentTransactionStateTransitionService {
     );
   }
 
+  /**
+   * @param {{ id: any; debt: { id: any; }; amount: number; confirmed: boolean; updatedAt: Date; }} payment
+   */
   async onConfirm(payment, user = "system", queryRunner = null) {
     const { updateDb } = require("../utils/dbUtils/dbActions");
+    const { enablePartialPayment } = require("../utils/system");
     logger.info(`[Transition] Confirming payment #${payment.id} by ${user}`);
 
     // 1. Apply payment (update debt paidAmount, remainingAmount)
@@ -279,6 +324,14 @@ class PaymentTransactionStateTransitionService {
       queryRunner,
     );
 
+    const allowPartial = await enablePartialPayment();
+    const remainingAfter = debtWithBorrower.remainingAmount - payment.amount;
+    if (!allowPartial && remainingAfter > 0.01) {
+      throw new Error(
+        "Partial payments are disabled. You can only pay the full remaining amount.",
+      );
+    }
+
     // 3. If debt is fully paid, mark status as 'paid'
     if (
       debtWithBorrower.remainingAmount <= 0 &&
@@ -288,6 +341,7 @@ class PaymentTransactionStateTransitionService {
       debtWithBorrower.status = "paid";
       debtWithBorrower.updatedAt = new Date();
       await updateDb(debtRepo, debtWithBorrower, {
+        // @ts-ignore
         queryRunner,
         skipSignal: false,
       });
@@ -300,6 +354,7 @@ class PaymentTransactionStateTransitionService {
     const paymentRepo = this._getRepo(queryRunner, PaymentTransaction);
     payment.confirmed = true;
     payment.updatedAt = new Date();
+    // @ts-ignore
     await updateDb(paymentRepo, payment, { queryRunner, skipSignal: true });
 
     // 5. Receipt printing (non-critical, use setTimeout)
@@ -311,11 +366,13 @@ class PaymentTransactionStateTransitionService {
         } catch (err) {
           logger.warn(
             `Failed to print receipt for debt #${debtWithBorrower.id}:`,
+            // @ts-ignore
             err,
           );
         }
       }, 0);
     } catch (err) {
+      // @ts-ignore
       logger.warn(`Failed to schedule receipt printing:`, err);
     }
 
