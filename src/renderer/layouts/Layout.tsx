@@ -1,9 +1,10 @@
 // src/layouts/Layout.tsx
 
-import React, { useState, useEffect } from 'react';
-import { Outlet } from 'react-router-dom';
-import Sidebar from './SideBar';
-import TopBar from './TopBar';
+import React, { useState, useEffect } from "react";
+import { Outlet } from "react-router-dom";
+import Sidebar from "./SideBar";
+import TopBar from "./TopBar";
+import { NotificationToastListener } from "../components/Shared/NotificationToastListener";
 
 const Layout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -26,7 +27,7 @@ const Layout: React.FC = () => {
   return (
     <div className="flex h-screen">
       {/* Sidebar component */}
-      
+
       <Sidebar isOpen={sidebarOpen} />
 
       {/* Mobile sidebar backdrop */}
@@ -47,6 +48,7 @@ const Layout: React.FC = () => {
           <Outlet />
         </main>
       </div>
+      <NotificationToastListener />
     </div>
   );
 };

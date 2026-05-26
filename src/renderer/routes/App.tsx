@@ -24,6 +24,7 @@ import DevicesPage from "../pages/devices";
 import NotificationLogPage from "../pages/reminder";
 import SyncPage from "../pages/sync";
 import LoanAgreementsPage from "../pages/loans/loan-agreements";
+import { NotificationToastListener } from "../components/Shared/NotificationToastListener";
 // import DebtDashboard from "../pages/dashboard";
 
 function App() {
@@ -96,6 +97,7 @@ function App() {
 
         {/* 404 Page */}
         <Route path="*" element={<div>Not found page</div>} />
+      
       </Route>
     </Routes>
   );
