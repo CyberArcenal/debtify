@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Collectly - Loading</title>
     <style>
-      /* (same styles, no changes) */
       * {
         margin: 0;
         padding: 0;
@@ -14,7 +13,7 @@
       body {
         font-family:
           -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        background: transparent; /* ← Binago ko ito */
+        background: transparent;
         color: #1e293b;
         height: 100vh;
         width: 100vw;
@@ -28,27 +27,41 @@
       .container {
         max-width: 400px;
         width: 90%;
-        background: white; /* Ito lang ang mananatiling light/white */
+        background: white;
         border-radius: 20px;
-        box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.25); /* slightly stronger shadow para lumabas sa transparent bg */
+        box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.25);
         padding: 2rem 1.5rem;
         border: 1px solid #e5e7eb;
       }
       .logo {
         width: 64px;
         height: 64px;
-        background: linear-gradient(135deg, #0e9d7c, #0b7a60);
+        margin: 0 auto 1.2rem;
         border-radius: 18px;
+        overflow: hidden;
+        box-shadow: 0 8px 16px -6px rgba(14, 157, 124, 0.3);
+        background: linear-gradient(135deg, #0e9d7c, #0b7a60);
         display: flex;
         align-items: center;
         justify-content: center;
-        margin: 0 auto 1.2rem;
-        box-shadow: 0 8px 16px -6px rgba(14, 157, 124, 0.3);
+        /* Force no extra space inside */
+        line-height: 0;
+        font-size: 0;
       }
-      .logo svg {
+      .logo img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        /* Remove any default spacing */
+        display: block;
+        margin: 0;
+        padding: 0;
+        border: none;
+      }
+      .fallback-svg {
         width: 36px;
         height: 36px;
-        color: white;
+        display: block;
       }
       h1 {
         font-size: 1.8rem;
@@ -127,24 +140,15 @@
   </head>
   <body>
     <div class="container">
-      <div class="logo">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <path
-            d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"
-          />
-          <circle cx="12" cy="12" r="3" />
-        </svg>
+      <div class="logo" id="logo-container">
+        <img
+          id="app-icon"
+          src="../assets/icon.png"
+          alt="Collectly"
+        />
       </div>
       <h1>Collectly</h1>
-      <div class="sub">Debt Management System</div>
+      <div class="sub">Collection Platform</div>
 
       <div class="progress-bar">
         <div class="progress-fill" id="progress-fill"></div>
@@ -159,7 +163,45 @@
     </div>
 
     <script>
-      // Dynamic loading messages (optional)
+      function showFallbackIcon() {
+        const container = document.getElementById('logo-container');
+        if (!container || container.querySelector('.fallback-svg')) return;
+        
+        container.innerHTML = '';
+        
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('width', '36');
+        svg.setAttribute('height', '36');
+        svg.setAttribute('viewBox', '0 0 24 24');
+        svg.setAttribute('fill', 'none');
+        svg.setAttribute('stroke', 'white');
+        svg.setAttribute('stroke-width', '2');
+        svg.setAttribute('stroke-linecap', 'round');
+        svg.setAttribute('stroke-linejoin', 'round');
+        svg.classList.add('fallback-svg');
+        
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', 'M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83');
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', '12');
+        circle.setAttribute('cy', '12');
+        circle.setAttribute('r', '3');
+        
+        svg.appendChild(path);
+        svg.appendChild(circle);
+        container.appendChild(svg);
+        container.style.background = 'linear-gradient(135deg, #0e9d7c, #0b7a60)';
+        console.log('Icon failed to load, using fallback SVG');
+      }
+      
+      const iconImg = document.getElementById('app-icon');
+      if (iconImg) {
+        iconImg.onerror = showFallbackIcon;
+        iconImg.onload = () => console.log('App icon loaded successfully');
+      } else {
+        showFallbackIcon();
+      }
+
       const loadingMessages = [
         "Loading modules...",
         "Connecting to database...",
@@ -173,9 +215,8 @@
       const migrationStatusDiv = document.getElementById("migration-status");
       const migrationMsgSpan = document.getElementById("migration-message");
 
-      // Rotate messages (only if no migration is active)
       let msgInterval = setInterval(() => {
-        if (migrationStatusDiv.style.display === "block") return; // stop rotating if migration showing
+        if (migrationStatusDiv.style.display === "block") return;
         loadingEl.style.opacity = "0.5";
         setTimeout(() => {
           step = (step + 1) % loadingMessages.length;
@@ -184,25 +225,19 @@
         }, 150);
       }, 1800);
 
-      // Listen for actual migration status from main process
       if (window.backendAPI) {
         window.backendAPI.on("migration:status", (event, data) => {
-          // Stop rotating messages
           clearInterval(msgInterval);
-
-          // Show migration status div
           migrationStatusDiv.style.display = "block";
 
           if (data.status === "running") {
-            migrationMsgSpan.textContent =
-              data.message || "Updating database structure...";
+            migrationMsgSpan.textContent = data.message || "Updating database structure...";
             migrationStatusDiv.style.background = "#fefce8";
             migrationStatusDiv.style.borderColor = "#fde047";
             migrationStatusDiv.style.color = "#854d0e";
             loadingEl.textContent = "Applying updates...";
           } else if (data.status === "completed") {
-            migrationMsgSpan.textContent =
-              data.message || "Database update completed ✓";
+            migrationMsgSpan.textContent = data.message || "Database update completed ✓";
             migrationStatusDiv.style.background = "#ecfdf5";
             migrationStatusDiv.style.borderColor = "#a7f3d0";
             migrationStatusDiv.style.color = "#065f46";
@@ -219,10 +254,7 @@
           }
         });
       } else {
-        // Fallback if backendAPI not available (just in case)
-        console.warn(
-          "backendAPI not available, cannot listen to migration events",
-        );
+        console.warn("backendAPI not available, cannot listen to migration events");
       }
     </script>
   </body>

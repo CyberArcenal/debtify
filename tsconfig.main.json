@@ -20,6 +20,7 @@
     "types": ["node"]
   },
   "include": [
+    "src/assets/**/*",
     "src/main/**/*",
     "src/entities/**/*",
     "src/migrations/**/*",
