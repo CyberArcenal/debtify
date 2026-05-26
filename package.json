@@ -1,7 +1,7 @@
 {
   "name": "collectly",
   "private": true,
-  "version": "v1.0.6",
+  "version": "v1.0.7",
   "main": "src/main/index.js",
   "author": {
     "name": "CyberArcenal",
