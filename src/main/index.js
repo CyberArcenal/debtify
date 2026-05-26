@@ -40,6 +40,7 @@ const {
   getAgreementFullPath,
 } = require("../utils/agreementFileStorage.js");
 const PenaltyApplicationScheduler = require("../scheduler/penaltyApplicationScheduler.js");
+const ZeroBalanceFixerScheduler = require("../scheduler/zeroBalanceFixerScheduler.js");
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -1013,10 +1014,21 @@ async function startupSequence() {
     penaltyScheduler.start().catch((err) => {
       console.error("Failed to start penalty scheduler", err);
     });
-    
+
     ipcMain.handle("scheduler:penalty:force", async () => {
       return await penaltyScheduler.forceRun();
     });
+
+    const zeroBalanceFixer = new ZeroBalanceFixerScheduler();
+    zeroBalanceFixer.start().catch((err) => {
+      log(LogLevel.ERROR, "Failed to start Zero Balance Fixer Scheduler", err);
+    });
+
+    // Optional: expose force-run via IPC
+    ipcMain.handle("scheduler:zero-balance-fixer:force", async () => {
+      return await zeroBalanceFixer.forceRun();
+    });
+    
   } catch (error) {
     log(LogLevel.ERROR, "Startup sequence failed:", error);
 
