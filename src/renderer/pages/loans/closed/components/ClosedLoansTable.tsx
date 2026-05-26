@@ -58,7 +58,7 @@ const ClosedLoansTable: React.FC<ClosedLoansTableProps> = ({
               <td className="px-4 py-3 text-right">
                 <div className="flex justify-end gap-2">
                   <button onClick={() => onView(loan)} className="p-1.5 rounded hover:bg-[var(--card-hover-bg)]" style={{ color: "var(--accent-blue)" }} title="View Details"><Eye className="w-4 h-4" /></button>
-                  <button onClick={() => onReopen(loan)} className="p-1.5 rounded hover:bg-[var(--card-hover-bg)]" style={{ color: "var(--warning-color)" }} title="Reopen"><RefreshCw className="w-4 h-4" /></button>
+                  <button onClick={() => onReopen(loan)} className="p-1.5 rounded hover:bg-[var(--card-hover-bg)] hidden" style={{ color: "var(--warning-color)" }} title="Reopen"><RefreshCw className="w-4 h-4" /></button>
                 </div>
               </td>
             </tr>
