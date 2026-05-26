@@ -103,7 +103,7 @@ async function getArray(key, settingType, defaultValue = []) {
 // ============================================================
 
 async function companyName() {
-  return getValue("company_name", SettingType.GENERAL, "Debtify");
+  return getValue("company_name", SettingType.GENERAL, "Collectly");
 }
 
 async function branchLocation() {

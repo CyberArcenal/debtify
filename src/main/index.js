@@ -2,7 +2,7 @@
 // src/main/index.js
 //@ts-check
 /**
- * @file Main entry point for retail Debtify System
+ * @file Main entry point for retail Collectly System
  * @version 0.0.0
  * @author CyberArcenal
  * @description Electron main process with TypeORM, SQLite, and React integration
@@ -110,7 +110,7 @@ let migrationManager = null;
 /** @type {AppConfig} */
 const APP_CONFIG = {
   isDev: process.env.NODE_ENV === "development" || !app.isPackaged,
-  appName: "Debtify",
+  appName: "Collectly",
   version: app.getVersion(),
   userDataPath: app.getPath("userData"),
 };
