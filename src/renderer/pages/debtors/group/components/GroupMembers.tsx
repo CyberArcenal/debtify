@@ -67,7 +67,7 @@ const GroupMembers: React.FC<GroupMembersProps> = ({
           Members: {groupName}
         </h3>
         <button
-          onClick={() => setShowAssignModal(true)}
+          onClick={(e) =>{e.stopPropagation(); setShowAssignModal(true)}}
           className="px-2 py-1 rounded-md bg-[var(--primary-color)] text-white text-sm flex items-center gap-1"
         >
           <UserPlus className="w-4 h-4" /> Assign
@@ -89,7 +89,7 @@ const GroupMembers: React.FC<GroupMembersProps> = ({
             {members.map((member) => (
               <li
                 key={member.debtorId}
-                onClick={() => onView({id: member.debtorId})}
+                onClick={(e) =>{e.stopPropagation(); onView({id: member.debtorId})}}
                 className="flex justify-between items-center p-2 rounded border"
                 style={{ borderColor: "var(--border-color)" }}
               >
@@ -107,7 +107,7 @@ const GroupMembers: React.FC<GroupMembersProps> = ({
                   </div>
                 </div>
                 <button
-                  onClick={() => onRemove(member.debtorId)}
+                    onClick={(e) =>{e.stopPropagation(); onRemove(member.debtorId)}}
                   className="p-1 rounded hover:bg-[var(--card-hover-bg)] text-red-500"
                   title="Remove"
                 >
@@ -154,10 +154,10 @@ const GroupMembers: React.FC<GroupMembersProps> = ({
                 {filteredAvailable.map((debtor) => (
                   <div
                     key={debtor.id}
-                    onClick={() => onView(debtor)}
+                    onClick={(e) =>{e.stopPropagation(); onView(debtor)}}
                     className="flex items-center gap-2 p-2 rounded hover:bg-[var(--card-hover-bg)]"
                   >
-                    <button onClick={() => toggleDebtorSelection(debtor.id)}>
+                    <button onClick={(e) =>{e.stopPropagation(); toggleDebtorSelection(debtor.id)}}>
                       {selectedDebtorIds.includes(debtor.id) ? (
                         <CheckSquare className="w-5 h-5 text-[var(--primary-color)]" />
                       ) : (
@@ -184,7 +184,7 @@ const GroupMembers: React.FC<GroupMembersProps> = ({
               style={{ borderColor: "var(--border-color)" }}
             >
               <button
-                onClick={() => setShowAssignModal(false)}
+                onClick={(e) =>{e.stopPropagation(); setShowAssignModal(false)}}
                 className="px-3 py-1 rounded border"
                 style={{ borderColor: "var(--border-color)" }}
               >

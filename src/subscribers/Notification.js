@@ -36,17 +36,19 @@ class NotificationSubscriber {
   }
 
   async afterInsert(entity, { manager, queryRunner }) {
-    try {
+   try {
       logger.info("[NotificationSubscriber] afterInsert", {
         id: entity.id,
         title: entity.title,
         type: entity.type,
         debtId: entity.debt?.id,
       });
-      // Could trigger onSend if scheduledFor is now
+      // Call onCreate transition
+      const service = await this.getTransitionService(manager.connection);
+      await service.onCreate(entity, "system", queryRunner);
     } catch (err) {
       logger.error("[NotificationSubscriber] afterInsert error", err);
-      throw err;
+      // Don't throw to avoid breaking the transaction
     }
   }
 
