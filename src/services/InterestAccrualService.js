@@ -1,136 +1,219 @@
 // src/services/InterestAccrualService.js
+//@ts-check
 const { AppDataSource } = require("../main/db/data-source");
 const Debt = require("../entities/Debt");
-const { updateDb } = require("../utils/dbUtils/dbActions");
+
 const auditLogger = require("../utils/auditLogger");
 const { logger } = require("../utils/logger");
 
 class InterestAccrualService {
-  constructor() {
-    this.debtRepo = AppDataSource.getRepository(Debt);
-  }
+  // Walang constructor na kumukuha ng repository – safe kahit hindi pa ready ang DB
 
   /**
-   * Get the next accrual date (monthly anniversary)
+   * Lazy getter para sa debt repository (safe kahit kailan tawagin)
    */
-  getNextAccrualDate(fromDate) {
-    let d = new Date(fromDate);
-    let day = d.getDate();
-    d.setMonth(d.getMonth() + 1);
-    if (d.getDate() !== day) {
-      d.setDate(0); // last day of previous month
+  get debtRepo() {
+    if (!AppDataSource.isInitialized) {
+      throw new Error("Database not initialized");
     }
-    return d;
+    return AppDataSource.getRepository(Debt);
   }
 
   /**
-   * Apply interest accrual to a single debt
+   * Mag-accrue ng interes para sa isang utang hanggang sa isang target date.
+   * Ginagamit ito bago mag-apply ng payment, o sa scheduler.
+   *
+   * @param {Object} debt - Debt entity
+   * @param {Date} asOfDate - petsa kung hanggang kailan mag-aaccrue (default: ngayon)
+   * @returns {Promise<Object>} updated debt
    */
   async applyAccrual(debt, asOfDate = new Date()) {
+    const { updateDb } = require("../utils/dbUtils/dbActions");
+    // Skip kung hindi active/overdue
+    // @ts-ignore
     if (debt.status !== "active" && debt.status !== "overdue") {
-      logger.debug(`[InterestAccrual] Skipping debt #${debt.id} (status: ${debt.status})`);
-      return debt;
-    }
-    if (!debt.interestRate || debt.interestRate <= 0) {
-      logger.debug(`[InterestAccrual] Skipping debt #${debt.id} (no interest rate)`);
-      return debt;
-    }
-    if (debt.remainingAmount <= 0) {
-      logger.debug(`[InterestAccrual] Skipping debt #${debt.id} (fully paid)`);
+      logger.debug(
+        // @ts-ignore
+        `[InterestAccrual] Skip debt #${debt.id}, status: ${debt.status}`,
+      );
       return debt;
     }
 
-    let lastDate = debt.lastInterestAccrualDate ? new Date(debt.lastInterestAccrualDate) : new Date(debt.createdAt);
-    if (isNaN(lastDate.getTime())) lastDate = new Date(debt.createdAt);
-    const today = new Date(asOfDate);
-    today.setHours(0, 0, 0, 0);
+    // Skip kung walang interest rate o zero
+    // @ts-ignore
+    if (!debt.interestRate || debt.interestRate <= 0) {
+      logger.debug(
+        // @ts-ignore
+        `[InterestAccrual] Skip debt #${debt.id}, interestRate = ${debt.interestRate}`,
+      );
+      return debt;
+    }
+
+    // Skip kung fully paid na
+    // @ts-ignore
+    if (debt.remainingAmount <= 0.01) {
+      logger.debug(
+        // @ts-ignore
+        `[InterestAccrual] Skip debt #${debt.id}, remaining = ${debt.remainingAmount}`,
+      );
+      return debt;
+    }
+
+    // Kunin ang huling accrual date (kung null, gamitin ang createdAt)
+    // @ts-ignore
+    let lastDate = debt.lastInterestAccrualDate
+      // @ts-ignore
+      ? new Date(debt.lastInterestAccrualDate)
+      // @ts-ignore
+      : new Date(debt.createdAt);
+    if (isNaN(lastDate.getTime())) {
+      // @ts-ignore
+      lastDate = new Date(debt.createdAt);
+    }
     lastDate.setHours(0, 0, 0, 0);
 
-    // Compute number of full months that have passed
-    let monthsDiff = (today.getFullYear() - lastDate.getFullYear()) * 12 + (today.getMonth() - lastDate.getMonth());
-    // If today's day is before the anniversary day, subtract one month
-    if (today.getDate() < lastDate.getDate()) {
-      monthsDiff--;
-    }
-    if (monthsDiff <= 0) {
-      logger.debug(`[InterestAccrual] Debt #${debt.id} not yet due (months since last: ${monthsDiff})`);
+    const targetDate = new Date(asOfDate);
+    targetDate.setHours(0, 0, 0, 0);
+
+    // Kung ang target date ay hindi lalampas sa last accrual date, walang gagawin
+    if (targetDate <= lastDate) {
+      logger.debug(
+        // @ts-ignore
+        `[InterestAccrual] Debt #${debt.id} already accrued up to ${lastDate.toISOString()}`,
+      );
       return debt;
     }
 
-    const monthlyRate = debt.interestRate / 100 / 12;
+    // Bilang ng araw mula lastDate hanggang targetDate (exclusive ng lastDate, inclusive ng targetDate? standard: from lastDate+1 to targetDate)
+    const daysDiff = Math.floor(
+      // @ts-ignore
+      (targetDate - lastDate) / (1000 * 60 * 60 * 24),
+    );
+    if (daysDiff === 0) return debt;
+
+    // Compute daily interest rate (simple interest)
+    // @ts-ignore
+    const annualRate = debt.interestRate / 100;
+    const dailyRate = annualRate / 365;
+    // @ts-ignore
     const principal = debt.remainingAmount;
-    const interestAmount = principal * monthlyRate * monthsDiff;
-    if (interestAmount <= 0.01) return debt;
+    const interestAmount = principal * dailyRate * daysDiff;
 
+    if (interestAmount <= 0.01) {
+      logger.debug(
+        // @ts-ignore
+        `[InterestAccrual] Negligible interest for debt #${debt.id}: ${interestAmount}`,
+      );
+      return debt;
+    }
+
+    // @ts-ignore
     const oldRemaining = debt.remainingAmount;
-    debt.remainingAmount = principal + interestAmount;
-    debt.remainingAmount = parseFloat(debt.remainingAmount.toFixed(2));
-    // Update last accrual date by adding monthsDiff months
-    let newLastDate = new Date(lastDate);
-    newLastDate.setMonth(newLastDate.getMonth() + monthsDiff);
-    if (newLastDate > today) newLastDate = today;
-    debt.lastInterestAccrualDate = newLastDate;
-    debt.updatedAt = today;
+    // @ts-ignore
+    debt.remainingAmount = parseFloat((principal + interestAmount).toFixed(2));
+    // @ts-ignore
+    debt.lastInterestAccrualDate = targetDate;
+    // @ts-ignore
+    debt.updatedAt = new Date();
 
+    // I-save gamit ang updateDb (skipSignal para hindi ma-trigger ang ibang hooks kung gusto)
+    // @ts-ignore
     await updateDb(this.debtRepo, debt, { skipSignal: true });
-    logger.info(`[InterestAccrual] Applied ₱${interestAmount.toFixed(2)} interest for ${monthsDiff} month(s) to debt #${debt.id}. New remaining: ${debt.remainingAmount}`);
 
+    logger.info(
+      // @ts-ignore
+      `[InterestAccrual] Debt #${debt.id}: +₱${interestAmount.toFixed(2)} interest for ${daysDiff} day(s). New remaining: ₱${debt.remainingAmount}`,
+    );
+
+    // Audit log
     await auditLogger.logUpdate(
       "Debt",
+      // @ts-ignore
       debt.id,
-      { remainingAmount: oldRemaining, interestAccrued: interestAmount, months: monthsDiff },
-      { remainingAmount: debt.remainingAmount, lastInterestAccrualDate: newLastDate },
-      "system"
+      {
+        oldRemaining,
+        interestAccrued: interestAmount,
+        days: daysDiff,
+        lastAccrualDate: lastDate,
+        accrualUpTo: targetDate,
+      },
+      {
+        // @ts-ignore
+        newRemaining: debt.remainingAmount,
+        newLastAccrualDate: targetDate,
+      },
+      "system",
     );
+
     return debt;
   }
 
   /**
-   * Find debts that need accrual (based on monthly anniversary)
+   * Hanapin ang lahat ng utang na kailangang i-accrue (active/overdue, may interest, positive balance)
+   * @returns {Promise<Debt[]>}
    */
   async findDebtsForAccrual() {
-    const debts = await this.debtRepo
+    // @ts-ignore
+    return await this.debtRepo
       .createQueryBuilder("debt")
-      .where("debt.status IN (:...statuses)", { statuses: ["active", "overdue"] })
+      .where("debt.status IN (:...statuses)", {
+        statuses: ["active", "overdue"],
+      })
       .andWhere("debt.remainingAmount > 0")
       .andWhere("debt.interestRate IS NOT NULL")
       .andWhere("debt.interestRate > 0")
+      .andWhere("debt.deletedAt IS NULL")
       .getMany();
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const eligible = [];
-    for (const debt of debts) {
-      let lastDate = debt.lastInterestAccrualDate ? new Date(debt.lastInterestAccrualDate) : new Date(debt.createdAt);
-      if (isNaN(lastDate.getTime())) lastDate = new Date(debt.createdAt);
-      lastDate.setHours(0, 0, 0, 0);
-      let monthsDiff = (today.getFullYear() - lastDate.getFullYear()) * 12 + (today.getMonth() - lastDate.getMonth());
-      if (today.getDate() < lastDate.getDate()) monthsDiff--;
-      if (monthsDiff >= 1) eligible.push(debt);
-    }
-    return eligible;
   }
 
+  /**
+   * I-accrue ang interes para sa LAHAT ng eligible debts, hanggang ngayong araw.
+   * Ginagamit ito ng scheduler (araw-araw).
+   * @returns {Promise<{processed: number, errors: number}>}
+   */
   async runAccrual() {
-    logger.info("[InterestAccrual] Starting monthly interest accrual check...");
+    logger.info("[InterestAccrual] Starting daily interest accrual...");
     const debts = await this.findDebtsForAccrual();
     if (debts.length === 0) {
       logger.info("[InterestAccrual] No debts need accrual.");
       return { processed: 0, errors: 0 };
     }
-    let processed = 0, errors = 0;
+
+    let processed = 0,
+      errors = 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     for (const debt of debts) {
       try {
-        await this.applyAccrual(debt);
+        await this.applyAccrual(debt, today);
         processed++;
       } catch (err) {
+        // @ts-ignore
         logger.error(`[InterestAccrual] Failed for debt #${debt.id}:`, err);
         errors++;
       }
     }
-    logger.info(`[InterestAccrual] Completed: processed ${processed}, errors ${errors}`);
+
+    logger.info(
+      `[InterestAccrual] Completed: processed ${processed}, errors ${errors}`,
+    );
     return { processed, errors };
+  }
+
+  /**
+   * I-accrue ang interes para sa isang specific na utang hanggang sa isang specific na petsa.
+   * Ito ay dapat tawagin **BAGO** mag-apply ng payment, para accurate ang balance bago ang payment.
+   * @param {number} debtId
+   * @param {Date} asOfDate
+   * @returns {Promise<Object>} updated debt
+   */
+  async accrueForPayment(debtId, asOfDate = new Date()) {
+    const debt = await this.debtRepo.findOne({ where: { id: debtId } });
+    if (!debt) throw new Error(`Debt #${debtId} not found`);
+    return await this.applyAccrual(debt, asOfDate);
   }
 }
 
+// I-export bilang singleton instance
 module.exports = new InterestAccrualService();
