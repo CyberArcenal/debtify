@@ -201,7 +201,7 @@ class LoanApplicationStateTransitionService {
     const agreementData = {
       agreementId: `LA-${createdDebt.id}`,
       agreementDate: new Date().toLocaleDateString(),
-      lenderName: "Debtify Lending Corp", // o galing sa settings
+      lenderName: "Collectly Lending Corp", // o galing sa settings
       borrowerName: application.debtorName,
       borrowerEmail: application.debtorEmail || "",
       borrowerContact: application.debtorContact || "",

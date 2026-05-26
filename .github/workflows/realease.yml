@@ -1,4 +1,4 @@
-name: Build & Release Debtify
+name: Build & Release Collectly
 
 on:
   push:
@@ -53,7 +53,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: debtify-${{ runner.os }}
+          name: collectly-${{ runner.os }}
           path: release/
 
   release:

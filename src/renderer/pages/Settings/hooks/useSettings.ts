@@ -16,7 +16,7 @@ import { useSettings as useSettingsContext } from "../../../contexts/SettingsCon
 
 // ========== Default values for each category ==========
 const DEFAULT_GENERAL: GeneralSettings = {
-  company_name: "Debtify",
+  company_name: "Collectly",
   sync_mode: "offline_first",
   branch_location: "",
   default_timezone: "Asia/Manila",

@@ -38,7 +38,7 @@ export function LicenseModal({ onAccept, onCommercialRequest }: LicenseModalProp
             <div className="p-2 bg-blue-500/10 rounded-lg">
               <CheckCircle className="w-6 h-6 text-blue-400" />
             </div>
-            <h2 className="text-xl font-bold text-white">Debtify License Agreement</h2>
+            <h2 className="text-xl font-bold text-white">Collectly License Agreement</h2>
           </div>
           <button
             onClick={handleAccept}
@@ -53,14 +53,14 @@ export function LicenseModal({ onAccept, onCommercialRequest }: LicenseModalProp
         <div className="p-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
           <div className="space-y-5 text-slate-300">
             <p>
-              Debtify is <strong className="text-white">dual‑licensed</strong> under the Apache License 2.0 (open source)
+              Collectly is <strong className="text-white">dual‑licensed</strong> under the Apache License 2.0 (open source)
               or a separate Commercial License for proprietary use.
             </p>
 
             <div className="bg-slate-900/50 rounded-lg p-4 border-l-4 border-blue-500">
               <h3 className="font-semibold text-white text-lg mb-1">📖 Open Source Terms (Apache 2.0)</h3>
               <p className="text-sm">
-                You may use, modify, and distribute Debtify for free under the Apache 2.0 license,
+                You may use, modify, and distribute Collectly for free under the Apache 2.0 license,
                 provided you retain all copyright notices and disclaimers.
               </p>
             </div>
@@ -68,7 +68,7 @@ export function LicenseModal({ onAccept, onCommercialRequest }: LicenseModalProp
             <div className="bg-slate-900/50 rounded-lg p-4 border-l-4 border-amber-500">
               <h3 className="font-semibold text-white text-lg mb-1">💼 Commercial License</h3>
               <p className="text-sm">
-                If you intend to use Debtify in a proprietary environment, for a business that generates revenue,
+                If you intend to use Collectly in a proprietary environment, for a business that generates revenue,
                 or require enterprise support, you must purchase a Commercial License.
               </p>
             </div>

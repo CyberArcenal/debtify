@@ -373,7 +373,7 @@ async getAllPrinters(page = 1, limit = 10) {
     const printer = await printerRepo.findOne({ where: { id } });
     if (!printer) throw new Error(`Printer with ID ${id} not found`);
 
-    const testContent = `Debtify Test Print\n`;
+    const testContent = `Collectly Test Print\n`;
     const timestamp = new Date().toLocaleString();
     const fullContent = `${testContent}Printed: ${timestamp}\n------------------------\nIf you see this, your printer is working correctly.\n`;
 

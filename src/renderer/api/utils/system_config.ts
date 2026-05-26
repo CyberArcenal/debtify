@@ -707,7 +707,7 @@ class SystemConfigAPI {
     const defaults: CreateSettingData[] = [
       {
         key: "company_name",
-        value: "Debtify",
+        value: "Collectly",
         setting_type: SettingType.GENERAL,
         description: "Company name",
         isPublic: false,

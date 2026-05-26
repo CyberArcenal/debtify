@@ -301,7 +301,7 @@ class SystemSettingService {
     const { version } = require("../../package.json");
     return {
       version,
-      name: "Debtify",
+      name: "Collectly",
       environment:
         process.env.NODE_ENV === "production" ? "production" : "development",
       debug_mode: process.env.NODE_ENV === "development",

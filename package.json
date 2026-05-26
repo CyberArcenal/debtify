@@ -1,7 +1,7 @@
 {
-  "name": "debtify",
+  "name": "collectly",
   "private": true,
-  "version": "v0.0.0-beta.9",
+  "version": "v1.0.0",
   "main": "src/main/index.js",
   "author": {
     "name": "CyberArcenal",
@@ -9,11 +9,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/CyberArcenal/debtify.git"
+    "url": "https://github.com/CyberArcenal/collectly.git"
   },
   "build": {
-    "appId": "com.CyberArcenal.debtify.app",
-    "productName": "debtify",
+    "appId": "com.CyberArcenal.collectly.app",
+    "productName": "collectly",
     "directories": {
       "output": "release"
     },
@@ -38,7 +38,7 @@
     "publish": {
       "provider": "github",
       "owner": "CyberArcenal",
-      "repo": "debtify",
+      "repo": "collectly",
       "releaseType": "release"
     }
   },

@@ -10,7 +10,7 @@ const settingsCache = {};
 // Map of known setting keys to their default values
 const DEFAULTS = {
   // General
-  company_name: "Debtify",
+  company_name: "Collectly",
   branch_location: "",
   default_timezone: "Asia/Manila",
   currency: "PHP",
