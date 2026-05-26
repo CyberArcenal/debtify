@@ -38,15 +38,18 @@ const StatusIndicators: React.FC = () => {
     };
   }, []);
 
-  // AUDIT CLEANUP LISTENER
+  // AUDIT CLEANUP LISTENER (FIXED: clears message after timeout)
   useEffect(() => {
     const cleanupListener = (event: any, data: any) => {
       if (!mountedRef.current) return;
+
+      // Clear any pending timeout for audit
+      if (auditTimeoutRef.current) clearTimeout(auditTimeoutRef.current);
+
       if (data.status === "started") {
-        if (auditTimeoutRef.current) clearTimeout(auditTimeoutRef.current);
         setAuditStatus({ active: true, status: "started" });
         auditTimeoutRef.current = setTimeout(() => {
-          if (mountedRef.current) setAuditStatus((prev) => ({ ...prev, active: false }));
+          if (mountedRef.current) setAuditStatus({ active: false });
         }, 5000);
       } else if (data.status === "completed") {
         setAuditStatus({
@@ -56,7 +59,7 @@ const StatusIndicators: React.FC = () => {
           message: `${data.deletedCount} old audit records deleted`,
         });
         auditTimeoutRef.current = setTimeout(() => {
-          if (mountedRef.current) setAuditStatus((prev) => ({ ...prev, active: false }));
+          if (mountedRef.current) setAuditStatus({ active: false });
         }, 5000);
       } else if (data.status === "failed") {
         setAuditStatus({
@@ -65,7 +68,7 @@ const StatusIndicators: React.FC = () => {
           message: `Cleanup failed: ${data.error}`,
         });
         auditTimeoutRef.current = setTimeout(() => {
-          if (mountedRef.current) setAuditStatus((prev) => ({ ...prev, active: false }));
+          if (mountedRef.current) setAuditStatus({ active: false });
         }, 5000);
       }
     };
@@ -73,7 +76,7 @@ const StatusIndicators: React.FC = () => {
     return () => window.backendAPI?.off?.("audit:cleanup", cleanupListener);
   }, []);
 
-  // EMAIL STATUS LISTENER
+  // EMAIL STATUS LISTENER (unchanged)
   useEffect(() => {
     const emailListener = (event: any, data: any) => {
       if (!mountedRef.current) return;
@@ -96,7 +99,7 @@ const StatusIndicators: React.FC = () => {
     return () => window.backendAPI?.off?.("email:status", emailListener);
   }, []);
 
-  // SMS STATUS LISTENER
+  // SMS STATUS LISTENER (unchanged)
   useEffect(() => {
     const smsListener = (event: any, data: any) => {
       if (!mountedRef.current) return;

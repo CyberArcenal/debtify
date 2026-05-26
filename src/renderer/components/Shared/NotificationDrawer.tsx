@@ -60,8 +60,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
         sortOrder: "DESC",
       });
       if (response.status) {
-        // ✅ response.data is PaginatedResult<Notification>
-        const items = response.data.data; // array of notifications
+        const items = response.data.data;
         setNotifications((prev) => (reset ? items : [...prev, ...items]));
         setHasMore(items.length === limit);
       } else {
@@ -166,7 +165,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
       case "overdue":
         return <div className="w-2 h-2 rounded-full bg-[var(--accent-red)]" />;
       case "reminder":
-        return <div className="w-2 h-2 rounded-full bg-[var(--accent-amber)]" />;
+        return <div className="w-2 h-2 rounded-full bg-[var(--accent-orange)]" />;
       default:
         return <div className="w-2 h-2 rounded-full bg-[var(--text-tertiary)]" />;
     }
@@ -177,7 +176,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="absolute right-0 top-0 h-full w-full max-w-md bg-[var(--card-bg)] border-l border-[var(--border-color)] shadow-xl transform transition-transform duration-300 ease-in-out windows-fade-in">
+      <div className="absolute right-0 top-0 h-full w-full max-w-md bg-[var(--card-bg)] border-l border-[var(--border-color)] shadow-xl transform transition-transform duration-300 ease-in-out">
         <div className="flex flex-col h-full">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-[var(--border-color)]">
@@ -212,7 +211,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
           )}
 
           {/* Notifications List */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-2">
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {loading && notifications.length === 0 ? (
               <div className="flex items-center justify-center h-32">
                 <Loader2 className="w-6 h-6 animate-spin text-[var(--accent-blue)]" />
@@ -247,43 +246,45 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
                 {notifications.map((notification) => {
                   const expanded = expandedIds.has(notification.id);
                   const longMessage = isLongMessage(notification.message);
+                  const isUnread = !notification.isRead;
 
                   return (
                     <div
                       key={notification.id}
-                      className={`group relative p-3 rounded-lg border ${
-                        notification.isRead
-                          ? "border-[var(--border-color)] bg-[var(--card-secondary-bg)]"
-                          : "border-[var(--accent-blue)] bg-[var(--accent-blue-light)]"
-                      } hover:shadow-md transition-shadow`}
+                      className={`
+                        group relative p-4 rounded-xl transition-all duration-200
+                        ${isUnread
+                          ? "bg-[var(--card-bg)] border-l-4 border-l-[var(--accent-blue)] shadow-sm hover:shadow-md"
+                          : "bg-[var(--card-secondary-bg)] border border-[var(--border-color)] hover:border-[var(--border-light)]"
+                        }
+                      `}
                     >
                       <div className="flex items-start gap-3">
-                        <div className="flex-shrink-0 mt-1">
+                        <div className="flex-shrink-0 mt-0.5">
                           {getTypeIcon(notification.type)}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p
-                            className={`text-sm font-medium ${
-                              notification.isRead
-                                ? "text-[var(--text-secondary)]"
-                                : "text-[var(--text-primary)]"
-                            }`}
-                          >
-                            {notification.title}
-                          </p>
+                          <div className="flex items-center justify-between gap-2">
+                            <p className={`text-sm font-medium ${isUnread ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]"}`}>
+                              {notification.title}
+                            </p>
+                            {isUnread && (
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--accent-blue-light)] text-[var(--accent-blue)]">
+                                New
+                              </span>
+                            )}
+                          </div>
 
-                          <div className="mt-1">
+                          <div className="mt-1.5">
                             <p
-                              className={`text-xs text-[var(--text-tertiary)] ${
-                                !expanded ? "line-clamp-2" : ""
-                              }`}
+                              className={`text-sm ${isUnread ? "text-[var(--text-primary)]" : "text-[var(--text-tertiary)]"} ${!expanded ? "line-clamp-2" : ""}`}
                             >
                               {notification.message}
                             </p>
                             {longMessage && (
                               <button
                                 onClick={() => toggleExpanded(notification.id)}
-                                className="mt-1 text-xs text-[var(--accent-blue)] hover:underline flex items-center gap-1"
+                                className="mt-1.5 text-xs text-[var(--accent-blue)] hover:underline flex items-center gap-1"
                               >
                                 {expanded ? (
                                   <>
@@ -298,7 +299,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
                             )}
                           </div>
 
-                          <p className="text-xs text-[var(--text-tertiary)] mt-2">
+                          <p className="text-xs text-[var(--text-tertiary)] mt-2.5">
                             {format(
                               new Date(notification.createdAt),
                               "MMM dd, yyyy • hh:mm a"
@@ -306,7 +307,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
                           </p>
 
                           {notification.debt && expanded && (
-                            <div className="mt-2 text-xs text-[var(--text-tertiary)] bg-[var(--card-bg)] p-2 rounded border border-[var(--border-color)]">
+                            <div className="mt-3 text-xs text-[var(--text-tertiary)] bg-[var(--card-bg)] p-2 rounded-md border border-[var(--border-color)]">
                               <span className="font-medium">Debt ID:</span>{" "}
                               {notification.debt.id}
                               {notification.debt.borrower && (
@@ -321,10 +322,10 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
                         </div>
 
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          {!notification.isRead && (
+                          {isUnread && (
                             <button
                               onClick={() => handleMarkAsRead(notification.id)}
-                              className="p-1 hover:bg-[var(--card-hover-bg)] rounded"
+                              className="p-1.5 hover:bg-[var(--card-hover-bg)] rounded-md"
                               title="Mark as read"
                             >
                               <CheckCheck className="w-4 h-4 text-[var(--accent-blue)]" />
@@ -332,7 +333,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
                           )}
                           <button
                             onClick={() => handleDelete(notification.id)}
-                            className="p-1 hover:bg-[var(--card-hover-bg)] rounded"
+                            className="p-1.5 hover:bg-[var(--card-hover-bg)] rounded-md"
                             title="Delete"
                           >
                             <Trash2 className="w-4 h-4 text-[var(--accent-red)]" />
@@ -347,7 +348,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
                   <button
                     onClick={loadMore}
                     disabled={loading}
-                    className="w-full py-2 text-sm text-[var(--accent-blue)] hover:bg-[var(--accent-blue-light)] rounded transition-colors disabled:opacity-50"
+                    className="w-full py-2.5 text-sm text-[var(--accent-blue)] hover:bg-[var(--accent-blue-light)] rounded-lg transition-colors disabled:opacity-50"
                   >
                     {loading ? (
                       <Loader2 className="w-4 h-4 animate-spin mx-auto" />
