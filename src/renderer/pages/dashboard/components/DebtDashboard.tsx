@@ -28,6 +28,10 @@ import {
 } from "../hooks/useDebtDashboardData";
 import { formatCurrency } from "../../../utils/formatters";
 import DebtorViewDialog from "../../debtors/components/DebtorViewDialog";
+import { AuditViewDialog } from "../../AuditTrail/components/AuditViewDialog";
+import { useAuditView } from "../../AuditTrail/hooks/useAuditView";
+import auditAPI from "../../../api/core/audit";
+import { hideLoading, showError, showLoading } from "../../../utils/notification";
 
 // ==================== Subcomponents ====================
 
@@ -346,6 +350,7 @@ const DebtDashboard: React.FC = () => {
   const { data, loading, error, refetch } = useDebtDashboardData();
   const [viewOpen, setViewOpen] = useState(false);
   const [viewingDebtor, setViewingDebtor] = useState<any>(null);
+  const viewAuditDialog = useAuditView();
 
   const openView = (debtor: any) => {
     setViewingDebtor(debtor);
@@ -703,7 +708,7 @@ const DebtDashboard: React.FC = () => {
           debtors={topDebtors}
           onViewAll={() => navigate("/debtors/list")}
           onSelect={(id) => {
-            openView({id:id});
+            openView({ id: id });
           }}
         />
       </div>
@@ -782,7 +787,19 @@ const DebtDashboard: React.FC = () => {
         <RecentActivitiesList
           activities={recentActivities}
           onViewAll={() => navigate("/system/audit")}
-          onSelect={(id) => navigate(`/audit-logs/view/${id}`)}
+          onSelect={async (id) => {
+            try {
+              showLoading("Loading audit details...")
+              const result = await auditAPI.getById(id);
+              if (result.status) {
+                viewAuditDialog.open(result.data);
+              }
+            } catch (err: any) {
+              showError("Error loading audit details...")
+            }finally{
+              hideLoading()
+            }
+          }}
         />
         <div
           className="compact-card rounded-lg p-4"
@@ -865,6 +882,13 @@ const DebtDashboard: React.FC = () => {
         debtorId={viewingDebtor?.id}
         isOpen={viewOpen}
         onClose={() => setViewOpen(false)}
+      />
+
+      {/* View Dialog */}
+      <AuditViewDialog
+        isOpen={viewAuditDialog.isOpen}
+        log={viewAuditDialog.log}
+        onClose={viewAuditDialog.close}
       />
     </div>
   );
