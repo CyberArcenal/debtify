@@ -48,7 +48,10 @@ const DebtorDirectory: React.FC = () => {
   useEffect(() => {
     if (!loading && paginationRef.current) {
       setTimeout(() => {
-        paginationRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+        paginationRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "end",
+        });
       }, 200);
     }
   }, [currentPage, loading]);
@@ -127,11 +130,17 @@ const DebtorDirectory: React.FC = () => {
   return (
     <div
       className="rounded-md shadow-md border p-4 m-1"
-      style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--border-color)" }}
+      style={{
+        backgroundColor: "var(--card-bg)",
+        borderColor: "var(--border-color)",
+      }}
     >
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
         <div>
-          <h2 className="text-lg font-semibold" style={{ color: "var(--sidebar-text)" }}>
+          <h2
+            className="text-lg font-semibold"
+            style={{ color: "var(--sidebar-text)" }}
+          >
             Debtor Directory
           </h2>
           <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
@@ -143,7 +152,10 @@ const DebtorDirectory: React.FC = () => {
             onClick={reload}
             disabled={loading}
             className="px-3 py-2 rounded-md flex items-center gap-1 transition-all"
-            style={{ backgroundColor: "var(--card-secondary-bg)", color: "var(--sidebar-text)" }}
+            style={{
+              backgroundColor: "var(--card-secondary-bg)",
+              color: "var(--sidebar-text)",
+            }}
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
             Refresh
@@ -154,14 +166,23 @@ const DebtorDirectory: React.FC = () => {
         </div>
       </div>
 
-      <FilterBar filters={filters} onFilterChange={handleFilterChange} onReset={resetFilters} />
+      <FilterBar
+        filters={filters}
+        onFilterChange={handleFilterChange}
+        onReset={resetFilters}
+      />
 
       {selectedDebtors.length > 0 && (
         <div
           className="mb-4 p-3 rounded-md flex items-center justify-between"
-          style={{ backgroundColor: "var(--accent-blue-light)", border: "1px solid var(--accent-blue)" }}
+          style={{
+            backgroundColor: "var(--accent-blue-light)",
+            border: "1px solid var(--accent-blue)",
+          }}
         >
-          <span className="text-sm font-medium">{selectedDebtors.length} debtor(s) selected</span>
+          <span className="text-sm font-medium">
+            {selectedDebtors.length} debtor(s) selected
+          </span>
           <button
             onClick={handleBulkDelete}
             className="px-3 py-1 rounded-md text-white bg-red-600 hover:bg-red-700"
@@ -178,25 +199,52 @@ const DebtorDirectory: React.FC = () => {
             value={pageSize}
             onChange={(e) => setPageSize(Number(e.target.value))}
             className="px-2 py-1 border rounded text-sm"
-            style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--border-color)", color: "var(--sidebar-text)" }}
+            style={{
+              backgroundColor: "var(--card-bg)",
+              borderColor: "var(--border-color)",
+              color: "var(--sidebar-text)",
+            }}
           >
             {[10, 25, 50, 100].map((size) => (
-              <option key={size} value={size}>{size}</option>
+              <option key={size} value={size}>
+                {size}
+              </option>
             ))}
           </select>
           <span className="text-sm text-[var(--text-secondary)]">entries</span>
         </div>
         <div className="text-sm text-[var(--text-secondary)]">
-          {pagination.totalItems > 0 ? `Showing ${start} to ${end} of ${pagination.totalItems} entries` : "No entries"}
+          {pagination.totalItems > 0
+            ? `Showing ${start} to ${end} of ${pagination.totalItems} entries`
+            : "No entries"}
         </div>
       </div>
 
-      {loading && (
-        <div className="flex justify-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--primary-color)]"></div>
+      {/* Center loading and error vertically */}
+      {(loading || error) && (
+        <div className="flex-1 flex items-center justify-center min-h-[400px]">
+          {loading && (
+            <div className="flex flex-col items-center gap-3">
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[var(--primary-color)]"></div>
+              <p className="text-sm text-[var(--text-secondary)]">
+                Loading debtors...
+              </p>
+            </div>
+          )}
+          {error && (
+            <div className="text-center">
+              <div className="text-red-500 mb-2">⚠️</div>
+              <p className="text-red-500">Error: {error}</p>
+              <button
+                onClick={reload}
+                className="mt-3 px-4 py-2 bg-[var(--primary-color)] text-white rounded-md text-sm"
+              >
+                Retry
+              </button>
+            </div>
+          )}
         </div>
       )}
-      {error && <div className="text-center py-4 text-red-500">Error: {error}</div>}
 
       {!loading && !error && (
         <>
@@ -214,14 +262,21 @@ const DebtorDirectory: React.FC = () => {
           />
 
           {debtors.length === 0 && (
-            <div className="text-center py-12 border rounded-md" style={{ borderColor: "var(--border-color)" }}>
+            <div
+              className="text-center py-12 border rounded-md"
+              style={{ borderColor: "var(--border-color)" }}
+            >
               <Users className="w-12 h-12 mx-auto mb-3 text-[var(--text-tertiary)]" />
               <p className="text-lg font-medium">No debtors found</p>
               <p className="text-sm text-[var(--text-tertiary)] mt-1">
-                {filters.search || filters.status !== "active" ? "Try adjusting your filters" : "Start by adding your first debtor"}
+                {filters.search || filters.status !== "active"
+                  ? "Try adjusting your filters"
+                  : "Start by adding your first debtor"}
               </p>
               <div className="mt-4">
-                <Button onClick={openAddForm} variant="primary">Add Debtor</Button>
+                <Button onClick={openAddForm} variant="primary">
+                  Add Debtor
+                </Button>
               </div>
             </div>
           )}

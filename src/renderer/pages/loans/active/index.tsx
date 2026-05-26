@@ -238,14 +238,29 @@ const ActiveLoansPage: React.FC = () => {
           </div>
         </div>
 
-        {loading && (
-          <div className="flex justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--primary-color)]"></div>
-          </div>
-        )}
-        {error && (
-          <div className="text-center py-4 text-red-500">Error: {error}</div>
-        )}
+    {/* Center loading and error vertically */}
+{(loading || error) && (
+  <div className="flex-1 flex items-center justify-center min-h-[400px]">
+    {loading && (
+      <div className="flex flex-col items-center gap-3">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[var(--primary-color)]"></div>
+        <p className="text-sm text-[var(--text-secondary)]">Loading ...</p>
+      </div>
+    )}
+    {error && (
+      <div className="text-center">
+        <div className="text-red-500 mb-2">⚠️</div>
+        <p className="text-red-500">Error: {error}</p>
+        <button
+          onClick={reload}
+          className="mt-3 px-4 py-2 bg-[var(--primary-color)] text-white rounded-md text-sm"
+        >
+          Retry
+        </button>
+      </div>
+    )}
+  </div>
+)}
 
         {!loading && !error && (
           <>

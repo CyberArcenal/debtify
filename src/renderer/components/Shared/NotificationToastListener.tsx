@@ -1,6 +1,12 @@
 // src/components/Shared/NotificationToastListener.tsx
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { showToast } from "../../utils/notification";
+
+type QueuedNotification = {
+  title: string;
+  message: string;
+  type: string;
+};
 
 // Map backend notification types to toast types
 const mapType = (type: string): "success" | "error" | "warning" | "info" | "critical" => {
@@ -19,19 +25,49 @@ const mapType = (type: string): "success" | "error" | "warning" | "info" | "crit
 };
 
 export const NotificationToastListener = () => {
+  const queueRef = useRef<QueuedNotification[]>([]);
+  const isShowingRef = useRef(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showNext = () => {
+    if (isShowingRef.current) return;
+    if (queueRef.current.length === 0) return;
+
+    const next = queueRef.current.shift();
+    if (!next) return;
+
+    isShowingRef.current = true;
+    const { title, message, type } = next;
+
+    // Show the toast
+    showToast(`${title}: ${message}`, mapType(type), {
+      duration: 5000,
+      autoClose: true,
+    });
+
+    // After 5 seconds (or a bit more to allow animation), show next
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      isShowingRef.current = false;
+      showNext(); // Process next in queue
+    }, 5200); // 5s + 200ms buffer
+  };
+
+  const addToQueue = (notification: QueuedNotification) => {
+    queueRef.current.push(notification);
+    showNext();
+  };
+
   useEffect(() => {
     const handleNotificationCreated = (_event: any, data: any) => {
-      const { title, message, type } = data;
       console.log("Received notification from main process:", data);
-
-      // Use the existing toast system
-      showToast(`${title}: ${message}`, mapType(type), {
-        duration: 5000,
-        autoClose: true,
+      addToQueue({
+        title: data.title,
+        message: data.message,
+        type: data.type,
       });
     };
 
-    // Listen for the event from main process
     if (window.backendAPI?.on) {
       window.backendAPI.on("notification:created", handleNotificationCreated);
     }
@@ -40,9 +76,11 @@ export const NotificationToastListener = () => {
       if (window.backendAPI?.off) {
         window.backendAPI.off("notification:created", handleNotificationCreated);
       }
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
     };
   }, []);
 
-  // This component does not render anything
   return null;
 };
