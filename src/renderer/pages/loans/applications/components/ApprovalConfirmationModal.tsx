@@ -10,7 +10,7 @@ interface ApprovalConfirmationModalProps {
   application: LoanApplication | null;
   type: "approve" | "reject";
   onClose: () => void;
-  onConfirm: (reason?: string) => void | Promise<void>;
+  onConfirm: (reason?: string) => Promise<void>;   // must return a promise, can throw
 }
 
 const ApprovalConfirmationModal: React.FC<ApprovalConfirmationModalProps> = ({
@@ -35,21 +35,20 @@ const ApprovalConfirmationModal: React.FC<ApprovalConfirmationModalProps> = ({
     if (isLoading) return;
     setIsLoading(true);
     try {
-      // Call the parent action (async)
       await onConfirm(type === "reject" ? rejectionReason : undefined);
-      // After successful action, parent will close modal via onClose (or its own state)
+      // Only close if successful
+      if (isMountedRef.current) {
+        onClose();
+      }
     } catch (error) {
-      // Error already handled by parent (dialogs.error)
-      // But we still need to stop loading and not close automatically
+      // Error already handled by parent (dialogs.error), but we need to reset loading
+      console.error("Confirmation error:", error);
+    } finally {
       if (isMountedRef.current) {
         setIsLoading(false);
       }
     }
-    // No need to set loading false here because modal will be closed by parent
-    // However, if parent doesn't close on error (e.g., they might show error but keep modal open),
-    // we should reset loading. The parent's confirmAction always calls setConfirmModal close in finally,
-    // so modal unmounts. But if the parent changes behavior, we keep the flag.
-  }, [isLoading, onConfirm, rejectionReason, type]);
+  }, [isLoading, onConfirm, onClose, rejectionReason, type]);
 
   if (!application) return null;
 

@@ -7,6 +7,7 @@ const { logger } = require("../utils/logger");
 const auditLogger = require("../utils/auditLogger");
 const { SystemSetting } = require("../entities/systemSettings");
 const Debt = require("../entities/Debt");
+const { overdueReminderDays } = require("../utils/system");
 
 class OverdueReminderScheduler {
   constructor() {
@@ -130,7 +131,7 @@ class OverdueReminderScheduler {
   }
 
   /**
-   * Main logic: find overdue debts and send reminders
+   * Main logic: find overdue debts and send reminders **only** on configured days overdue
    */
   async sendOverdueReminders() {
     try {
@@ -155,6 +156,7 @@ class OverdueReminderScheduler {
       // - dueDate < current date
       // - status NOT in ['paid', 'defaulted']
       // - deletedAt IS NULL
+      // - have borrower email
       const overdueDebts = await debtRepo
         .createQueryBuilder("debt")
         .leftJoinAndSelect("debt.borrower", "borrower")
@@ -171,17 +173,47 @@ class OverdueReminderScheduler {
         return;
       }
 
+      // Get the configured reminder days (e.g., [7, 3, 1])
+      const reminderDays = await overdueReminderDays();
+      if (!reminderDays || reminderDays.length === 0) {
+        logger.warn(
+          "[OVERDUE REMINDER] overdue_reminder_days setting is empty, no reminders will be sent",
+        );
+        await this.markRanToday();
+        return;
+      }
+
       logger.info(
-        `[OVERDUE REMINDER] Found ${overdueDebts.length} overdue debt(s)`,
+        `[OVERDUE REMINDER] Found ${overdueDebts.length} overdue debt(s). Reminder days: ${reminderDays.join(", ")}`,
       );
 
       let sentCount = 0;
       let failedCount = 0;
+      let skippedCount = 0;
 
       for (const debt of overdueDebts) {
         // @ts-ignore
         const borrower = debt.borrower;
         if (!borrower || !borrower.email) continue;
+
+        // Calculate days overdue (positive integer, 1 = first day overdue)
+        // @ts-ignore
+        const dueDate = new Date(debt.dueDate);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const daysOverdue = Math.floor(
+          // @ts-ignore
+          (today - dueDate) / (1000 * 60 * 60 * 24),
+        );
+
+        // Only send if daysOverdue is exactly one of the configured reminder days
+        if (!reminderDays.includes(daysOverdue)) {
+          logger.debug(
+            `[OVERDUE REMINDER] Debt #${debt.id} is ${daysOverdue} days overdue – not a configured reminder day, skipping`,
+          );
+          skippedCount++;
+          continue;
+        }
 
         const subject = `Overdue Payment Reminder - ${debt.name}`;
         // @ts-ignore
@@ -190,7 +222,7 @@ class OverdueReminderScheduler {
           <div style="font-family: Arial, sans-serif;">
             <h2>Overdue Payment Reminder</h2>
             <p>Dear ${borrower.name},</p>
-            <p>This is a reminder that your following debt is <strong style="color: red;">OVERDUE</strong>:</p>
+            <p>This is a reminder that your following debt is <strong style="color: red;">OVERDUE</strong> (${daysOverdue} day(s)):</p>
             <ul>
               <li><strong>Debt Name:</strong> ${debt.name}</li>
               <li><strong>Total Amount:</strong> ₱${
@@ -215,7 +247,7 @@ class OverdueReminderScheduler {
         const text = `
           Overdue Payment Reminder
           Dear ${borrower.name},
-          Your debt "${debt.name}" is OVERDUE.
+          Your debt "${debt.name}" is OVERDUE (${daysOverdue} day(s)).
           Total: ₱${
 // @ts-ignore
           debt.totalAmount.toFixed(2)} | Paid: ₱${debt.paidAmount.toFixed(2)} | Remaining: ₱${remaining}
@@ -237,7 +269,7 @@ class OverdueReminderScheduler {
           if (result.success) {
             sentCount++;
             logger.info(
-              `✅ Reminder sent to ${borrower.email} for debt #${debt.id}`,
+              `✅ Reminder sent to ${borrower.email} for debt #${debt.id} (${daysOverdue} days overdue)`,
             );
             // Optionally update debt status to 'overdue' if not already set
             if (debt.status !== "overdue") {
@@ -265,13 +297,15 @@ class OverdueReminderScheduler {
         {
           sent: sentCount,
           failed: failedCount,
+          skipped: skippedCount,
+          reminderDays,
           date: new Date().toISOString(),
         },
         "system",
       );
 
       logger.info(
-        `[OVERDUE REMINDER] Completed: ${sentCount} sent, ${failedCount} failed`,
+        `[OVERDUE REMINDER] Completed: ${sentCount} sent, ${failedCount} failed, ${skippedCount} skipped (not a reminder day)`,
       );
 
       // Mark as run today even if some failed, to avoid re-running same day
@@ -295,7 +329,7 @@ class OverdueReminderScheduler {
       isEnabled: this.isEnabled,
       isRunning: !!this.intervalId,
       checkInterval: this.checkInterval,
-      lastRun: null, // could fetch from DB if needed
+      lastRun: null,
       nextRun: this.intervalId
         ? new Date(Date.now() + this.checkInterval)
         : null,

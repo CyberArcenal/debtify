@@ -584,6 +584,14 @@ async function setSyncSettings(mode, url = "") {
   }
 }
 
+async function creditCheckValidityDays() {
+  return getInt("credit_check_validity_days", SettingType.COLLECTIONS, 30);
+}
+
+async function minCreditScoreForApproval() {
+  return getInt("min_credit_score_for_approval", SettingType.COLLECTIONS, 0); // 0 = disabled
+}
+
 
 
 // ============================================================
@@ -591,6 +599,9 @@ async function setSyncSettings(mode, url = "") {
 // ============================================================
 
 module.exports = {
+  creditCheckValidityDays,
+  minCreditScoreForApproval,
+
   syncMode,
   serverUrl,
   setSyncSettings,

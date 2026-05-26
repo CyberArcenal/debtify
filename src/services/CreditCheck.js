@@ -253,6 +253,22 @@ class CreditCheckService {
     await auditLogger.logDelete("CreditCheckLog", logId, log, user);
     console.log(`Credit check log ${logId} deleted`);
   }
+
+    /**
+ * Get the most recent credit check for a debtor
+ * @param {number} debtorId
+ * @param {import("typeorm").QueryRunner | null} qr
+ * @returns {Promise<Object|null>}
+ */
+async getLatestCreditCheck(debtorId, qr = null) {
+  const CreditCheckLog = require("../entities/CreditCheckLog");
+  const repo = this._getRepo(qr, CreditCheckLog);
+  const latest = await repo.findOne({
+    where: { debtorId },
+    order: { dateChecked: "DESC" },
+  });
+  return latest || null;
+}
 }
 
 const creditCheckService = new CreditCheckService();
