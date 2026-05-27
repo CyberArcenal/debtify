@@ -22,10 +22,10 @@ const UpdateNotifier: React.FC = () => {
 
   const handleDownload = async () => {
     if (isDownloading) return;
-    
+
     setIsDownloading(true);
     setDownloadError(null);
-    
+
     try {
       await downloadUpdate();
     } catch (err: any) {
@@ -84,7 +84,10 @@ const UpdateNotifier: React.FC = () => {
   const getStatusInfo = () => {
     switch (state) {
       case "available":
-        return { message: "New version ready to download", color: "text-blue-400" };
+        return {
+          message: "New version ready to download",
+          color: "text-blue-400",
+        };
       case "downloading":
         return { message: "Downloading update...", color: "text-blue-400" };
       case "downloaded":
@@ -99,19 +102,19 @@ const UpdateNotifier: React.FC = () => {
   // Helper to safely render HTML release notes
   const renderReleaseNotes = () => {
     if (!updateInfo?.releaseNotes) return null;
-    
+
     const notes = updateInfo.releaseNotes;
     const isHtml = /<[a-z][\s\S]*>/i.test(notes);
-    
+
     if (isHtml) {
       return (
-        <div 
+        <div
           className="release-notes-content text-sm text-[var(--text-secondary)] space-y-2"
           dangerouslySetInnerHTML={{ __html: notes }}
         />
       );
     }
-    
+
     return (
       <pre className="text-xs whitespace-pre-wrap font-sans text-[var(--text-secondary)]">
         {notes}
@@ -143,10 +146,12 @@ const UpdateNotifier: React.FC = () => {
 
             {/* Header with status badge */}
             <div className="flex items-center gap-3 mb-4">
-              <div className={`
+              <div
+                className={`
                 w-10 h-10 rounded-full flex items-center justify-center
                 ${state === "downloaded" ? "bg-green-500/20" : "bg-blue-500/20"}
-              `}>
+              `}
+              >
                 {state === "downloaded" ? (
                   <CheckCircle className="w-5 h-5 text-green-400" />
                 ) : (
@@ -181,10 +186,11 @@ const UpdateNotifier: React.FC = () => {
                     v{updateInfo.version}
                   </p>
                   <p className="text-xs text-[var(--text-tertiary)]">
-                    Released: {new Date(updateInfo.releaseDate).toLocaleDateString()}
+                    Released:{" "}
+                    {new Date(updateInfo.releaseDate).toLocaleDateString()}
                   </p>
                 </div>
-                
+
                 {updateInfo.releaseNotes && (
                   <div className="mt-3">
                     <p className="text-sm font-medium text-[var(--sidebar-text)] mb-2">
@@ -202,7 +208,9 @@ const UpdateNotifier: React.FC = () => {
             {progress && (state === "downloading" || isDownloading) && (
               <div className="mb-4 animate-in fade-in duration-300">
                 <div className="flex justify-between text-sm mb-2">
-                  <span className="text-[var(--text-secondary)]">Downloading...</span>
+                  <span className="text-[var(--text-secondary)]">
+                    Downloading...
+                  </span>
                   <span className="text-[var(--sidebar-text)] font-medium">
                     {Math.round(progress.percent)}%
                   </span>
@@ -225,7 +233,7 @@ const UpdateNotifier: React.FC = () => {
 
             {/* Action buttons */}
             <div className="flex gap-3 justify-end mt-6">
-              {state === "available" && (
+              {(state === "available" || state === "downloading") && (
                 <Button
                   onClick={handleDownload}
                   disabled={isDownloading}
@@ -235,7 +243,7 @@ const UpdateNotifier: React.FC = () => {
                     disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100
                   `}
                 >
-                  {isDownloading ? (
+                  {state === "downloading" ? (
                     <>
                       <RefreshCw className="icon-sm animate-spin" />
                       Downloading...
@@ -248,7 +256,7 @@ const UpdateNotifier: React.FC = () => {
                   )}
                 </Button>
               )}
-              
+
               {state === "downloaded" && (
                 <Button
                   onClick={handleInstall}
@@ -263,7 +271,7 @@ const UpdateNotifier: React.FC = () => {
                   Install & Restart
                 </Button>
               )}
-              
+
               <Button
                 onClick={() => setShowModal(false)}
                 className="
@@ -278,7 +286,8 @@ const UpdateNotifier: React.FC = () => {
             {/* Help text */}
             {state === "downloaded" && (
               <p className="text-xs text-[var(--text-tertiary)] mt-4 text-center">
-                The application will restart after installation to apply the update.
+                The application will restart after installation to apply the
+                update.
               </p>
             )}
           </div>
